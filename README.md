@@ -1,4 +1,4 @@
-# SimpleRecon: 3D Reconstruction Without 3D Convolutions
+# GeometryHints
 
 Internal copy of the publicly released research code for experimentation.
 
