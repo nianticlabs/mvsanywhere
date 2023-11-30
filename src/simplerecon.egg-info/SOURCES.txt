@@ -1,0 +1,8 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+src/simplerecon.egg-info/PKG-INFO
+src/simplerecon.egg-info/SOURCES.txt
+src/simplerecon.egg-info/dependency_links.txt
+src/simplerecon.egg-info/top_level.txt
