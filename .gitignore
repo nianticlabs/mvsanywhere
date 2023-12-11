@@ -13,3 +13,6 @@ results
 debug_dump
 
 .mypy_cache
+
+*.egg-info/
+*.egg

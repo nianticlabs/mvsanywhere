@@ -3,10 +3,10 @@ import setuptools
 __version__ = "0.1.0"
 
 setuptools.setup(
-    name="simplerecon",
+    name="geometryhints",
     version=__version__,
-    description="SimpleRecon Research",
+    description="GeometryHints Research",
     packages=setuptools.find_packages("src"),
     package_dir={"": "src"},
-    project_urls={"Source": "https://gitlab.nianticlabs.com/niantic-ar/research/SimpleRecon"},
+    project_urls={"Source": "https://gitlab.nianticlabs.com/niantic-ar/research/GeometryHints"},
 )
