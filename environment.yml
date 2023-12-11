@@ -1,4 +1,4 @@
-name: simplerecon
+name: geometryhints
 channels:
   - default
   - pytorch
