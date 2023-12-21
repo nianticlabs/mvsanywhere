@@ -1,4 +1,4 @@
-!!python/object:options.Options
+!!python/object:geometryhints.options.Options
 dataset_path: /mnt/res_nas/mohameds/datasets/arkit
 tuple_info_file_location: data_splits/arkit/
 dataset_scan_split_file: data_splits/arkit/scans.txt

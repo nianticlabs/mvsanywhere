@@ -1,4 +1,4 @@
-!!python/object:options.Options
+!!python/object:geometryhints.options.Options
 feature_volume_type: simple_cost_volume
 batch_size: 16
 cost_volume_aggregation: dot

@@ -267,11 +267,16 @@ def cache_model_outputs(
 
         elem_output_dict = {}
 
-        for key in outputs:
-            if outputs[key] is not None:
-                elem_output_dict[key] = outputs[key][elem_ind].unsqueeze(0)
-            else:
-                elem_output_dict[key] = None
+        # for key in outputs:
+        #     if outputs[key] is not None:
+        #         elem_output_dict[key] = outputs[key][elem_ind].unsqueeze(0)
+        #     else:
+        #         elem_output_dict[key] = None
+
+        elem_output_dict["depth_pred_s0_b1hw"] = outputs["depth_pred_s0_b1hw"][elem_ind].unsqueeze(
+            0
+        )
+        elem_output_dict["overall_mask_bhw"] = outputs["overall_mask_bhw"][elem_ind].unsqueeze(0)
 
         # include some auxiliary information
         elem_output_dict["K_full_depth_b44"] = cur_data["K_full_depth_b44"][elem_ind].unsqueeze(0)

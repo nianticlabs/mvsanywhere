@@ -13,7 +13,7 @@
         --num_workers 16 
 
     where scannet_default_train.yaml looks like: 
-        !!python/object:options.Options
+        !!python/object:geometryhints.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: $tuples_directory$
         dataset_scan_split_file: $train_split_list_location$

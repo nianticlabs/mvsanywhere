@@ -10,7 +10,7 @@
         --split test
     
     where scannet_default_test.yaml looks like: 
-        !!python/object:options.Options
+        !!python/object:geometryhints.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: SCANNET_PATH/tuples
         dataset_scan_split_file: SCANNET_PATH/scannetv2_test.txt

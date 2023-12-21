@@ -1,4 +1,4 @@
-!!python/object:options.Options
+!!python/object:geometryhints.options.Options
 dataset_path: /mnt/scannet-data-png2/
 tuple_info_file_location: data_splits/ScanNetv2/standard_split
 dataset_scan_split_file: data_splits/ScanNetv2/standard_split/scannetv2_test.txt
