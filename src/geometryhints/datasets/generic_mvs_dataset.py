@@ -71,6 +71,10 @@ class GenericMVSDataset(Dataset):
         native_depth_width=640,
         native_depth_height=480,
         image_resampling_mode=pil.BILINEAR,
+        fill_depth_hints=False,
+        load_empty_hints=False,
+        depth_hint_aug=0.0,
+        depth_hint_dir=None,
     ):
         """
         Args:
@@ -206,6 +210,11 @@ class GenericMVSDataset(Dataset):
 
         self.disable_resize_warning = False
         self.image_resampling_mode = image_resampling_mode
+
+        self.fill_depth_hints = fill_depth_hints
+        self.load_empty_hints = load_empty_hints
+        self.depth_hint_dir = depth_hint_dir
+        self.depth_hint_aug = depth_hint_aug
 
     def __len__(self):
         return len(self.frame_tuples)
@@ -412,6 +421,19 @@ class GenericMVSDataset(Dataset):
         """
         raise NotImplementedError()
 
+    def load_depth_hint(self, scan_id, frame_id, flip=False):
+        """Loads a depth hint for a frame if it exists.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+            flip: if the hint should be flipped along x.
+
+        Returns:
+            depth_hint_dict: depth hint dict.
+        """
+        raise NotImplementedError()
+
     def load_color(self, scan_id, frame_id):
         """Loads a frame's RGB file, resizes it to configured RGB size.
 
@@ -461,7 +483,7 @@ class GenericMVSDataset(Dataset):
 
         return high_res_color
 
-    def get_frame(self, scan_id, frame_id, load_depth, flip=False):
+    def get_frame(self, scan_id, frame_id, load_depth, flip=False, load_depth_hint=False):
         """Retrieves a single frame's worth of information.
 
         NOTE: Returned depth maps will use NaN for values where the depth
@@ -473,6 +495,7 @@ class GenericMVSDataset(Dataset):
             load_depth: a bool flag for loading depth maps and not dummy
                 data
             flip: flips images, depth maps, and intriniscs along x.
+            load_depth_hint: loads depth hints
         Returns:
             output_dict: a dictionary with this frame's information,
             including:
@@ -603,6 +626,16 @@ class GenericMVSDataset(Dataset):
         if self.pass_frame_id:
             output_dict["frame_id_string"] = self.get_frame_id_string(frame_id)
 
+        if load_depth_hint:
+            empty_hint = self.load_empty_hints or torch.rand(1).item() < self.depth_hint_aug
+            depth_hint_dict = self.load_depth_hint(
+                scan_id,
+                frame_id,
+                flip=flip,
+                mark_all_empty=empty_hint,
+            )
+            output_dict.update(depth_hint_dict)
+
         return output_dict
 
     def stack_src_data(self, src_data):
@@ -649,8 +682,16 @@ class GenericMVSDataset(Dataset):
 
         # assemble the dataset element by getting all data for each frame
         inputs = []
-        for _, frame_id in enumerate(frame_ids):
-            inputs += [self.get_frame(scan_id, frame_id, load_depth=True, flip=flip)]
+        for frame_ind, frame_id in enumerate(frame_ids):
+            inputs += [
+                self.get_frame(
+                    scan_id,
+                    frame_id,
+                    load_depth=True,
+                    flip=flip,
+                    load_depth_hint=(frame_ind == 0 and self.fill_depth_hints),
+                )
+            ]
 
         # cur_data is the reference frame
         cur_data, *src_data_list = inputs

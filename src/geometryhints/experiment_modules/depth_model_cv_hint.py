@@ -15,6 +15,7 @@ from geometryhints.losses import (
 from geometryhints.modules.cost_volume import (
     CostVolumeManager,
     FeatureHintVolumeManager,
+    FeatureMeshHintVolumeManager,
     FeatureVolumeManager,
 )
 from geometryhints.modules.layers import TensorFormatter
@@ -191,6 +192,8 @@ class DepthModelCVHint(pl.LightningModule):
             cost_volume_class = FeatureVolumeManager
         elif self.run_opts.feature_volume_type == "mlp_hint_feature_volume":
             cost_volume_class = FeatureHintVolumeManager
+        elif self.run_opts.feature_volume_type == "mlp_mesh_hint_feature_volume":
+            cost_volume_class = FeatureMeshHintVolumeManager
         else:
             raise ValueError(
                 f"Unrecognized option {self.run_opts.feature_volume_type} "
@@ -528,7 +531,7 @@ class DepthModelCVHint(pl.LightningModule):
         }
         return losses
 
-    def step(self, phase, batch, batch_idx):
+    def step(self, phase, batch, batch_idx, dataloader_idx):
         """Takes a training/validation step through the model.
 
         phase: "train" or "val". "train" will signal this function and
@@ -550,6 +553,10 @@ class DepthModelCVHint(pl.LightningModule):
         mask = cur_data["mask_b1hw"]
         mask_b = cur_data["mask_b_b1hw"]
 
+        depth_hint = cur_data["depth_hint_b1hw"]
+        hint_mask = cur_data["depth_hint_mask_1hw"]
+        hint_mask_b = cur_data["depth_hint_mask_b_1hw"]
+
         # estimate normals for groundtruth
         normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
         cur_data["normals_b3hw"] = normals_gt
@@ -567,7 +574,16 @@ class DepthModelCVHint(pl.LightningModule):
         # logging and validation
         with torch.inference_mode():
             # log images for train.
-            if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
+            log_images = (is_train and self.global_step % self.trainer.log_every_n_steps == 0) or (
+                not is_train and batch_idx==0
+            )
+            
+            if is_train:
+                prefix = "train_"
+            else:
+                prefix = f"val_{dataloader_idx}_"
+            
+            if log_images:
                 for i in range(4):
                     mask_i = mask[i].float().cpu()
                     depth_gt_viz_i, vmin, vmax = colormap_image(
@@ -575,6 +591,12 @@ class DepthModelCVHint(pl.LightningModule):
                     )
                     depth_pred_viz_i = colormap_image(
                         depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                    )
+                    depth_hint_viz_i = colormap_image(
+                        depth_hint[i].float().cpu(),
+                        hint_mask[i].float().cpu(),
+                        vmin=vmin,
+                        vmax=vmax,
                     )
                     cv_min_viz_i = colormap_image(
                         cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
@@ -584,24 +606,27 @@ class DepthModelCVHint(pl.LightningModule):
                     )
 
                     image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
-
+        
                     self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
                     self.logger.experiment.add_image(
-                        f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                        f"{prefix}depth_gt/{i}", depth_gt_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                        f"{prefix}depth_pred/{i}", depth_pred_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+                        f"{prefix}depth_hint/{i}", depth_hint_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
+                        f"{prefix}depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                        f"{prefix}normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
                     )
-                    self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
+                    self.logger.experiment.add_image(
+                        f"{prefix}normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                    )
+                    self.logger.experiment.add_image(f"{prefix}cv_min/{i}", cv_min_viz_i, self.global_step)
 
                 self.logger.experiment.flush()
 
@@ -642,7 +667,7 @@ class DepthModelCVHint(pl.LightningModule):
 
             for metric_name, metric_val in metrics.items():
                 self.log(
-                    f"{phase}_metrics/{metric_name}",
+                    f"{phase}_metrics/{metric_name}" if phase == "train" else f"{phase}_{dataloader_idx}_metrics/{metric_name}",
                     metric_val,
                     sync_dist=True,
                     on_step=is_train,
@@ -653,11 +678,11 @@ class DepthModelCVHint(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""
-        return self.step("train", batch, batch_idx)
+        return self.step("train", batch, batch_idx, 0)
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx):
         """Runs a validation step."""
-        return self.step("val", batch, batch_idx)
+        return self.step("val", batch, batch_idx, dataloader_idx)
 
     def configure_optimizers(self):
         """Configuring optmizers and learning rate schedules.

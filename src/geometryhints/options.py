@@ -107,6 +107,7 @@ class Options:
 
     # loads model weights
     load_weights_from_checkpoint: str = None
+    lazy_load_weights_from_checkpoint: str = None
 
     # image prior encoder
     image_encoder_name: str = "efficientnet"
@@ -212,6 +213,11 @@ class Options:
     # for backfacing meshes, this allows them to be rendered and composited with
     # an alpha to a culled-back-faces render.
     back_face_alpha: float = 0.5
+
+    ############################### Depth Hints ##############################
+    fill_depth_hints: bool = False
+    depth_hint_aug: float = 0.0
+    depth_hint_dir: str = None
 
 
 class OptionsHandler:

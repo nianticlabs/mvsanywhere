@@ -99,6 +99,10 @@ class ScannetDataset(GenericMVSDataset):
         verbose_init=True,
         min_valid_depth=1e-3,
         max_valid_depth=10,
+        fill_depth_hints=False,
+        load_empty_hints=False,
+        depth_hint_aug=0.0,
+        depth_hint_dir=None,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -121,6 +125,10 @@ class ScannetDataset(GenericMVSDataset):
             skip_frames=skip_frames,
             skip_to_frame=skip_to_frame,
             verbose_init=verbose_init,
+            fill_depth_hints=fill_depth_hints,
+            load_empty_hints=load_empty_hints,
+            depth_hint_dir=depth_hint_dir,
+            depth_hint_aug=depth_hint_aug,
         )
 
         """
@@ -567,3 +575,39 @@ class ScannetDataset(GenericMVSDataset):
         cam_T_world = np.linalg.inv(world_T_cam)
 
         return world_T_cam, cam_T_world
+
+    def load_depth_hint(self, scan_id, frame_id, flip=False, mark_all_empty=False):
+        """Loads a depth hint for a frame if it exists.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+            flip: if the hint should be flipped along x.
+            mark_all_empty: if the hint should be marked as empty.
+
+        Returns:
+            depth_hint_dict: depth hint dict.
+        """
+        depth_hint_path = os.path.join(self.depth_hint_dir, scan_id, f"{int(frame_id)}.png")
+
+        depth_hint_dict = {}
+        depth_hint_1hw = torch.tensor(read_image_file(depth_hint_path, value_scale_factor=1 / 256))
+        depth_hint_mask_1hw = (depth_hint_1hw > 0).float()
+        depth_hint_mask_b_1hw = depth_hint_1hw > 0
+        depth_hint_1hw[~depth_hint_mask_b_1hw] = torch.nan
+
+        if flip:
+            depth_hint_1hw = torch.flip(depth_hint_1hw, (-1,))
+            depth_hint_mask_1hw = torch.flip(depth_hint_mask_1hw, (-1,))
+            depth_hint_mask_b_1hw = torch.flip(depth_hint_mask_b_1hw, (-1,))
+
+        if mark_all_empty:
+            depth_hint_mask_1hw = torch.zeros_like(depth_hint_mask_1hw)
+            depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_mask_b_1hw).bool()
+            depth_hint_1hw[:] = torch.nan
+
+        depth_hint_dict["depth_hint_b1hw"] = depth_hint_1hw
+        depth_hint_dict["depth_hint_mask_1hw"] = depth_hint_mask_1hw
+        depth_hint_dict["depth_hint_mask_b_1hw"] = depth_hint_mask_b_1hw
+
+        return depth_hint_dict
