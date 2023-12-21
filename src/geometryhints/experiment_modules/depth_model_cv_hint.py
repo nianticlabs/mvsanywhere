@@ -638,6 +638,7 @@ class DepthModelCVHint(pl.LightningModule):
                     sync_dist=True,
                     on_step=is_train,
                     on_epoch=not is_train,
+                    add_dataloader_idx=False,
                 )
 
             # high_res_validation: it isn't always wise to load in high
@@ -672,6 +673,7 @@ class DepthModelCVHint(pl.LightningModule):
                     sync_dist=True,
                     on_step=is_train,
                     on_epoch=not is_train,
+                    add_dataloader_idx=False,
                 )
 
         return losses["loss"]
