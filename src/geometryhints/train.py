@@ -123,7 +123,7 @@ def main(opts):
                 num_workers=opts.num_workers,
                 pin_memory=True,
                 drop_last=True,
-                persistent_workers=True,
+                persistent_workers=False,
             )
         )
 
@@ -149,7 +149,7 @@ def main(opts):
                 num_workers=opts.num_workers,
                 pin_memory=True,
                 drop_last=True,
-                persistent_workers=True,
+                persistent_workers=False,
             )
         )
 
@@ -175,7 +175,7 @@ def main(opts):
                 num_workers=opts.num_workers,
                 pin_memory=True,
                 drop_last=True,
-                persistent_workers=True,
+                persistent_workers=False,
             )
         )
     else:
