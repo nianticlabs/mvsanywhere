@@ -120,7 +120,7 @@ def main(opts):
                 val_dataset,
                 batch_size=opts.val_batch_size,
                 shuffle=False,
-                num_workers=opts.num_workers,
+                num_workers=max(opts.num_workers // 2, 1),
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
@@ -146,7 +146,7 @@ def main(opts):
                 val_dataset,
                 batch_size=opts.val_batch_size,
                 shuffle=False,
-                num_workers=opts.num_workers,
+                num_workers=max(opts.num_workers // 2, 1),
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
@@ -172,7 +172,33 @@ def main(opts):
                 val_dataset,
                 batch_size=opts.val_batch_size,
                 shuffle=False,
-                num_workers=opts.num_workers,
+                num_workers=max(opts.num_workers // 2, 1),
+                pin_memory=True,
+                drop_last=True,
+                persistent_workers=False,
+            )
+        )
+
+        val_dataset = dataset_class(
+            opts.dataset_path,
+            split="val",
+            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
+            num_images_in_tuple=opts.num_images_in_tuple,
+            tuple_info_file_location=opts.tuple_info_file_location,
+            image_width=opts.image_width,
+            image_height=opts.image_height,
+            include_full_res_depth=opts.high_res_validation,
+            fill_depth_hints=opts.fill_depth_hints,
+            depth_hint_aug=1.0,
+            depth_hint_dir=opts.depth_hint_dir,
+        )
+
+        val_dataloaders.append(
+            DataLoader(
+                val_dataset,
+                batch_size=opts.val_batch_size,
+                shuffle=False,
+                num_workers=max(opts.num_workers // 2, 1),
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,

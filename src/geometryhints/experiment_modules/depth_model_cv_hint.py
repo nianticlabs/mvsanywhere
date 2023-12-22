@@ -284,6 +284,7 @@ class DepthModelCVHint(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
+        null_plane_sweep=False,
     ):
         """
         Computes a forward pass through the depth model.
@@ -388,6 +389,9 @@ class DepthModelCVHint(pl.LightningModule):
         # Get the final mask for plane sweep.
         # True when we have a hint and we flipped a coin and it came out to ignore.
         plane_sweep_ignore_b = torch.logical_and(available_hint_b, plane_sweep_ablate_b)
+
+        if null_plane_sweep:
+            plane_sweep_ignore_b = torch.ones_like(plane_sweep_ignore_b).bool()
 
         cur_data["plane_sweep_ignore_b"] = plane_sweep_ignore_b
 
@@ -583,7 +587,9 @@ class DepthModelCVHint(pl.LightningModule):
         cur_data, src_data = batch
 
         # forward pass through the model.
-        outputs = self(phase, cur_data, src_data)
+        outputs = self(
+            phase, cur_data, src_data, null_plane_sweep=dataloader_idx == 3 and phase != "train"
+        )
 
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
