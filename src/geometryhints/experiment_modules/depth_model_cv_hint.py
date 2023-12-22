@@ -377,6 +377,46 @@ class DepthModelCVHint(pl.LightningModule):
         # prior.
         cur_feats = self.encoder(cur_image)
 
+        # this gets a mask for those batches that have a hint
+        available_hint_b = torch.any(cur_data["depth_hint_mask_b_b1hw"].flatten(1), 1)
+        # get the chance of ablating plane sweep
+        plane_sweep_ablation_ratio = getattr(self.run_opts, "plane_sweep_ablation_ratio", 0.0)
+        # randomly ablate plane sweep for batches that have a hint. This mask is true when plane sweep should be ignored.
+        plane_sweep_ablate_b = (torch.rand(available_hint_b.shape) < plane_sweep_ablation_ratio).to(
+            available_hint_b.device
+        )
+        # Get the final mask for plane sweep.
+        # True when we have a hint and we flipped a coin and it came out to ignore.
+        plane_sweep_ignore_b = torch.logical_and(available_hint_b, plane_sweep_ablate_b)
+
+        cur_data["plane_sweep_ignore_b"] = plane_sweep_ignore_b
+
+        # if plane_sweep_ignore_b.any():
+        #     batch_size = cur_image.shape[0]
+        #     matching_height = cur_feats[self.run_opts.matching_scale].shape[-2]
+        #     matching_width = cur_feats[self.run_opts.matching_scale].shape[-1]
+
+        #     matching_cur_feats = torch.zeros(
+        #         batch_size, self.run_opts.matching_feature_dims, matching_height, matching_width
+        #     ).type_as(cur_feats[0])
+        #     matching_src_feats = torch.zeros(
+        #         batch_size,
+        #         src_image.shape[1],
+        #         self.run_opts.matching_feature_dims,
+        #         matching_height,
+        #         matching_width,
+        #     ).type_as(cur_feats[0])
+
+        #     (
+        #         matching_cur_feats[~plane_sweep_ignore_b],
+        #         matching_src_feats[~plane_sweep_ignore_b],
+        #     ) = self.compute_matching_feats(
+        #         cur_image[~plane_sweep_ignore_b],
+        #         src_image[~plane_sweep_ignore_b],
+        #         unbatched_matching_encoder_forward,
+        #     )
+        # else:
+        # instead of the above, opting to pass all images for better batchnorm
         # Compute matching features
         matching_cur_feats, matching_src_feats = self.compute_matching_feats(
             cur_image, src_image, unbatched_matching_encoder_forward
@@ -554,8 +594,8 @@ class DepthModelCVHint(pl.LightningModule):
         mask_b = cur_data["mask_b_b1hw"]
 
         depth_hint = cur_data["depth_hint_b1hw"]
-        hint_mask = cur_data["depth_hint_mask_1hw"]
-        hint_mask_b = cur_data["depth_hint_mask_b_1hw"]
+        hint_mask = cur_data["depth_hint_mask_b1hw"]
+        hint_mask_b = cur_data["depth_hint_mask_b_b1hw"]
 
         # estimate normals for groundtruth
         normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
@@ -575,14 +615,14 @@ class DepthModelCVHint(pl.LightningModule):
         with torch.inference_mode():
             # log images for train.
             log_images = (is_train and self.global_step % self.trainer.log_every_n_steps == 0) or (
-                not is_train and batch_idx==0
+                not is_train and batch_idx == 0
             )
-            
+
             if is_train:
                 prefix = "train_"
             else:
                 prefix = f"val_{dataloader_idx}_"
-            
+
             if log_images:
                 for i in range(4):
                     mask_i = mask[i].float().cpu()
@@ -606,7 +646,7 @@ class DepthModelCVHint(pl.LightningModule):
                     )
 
                     image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
-        
+
                     self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
                     self.logger.experiment.add_image(
                         f"{prefix}depth_gt/{i}", depth_gt_viz_i, self.global_step
@@ -626,7 +666,9 @@ class DepthModelCVHint(pl.LightningModule):
                     self.logger.experiment.add_image(
                         f"{prefix}normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
                     )
-                    self.logger.experiment.add_image(f"{prefix}cv_min/{i}", cv_min_viz_i, self.global_step)
+                    self.logger.experiment.add_image(
+                        f"{prefix}cv_min/{i}", cv_min_viz_i, self.global_step
+                    )
 
                 self.logger.experiment.flush()
 
@@ -668,7 +710,9 @@ class DepthModelCVHint(pl.LightningModule):
 
             for metric_name, metric_val in metrics.items():
                 self.log(
-                    f"{phase}_metrics/{metric_name}" if phase == "train" else f"{phase}_{dataloader_idx}_metrics/{metric_name}",
+                    f"{phase}_metrics/{metric_name}"
+                    if phase == "train"
+                    else f"{phase}_{dataloader_idx}_metrics/{metric_name}",
                     metric_val,
                     sync_dist=True,
                     on_step=is_train,

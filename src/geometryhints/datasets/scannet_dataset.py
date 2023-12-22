@@ -607,7 +607,7 @@ class ScannetDataset(GenericMVSDataset):
             depth_hint_1hw[:] = torch.nan
 
         depth_hint_dict["depth_hint_b1hw"] = depth_hint_1hw
-        depth_hint_dict["depth_hint_mask_1hw"] = depth_hint_mask_1hw
-        depth_hint_dict["depth_hint_mask_b_1hw"] = depth_hint_mask_b_1hw
+        depth_hint_dict["depth_hint_mask_b1hw"] = depth_hint_mask_1hw
+        depth_hint_dict["depth_hint_mask_b_b1hw"] = depth_hint_mask_b_1hw
 
         return depth_hint_dict

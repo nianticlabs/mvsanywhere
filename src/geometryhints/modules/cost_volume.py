@@ -1860,17 +1860,27 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
         )
 
         prev_mesh_hint_depth_mask_b1hw = F.interpolate(
-            cv_depth_hint_dict["depth_hint_mask_1hw"],
+            cv_depth_hint_dict["depth_hint_mask_b1hw"],
             size=depth_planes_bdhw.shape[-2:],
             mode="nearest",
         ).bool()
+
+        # handle plane sweep ignore
+        plane_sweep_ignore_b = cv_depth_hint_dict["plane_sweep_ignore_b"]
+        nuke_mask_b = torch.ones_like(plane_sweep_ignore_b)
+        nuke_mask_b[plane_sweep_ignore_b] = 0.0
+        nuke_mask_b = nuke_mask_b.view(nuke_mask_b.shape[0], 1, 1, 1)
+
+        frame_pose_dist_bkhw = frame_pose_dist_bkhw * nuke_mask_b
+        r_measure_bkhw = r_measure_bkhw * nuke_mask_b
+        t_measure_bkhw = t_measure_bkhw * nuke_mask_b
 
         all_dps = []
         # Intialize the cost volume and the countsx
         # loop through depth planes
         for depth_id in range(self.num_depth_bins):
             # current depth plane
-            depth_plane_b1hw = depth_planes_bdhw[:, depth_id].unsqueeze(1)
+            depth_plane_b1hw = depth_planes_bdhw[:, depth_id].unsqueeze(1).clone()
 
             current_hint_map_b1hw = torch.abs(prev_mesh_hint_depth_b1hw - depth_plane_b1hw)
             current_hint_map_b1hw[~prev_mesh_hint_depth_mask_b1hw] = -1
@@ -2008,6 +2018,15 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                 1,
                 3,
             )
+
+            # handle plane sweep ignore
+            combined_visual_features_bchw = combined_visual_features_bchw * nuke_mask_b
+            mask = mask * nuke_mask_b
+            depths *= nuke_mask_b
+            depth_plane_b1hw *= nuke_mask_b
+            dot_product_bkhw *= nuke_mask_b
+            ray_angle_bkhw *= nuke_mask_b
+            all_rays_bchw *= nuke_mask_b
 
             # concat all input visual and metadata features.
             mlp_input_features_bchw = torch.cat(
