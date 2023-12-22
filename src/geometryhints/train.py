@@ -189,7 +189,7 @@ def main(opts):
             image_height=opts.image_height,
             include_full_res_depth=opts.high_res_validation,
             fill_depth_hints=opts.fill_depth_hints,
-            depth_hint_aug=1.0,
+            depth_hint_aug=0.0,
             depth_hint_dir=opts.depth_hint_dir,
         )
 
