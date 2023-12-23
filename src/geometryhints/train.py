@@ -248,7 +248,7 @@ def main(opts):
         save_top_k=1,
         verbose=True,
         monitor="val_0_metrics/a5",
-        mode="min",
+        mode="max",
     )
 
     # keep track of changes in learning rate
