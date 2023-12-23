@@ -124,7 +124,6 @@ def main(opts):
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
-                prefetch_factor=1,
             )
         )
 
@@ -151,7 +150,6 @@ def main(opts):
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
-                prefetch_factor=1,
             )
         )
 
@@ -178,7 +176,6 @@ def main(opts):
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
-                prefetch_factor=1,
             )
         )
 
@@ -205,7 +202,6 @@ def main(opts):
                 pin_memory=True,
                 drop_last=True,
                 persistent_workers=False,
-                prefetch_factor=1,
             )
         )
     else:
