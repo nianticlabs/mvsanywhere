@@ -591,7 +591,7 @@ class ScannetDataset(GenericMVSDataset):
         depth_hint_path = os.path.join(self.depth_hint_dir, scan_id, f"{int(frame_id)}.png")
 
         depth_hint_dict = {}
-        depth_hint_1hw = torch.tensor(read_image_file(depth_hint_path, value_scale_factor=1 / 256))
+        depth_hint_1hw = read_image_file(depth_hint_path, value_scale_factor=1 / 256)
         depth_hint_mask_1hw = (depth_hint_1hw > 0).float()
         depth_hint_mask_b_1hw = depth_hint_1hw > 0
         depth_hint_1hw[~depth_hint_mask_b_1hw] = torch.nan

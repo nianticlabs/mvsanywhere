@@ -114,6 +114,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
@@ -194,11 +195,22 @@ def main(opts):
     # used when training, saved internally as part of hparams in the checkpoint.
     # You can change this at inference by passing in 'opts=opts,' but there
     # be dragons if you're not careful.
-    model = DepthModel.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
+
+
+    if opts.model_type == "depth_model":
+        model_class_to_use = DepthModel
+    elif opts.model_type == "cv_hint_depth_model":
+        model_class_to_use = DepthModelCVHint
+    else:
+        raise ValueError(f"Unknown model type: {opts.model_type}")
+    
+    model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
     if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
         model.cost_volume = model.cost_volume.to_fast()
 
     model = model.cuda().eval()
+    
+    model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
 
     # setting up overall result averagers
     all_frame_metrics = None
@@ -236,6 +248,10 @@ def main(opts):
                 image_width=opts.image_width,
                 image_height=opts.image_height,
                 pass_frame_id=True,
+                fill_depth_hints=opts.fill_depth_hints,
+                depth_hint_aug=opts.depth_hint_aug,
+                depth_hint_dir=opts.depth_hint_dir,
+                load_empty_hints=opts.load_empty_hint,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -268,6 +284,7 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
+                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()

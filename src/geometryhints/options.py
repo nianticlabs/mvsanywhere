@@ -219,6 +219,8 @@ class Options:
     depth_hint_aug: float = 0.0
     depth_hint_dir: str = None
     plane_sweep_ablation_ratio: float = 0.0
+    load_empty_hint: bool = False
+    null_plane_sweep: bool = False
 
 
 class OptionsHandler:

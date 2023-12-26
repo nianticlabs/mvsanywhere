@@ -17,7 +17,7 @@ num_workers: 12
 precision: 16
 random_seed: 0
 model_type: cv_hint_depth_model
-lr_steps: [50000, 60000]
+lr_steps: [70000, 80000]
 
 fill_depth_hints: True
 depth_hint_aug: 0.5
