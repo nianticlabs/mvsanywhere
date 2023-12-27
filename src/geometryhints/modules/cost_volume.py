@@ -1871,9 +1871,10 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
         nuke_mask_b[plane_sweep_ignore_b] = 0.0
         nuke_mask_b = nuke_mask_b.view(nuke_mask_b.shape[0], 1, 1, 1)
 
-        frame_pose_dist_bkhw = frame_pose_dist_bkhw * nuke_mask_b
-        r_measure_bkhw = r_measure_bkhw * nuke_mask_b
-        t_measure_bkhw = t_measure_bkhw * nuke_mask_b
+        if not nuke_mask_b.all():
+            frame_pose_dist_bkhw = frame_pose_dist_bkhw * nuke_mask_b
+            r_measure_bkhw = r_measure_bkhw * nuke_mask_b
+            t_measure_bkhw = t_measure_bkhw * nuke_mask_b
 
         all_dps = []
         # Intialize the cost volume and the countsx
@@ -2019,14 +2020,15 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                 3,
             )
 
-            # handle plane sweep ignore
-            combined_visual_features_bchw = combined_visual_features_bchw * nuke_mask_b
-            mask = mask * nuke_mask_b
-            depths *= nuke_mask_b
-            depth_plane_b1hw *= nuke_mask_b
-            dot_product_bkhw *= nuke_mask_b
-            ray_angle_bkhw *= nuke_mask_b
-            all_rays_bchw *= nuke_mask_b
+            if not nuke_mask_b.all():
+                # handle plane sweep ignore
+                combined_visual_features_bchw = combined_visual_features_bchw * nuke_mask_b
+                mask = mask * nuke_mask_b
+                depths *= nuke_mask_b
+                depth_plane_b1hw *= nuke_mask_b
+                dot_product_bkhw *= nuke_mask_b
+                ray_angle_bkhw *= nuke_mask_b
+                all_rays_bchw *= nuke_mask_b
 
             # concat all input visual and metadata features.
             mlp_input_features_bchw = torch.cat(
