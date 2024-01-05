@@ -125,13 +125,14 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
                 os.path.join(output_path, f"{frame_id}_gt_depth.png")
             )
 
-        lowest_cost_3hw = colormap_image(
-            outputs["lowest_cost_bhw"][elem_ind].unsqueeze(0), vmin=batch_vmin, vmax=batch_vmax
-        )
-        pil_image = Image.fromarray(
-            np.uint8(lowest_cost_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
-        )
-        pil_image.save(os.path.join(output_path, f"{frame_id}_lowest_cost_pred.png"))
+        if "lowest_cost_bhw" in outputs:
+            lowest_cost_3hw = colormap_image(
+                outputs["lowest_cost_bhw"][elem_ind].unsqueeze(0), vmin=batch_vmin, vmax=batch_vmax
+            )
+            pil_image = Image.fromarray(
+                np.uint8(lowest_cost_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
+            )
+            pil_image.save(os.path.join(output_path, f"{frame_id}_lowest_cost_pred.png"))
 
         depth_3hw = colormap_image(
             outputs["depth_pred_s0_b1hw"][elem_ind], vmin=batch_vmin, vmax=batch_vmax
