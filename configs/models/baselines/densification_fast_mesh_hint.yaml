@@ -20,4 +20,4 @@ model_type: densification
 lr_steps: [70000, 80000]
 
 fill_depth_hints: True
-depth_hint_aug: 1.0
+depth_hint_aug: 0.0
