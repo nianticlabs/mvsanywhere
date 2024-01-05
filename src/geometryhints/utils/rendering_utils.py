@@ -1,6 +1,7 @@
+import torch
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings
 from pytorch3d.utils import cameras_from_opencv_projection
-import torch
+
 
 class PyTorch3DMeshDepthRenderer:
     def __init__(self, height=192, width=256) -> None:
@@ -8,10 +9,7 @@ class PyTorch3DMeshDepthRenderer:
         self.width = width
 
         self.raster_settings = RasterizationSettings(
-            image_size=(height, width),
-            blur_radius=0.0,
-            faces_per_pixel=1,
-            bin_size=0
+            image_size=(height, width), blur_radius=0.0, faces_per_pixel=1, bin_size=0
         )
 
     def render(self, mesh, cam_T_world_b44, K_b44):

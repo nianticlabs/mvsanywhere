@@ -4,6 +4,8 @@ from pathlib import Path
 import cv2 as cv2
 import numpy as np
 import scipy
+import scipy.interpolate
+import scipy.ndimage
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -20,8 +22,6 @@ from geometryhints.utils.metrics_utils import (
     compute_depth_metrics_batched,
 )
 from geometryhints.utils.visualization_utils import quick_viz_export
-import scipy.ndimage
-import scipy.interpolate
 
 
 def fillMissingValues(
@@ -34,16 +34,16 @@ def fillMissingValues(
 
     # array of (number of points, 2) containing the x,y coordinates of the valid values only
     xx, yy = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
-    xym = np.vstack( (np.ravel(xx[mask]), np.ravel(yy[mask])) ).T
+    xym = np.vstack((np.ravel(xx[mask]), np.ravel(yy[mask]))).T
 
     # the valid values in the first, second, as 1D arrays (in the same order as their coordinates in xym)
-    data0 = np.ravel( data[:,:][mask] )
+    data0 = np.ravel(data[:, :][mask])
 
     # interpolate
-    interp0 = scipy.interpolate.LinearNDInterpolator( xym, data0 )
+    interp0 = scipy.interpolate.LinearNDInterpolator(xym, data0)
 
     # reshape
-    result0 = interp0(np.ravel(xx), np.ravel(yy)).reshape( xx.shape )
+    result0 = interp0(np.ravel(xx), np.ravel(yy)).reshape(xx.shape)
 
     return result0
 
@@ -58,8 +58,6 @@ def main(opts):
     results_path = os.path.join(
         opts.output_base_path, opts.name, opts.dataset, opts.frame_tuple_type
     )
-
-
 
     # set up directories for quick depth visualizations
     if opts.dump_depth_visualization:
@@ -92,8 +90,6 @@ def main(opts):
 
         # loop over scans
         for scan in tqdm(scans):
-
-
             # set up dataset with current scan
             dataset = dataset_class(
                 opts.dataset_path,
@@ -146,8 +142,9 @@ def main(opts):
                 outputs = {}
 
                 filled_depth_maps = []
-                for rendered_depth_ind, rendered_depth_1hw in enumerate(cur_data["depth_hint_b1hw"]):
-
+                for rendered_depth_ind, rendered_depth_1hw in enumerate(
+                    cur_data["depth_hint_b1hw"]
+                ):
                     # fill holes if the mesh is empty
                     if not cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].all():
                         rendered_depth_hw = fillMissingValues(
@@ -158,7 +155,7 @@ def main(opts):
                         )
                     else:
                         filled_depth_maps.append(rendered_depth_1hw.unsqueeze(0))
-                    
+
                 outputs["depth_pred_s0_b1hw"] = torch.cat(filled_depth_maps, dim=0)
 
                 end_time.record()

@@ -1954,7 +1954,9 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                     self.matching_height,
                     self.matching_width,
                 )
-                bounds_mask_bkhw = self.get_mask(pix_coords_bk2hw)#torch.any(self.get_mask(pix_coords_bk2hw), dim=1)
+                bounds_mask_bkhw = self.get_mask(
+                    pix_coords_bk2hw
+                )  # torch.any(self.get_mask(pix_coords_bk2hw), dim=1)
                 overall_mask_bhw = torch.logical_and(depth_mask_bkhw, bounds_mask_bkhw)
 
             # compute rays to world points for current frame

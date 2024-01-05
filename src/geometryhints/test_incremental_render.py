@@ -111,8 +111,11 @@
 import os
 from pathlib import Path
 
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from pytorch3d.renderer import TexturesVertex
+from pytorch3d.structures import Meshes
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
@@ -129,11 +132,6 @@ from geometryhints.utils.metrics_utils import (
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 from geometryhints.utils.visualization_utils import quick_viz_export
 
-
-from pytorch3d.renderer import TexturesVertex
-from pytorch3d.structures import Meshes
-
-import pytorch_lightning as pl
 
 def main(opts):
     # get dataset
@@ -208,13 +206,13 @@ def main(opts):
         model_class_to_use = DepthModelCVHint
     else:
         raise ValueError(f"Unknown model type: {opts.model_type}")
-    
+
     model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
     if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
         model.cost_volume = model.cost_volume.to_fast()
 
     model = model.cuda().eval()
-    
+
     model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
 
     # setting up overall result averagers
@@ -284,44 +282,43 @@ def main(opts):
                         verts=[torch.tensor(scene_trimesh_mesh.vertices).float()],
                         faces=[torch.tensor(scene_trimesh_mesh.faces).float()],
                         textures=TexturesVertex(
-                            torch.tensor(scene_trimesh_mesh.visual.vertex_colors).unsqueeze(0).float() / 255.0
+                            torch.tensor(scene_trimesh_mesh.visual.vertex_colors)
+                            .unsqueeze(0)
+                            .float()
+                            / 255.0
                         ),
                     )
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s0_b44"].clone()
-                    K_b44[:,0] /= 256
-                    K_b44[:,1] /= 192
-                    rendered_depth_b1hw = mesh_renderer.render(mesh, cur_data["cam_T_world_b44"].clone(), K_b44)
+                    K_b44[:, 0] /= 256
+                    K_b44[:, 1] /= 192
+                    rendered_depth_b1hw = mesh_renderer.render(
+                        mesh, cur_data["cam_T_world_b44"].clone(), K_b44
+                    )
                     cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
 
                     cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                    
+
                     # print(cur_data["depth_hint_mask_b1hw"].mean())
                     if cur_data["depth_hint_mask_b1hw"].mean() < 0.8:
                         cur_data["depth_hint_b1hw"][:] = float("nan")
                         cur_data["depth_hint_mask_b1hw"][:] = 0.0
                         cur_data["depth_hint_mask_b_b1hw"][:] = False
-                    
+
                     del mesh
-                    
 
                     # cur_data["depth_hint_b1hw"][:,:,:,170:] = torch.nan
                     # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                    
+
                 else:
                     # load empty hints
-                    cur_data["depth_hint_b1hw"] = torch.zeros_like(
-                        cur_data["depth_b1hw"]
-                    )
+                    cur_data["depth_hint_b1hw"] = torch.zeros_like(cur_data["depth_b1hw"])
                     cur_data["depth_hint_b1hw"][:] = float("nan")
-                    cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(
-                        cur_data["depth_hint_b1hw"]
-                    )               
+                    cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
-
 
                 depth_gt = cur_data["full_res_depth_b1hw"]
 
@@ -401,7 +398,7 @@ def main(opts):
                             mode="nearest",
                         ).bool()
                         overall_mask_b1hw = overall_mask_bkhw.sum(1, keepdim=True) > 2
-                        
+
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 
                     # fuse the raw best guess depths from the cost volume, off
@@ -519,7 +516,6 @@ def main(opts):
 if __name__ == "__main__":
     # don't need grad for test.
     torch.set_grad_enabled(False)
-    
 
     # get an instance of options and load it with config file(s) and cli args.
     option_handler = options.OptionsHandler()
@@ -532,6 +528,5 @@ if __name__ == "__main__":
     if opts.gpus == 0:
         print("Setting precision to 32 bits since --gpus is set to 0.")
         opts.precision = 32
-
 
     main(opts)

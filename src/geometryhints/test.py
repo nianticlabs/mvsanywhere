@@ -202,13 +202,13 @@ def main(opts):
         model_class_to_use = DepthModelCVHint
     else:
         raise ValueError(f"Unknown model type: {opts.model_type}")
-    
+
     model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
     if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
         model.cost_volume = model.cost_volume.to_fast()
 
     model = model.cuda().eval()
-    
+
     model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
 
     # setting up overall result averagers
