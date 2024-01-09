@@ -127,7 +127,7 @@ from geometryhints.utils.metrics_utils import (
     ResultsAverager,
     compute_depth_metrics_batched,
 )
-from geometryhints.utils.model_utils import get_model_class
+from geometryhints.utils.model_utils import get_model_class, load_model_inference
 from geometryhints.utils.visualization_utils import quick_viz_export
 
 
@@ -199,9 +199,7 @@ def main(opts):
     # be dragons if you're not careful.
 
     model_class_to_use = get_model_class(opts)
-
     model = load_model_inference(opts, model_class_to_use)
-
     model = model.cuda().eval()
 
     model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio

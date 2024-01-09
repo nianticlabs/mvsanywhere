@@ -202,9 +202,7 @@ def main(opts):
     # be dragons if you're not careful.
 
     model_class_to_use = get_model_class(opts)
-
     model = load_model_inference(opts, model_class_to_use)
-
     model = model.cuda().eval()
 
     model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
