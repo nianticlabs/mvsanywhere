@@ -111,13 +111,15 @@
 import os
 from pathlib import Path
 
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from pytorch3d.renderer import TexturesVertex
+from pytorch3d.structures import Meshes
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
-from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 from geometryhints.tools import fusers_helper
@@ -128,6 +130,7 @@ from geometryhints.utils.metrics_utils import (
     compute_depth_metrics_batched,
 )
 from geometryhints.utils.model_utils import get_model_class, load_model_inference
+from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 from geometryhints.utils.visualization_utils import quick_viz_export
 
 
@@ -240,7 +243,7 @@ def main(opts):
                 image_width=opts.image_width,
                 image_height=opts.image_height,
                 pass_frame_id=True,
-                fill_depth_hints=opts.fill_depth_hints,
+                fill_depth_hints=False,
                 depth_hint_aug=opts.depth_hint_aug,
                 depth_hint_dir=opts.depth_hint_dir,
                 load_empty_hints=opts.load_empty_hint,
@@ -257,17 +260,63 @@ def main(opts):
             # initialize scene averager
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
 
+            mesh_renderer = PyTorch3DMeshDepthRenderer(height=192, width=256)
             for batch_ind, batch in enumerate(tqdm(dataloader)):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
                 src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
 
+                # get mesh render for hint, but after 12 keyframes have passed.
+                if batch_ind * opts.batch_size > 12:
+                    scene_trimesh_mesh = fuser.get_mesh(convert_to_trimesh=True)
+                    mesh = Meshes(
+                        verts=[torch.tensor(scene_trimesh_mesh.vertices).float()],
+                        faces=[torch.tensor(scene_trimesh_mesh.faces).float()],
+                        textures=TexturesVertex(
+                            torch.tensor(scene_trimesh_mesh.visual.vertex_colors)
+                            .unsqueeze(0)
+                            .float()
+                            / 255.0
+                        ),
+                    )
+                    # renderer expects normalized intrinsics.
+                    K_b44 = cur_data["K_s0_b44"].clone()
+                    K_b44[:, 0] /= 256
+                    K_b44[:, 1] /= 192
+                    rendered_depth_b1hw = mesh_renderer.render(
+                        mesh, cur_data["cam_T_world_b44"].clone(), K_b44
+                    )
+                    cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
+
+                    cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
+                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+
+                    # print(cur_data["depth_hint_mask_b1hw"].mean())
+                    if cur_data["depth_hint_mask_b1hw"].mean() < 0.8:
+                        cur_data["depth_hint_b1hw"][:] = float("nan")
+                        cur_data["depth_hint_mask_b1hw"][:] = 0.0
+                        cur_data["depth_hint_mask_b_b1hw"][:] = False
+
+                    del mesh
+
+                    # cur_data["depth_hint_b1hw"][:,:,:,170:] = torch.nan
+                    # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                    # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+
+                else:
+                    # load empty hints
+                    cur_data["depth_hint_b1hw"] = torch.zeros_like(cur_data["depth_b1hw"])
+                    cur_data["depth_hint_b1hw"][:] = float("nan")
+                    cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
+                    cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
+
                 depth_gt = cur_data["full_res_depth_b1hw"]
 
                 # run to get output, also measure time
                 start_time.record()
-                # use unbatched (looping) matching encoder image forward passes
+                # use unbatched (locur_data["depth_hint_b1hw"]oping) matching encoder image forward passes
                 # for numerically stable testing. If opts.fast_cost_volume, then
                 # batch.
                 outputs = model(
@@ -325,13 +374,22 @@ def main(opts):
                     # mask predicted depths when no vaiid MVS information
                     # exists, off by default
                     if opts.mask_pred_depth:
-                        overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
+                        # overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
 
-                        overall_mask_b1hw = F.interpolate(
-                            overall_mask_b1hw,
+                        # overall_mask_b1hw = F.interpolate(
+                        #     overall_mask_b1hw,
+                        #     size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                        #     mode="nearest",
+                        # ).bool()
+
+                        overall_mask_bkhw = outputs["overall_mask_bhw"].cuda().float()
+
+                        overall_mask_bkhw = F.interpolate(
+                            overall_mask_bkhw,
                             size=(depth_gt.shape[-2], depth_gt.shape[-1]),
                             mode="nearest",
                         ).bool()
+                        overall_mask_b1hw = overall_mask_bkhw.sum(1, keepdim=True) > 2
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 

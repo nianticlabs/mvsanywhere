@@ -12,7 +12,12 @@ from geometryhints.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from geometryhints.modules.cost_volume import CostVolumeManager, FeatureVolumeManager
+from geometryhints.modules.cost_volume import (
+    CostVolumeManager,
+    FeatureHintVolumeManager,
+    FeatureMeshHintVolumeManager,
+    FeatureVolumeManager,
+)
 from geometryhints.modules.layers import TensorFormatter
 from geometryhints.modules.networks import (
     CVEncoder,
@@ -33,8 +38,8 @@ from geometryhints.utils.visualization_utils import colormap_image
 logger = logging.getLogger(__name__)
 
 
-class DepthModel(pl.LightningModule):
-    """Class for SimpleRecon depth estimators.
+class DensificationModel(pl.LightningModule):
+    """Class for rendered depth densification.
 
     This class handles training and inference for SimpleRecon models.
 
@@ -100,7 +105,7 @@ class DepthModel(pl.LightningModule):
             that resolution.
         opts.depth_decoder_name: the type of decoder to use for decoding
             features into depth. We're using a U-Net++ like architure in
-            geometryhints.
+            SimpleRecon.
         opts.image_width, opts.image_height: incoming image width and
             height.
         opts.loss_type: type of loss to use at multiple scales. Final
@@ -135,11 +140,11 @@ class DepthModel(pl.LightningModule):
         else:
             raise ValueError("Unrecognized option for image encoder type!")
 
-        # iniitalize the first half of the U-Net, encoding the cost volume
+        # iniitalize the first half of the U-Net, encoding the depth hint
         # and image prior image feautres
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             self.cost_volume_net = CVEncoder(
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                num_ch_cv=1,  # one channel for depth hint
                 num_ch_enc=self.encoder.num_ch_enc[self.run_opts.matching_scale :],
                 num_ch_outs=[64, 128, 256, 384],
             )
@@ -180,93 +185,7 @@ class DepthModel(pl.LightningModule):
             self.run_opts.image_width // 2,
         )
 
-        # what type of cost volume are we using?
-        if self.run_opts.feature_volume_type == "simple_cost_volume":
-            cost_volume_class = CostVolumeManager
-        elif self.run_opts.feature_volume_type == "mlp_feature_volume":
-            cost_volume_class = FeatureVolumeManager
-        else:
-            raise ValueError(
-                f"Unrecognized option {self.run_opts.feature_volume_type} "
-                f"for feature volume type!"
-            )
-
-        self.cost_volume = cost_volume_class(
-            matching_height=self.run_opts.image_height // (2 ** (self.run_opts.matching_scale + 1)),
-            matching_width=self.run_opts.image_width // (2 ** (self.run_opts.matching_scale + 1)),
-            num_depth_bins=self.run_opts.matching_num_depth_bins,
-            matching_dim_size=self.run_opts.matching_feature_dims,
-            num_source_views=opts.model_num_views - 1,
-        )
-
-        # init the matching encoder. resnet is fast and is the default for
-        # results in the paper, fpn is more accurate but much slower.
-        if "resnet" == self.run_opts.matching_encoder_type:
-            self.matching_model = ResnetMatchingEncoder(18, self.run_opts.matching_feature_dims)
-        elif "unet_encoder" == self.run_opts.matching_encoder_type:
-            self.matching_model = UNetMatchingEncoder()
-        else:
-            raise ValueError(
-                f"Unrecognized option {self.run_opts.matching_encoder_type} "
-                f"for matching encoder type!"
-            )
-
         self.tensor_formatter = TensorFormatter()
-
-    def compute_matching_feats(
-        self,
-        cur_image,
-        src_image,
-        unbatched_matching_encoder_forward,
-    ):
-        """
-        Computes matching features for the current image (reference) and
-        source images.
-
-        Unfortunately on this PyTorch branch we've noticed that the output
-        of our ResNet matching encoder is not numerically consistent when
-        batching. While this doesn't affect training (the changes are too
-        small), it does change and will affect test scores. To combat this
-        we disable batching through this module when testing and instead
-        loop through images to compute their feautures. This is stable and
-        produces exact repeatable results.
-
-        Args:
-            cur_image: image tensor of shape B3HW for the reference image.
-            src_image: images tensor of shape BM3HW for the source images.
-            unbatched_matching_encoder_forward: disable batching and loops
-                through iamges to compute feaures.
-        Returns:
-            matching_cur_feats: tensor of matching features of size bchw for
-                the reference current image.
-            matching_src_feats: tensor of matching features of size BMcHW
-                for the source images.
-        """
-        if unbatched_matching_encoder_forward:
-            all_frames_bm3hw = torch.cat([cur_image.unsqueeze(1), src_image], dim=1)
-            batch_size, num_views = all_frames_bm3hw.shape[:2]
-            all_frames_B3hw = tensor_bM_to_B(all_frames_bm3hw)
-            matching_feats = [self.matching_model(f) for f in all_frames_B3hw.split(1, dim=0)]
-
-            matching_feats = torch.cat(matching_feats, dim=0)
-            matching_feats = tensor_B_to_bM(
-                matching_feats,
-                batch_size=batch_size,
-                num_views=num_views,
-            )
-
-        else:
-            # Compute matching features and batch them to reduce variance from
-            # batchnorm when training.
-            matching_feats = self.tensor_formatter(
-                torch.cat([cur_image.unsqueeze(1), src_image], dim=1),
-                apply_func=self.matching_model,
-            )
-
-        matching_cur_feats = matching_feats[:, 0]
-        matching_src_feats = matching_feats[:, 1:].contiguous()
-
-        return matching_cur_feats, matching_src_feats
 
     def forward(
         self,
@@ -336,9 +255,6 @@ class DepthModel(pl.LightningModule):
 
         # get all tensors from the batch dictioanries.
         cur_image = cur_data["image_b3hw"]
-        src_image = src_data["image_b3hw"]
-        src_K = src_data[f"K_s{self.run_opts.matching_scale}_b44"]
-        cur_invK = cur_data[f"invK_s{self.run_opts.matching_scale}_b44"]
         src_cam_T_world = src_data["cam_T_world_b44"]
         src_world_T_cam = src_data["world_T_cam_b44"]
 
@@ -363,48 +279,26 @@ class DepthModel(pl.LightningModule):
         if flip:
             # flip all images.
             cur_image = torch.flip(cur_image, (-1,))
-            src_image = torch.flip(src_image, (-1,))
 
         # Compute image features for the current view. Used for a strong image
         # prior.
         cur_feats = self.encoder(cur_image)
 
-        # Compute matching features
-        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
-            cur_image, src_image, unbatched_matching_encoder_forward
+        hint_to_use_b1hw = torch.ones_like(cur_data["depth_hint_b1hw"])
+        hint_to_use_b1hw[cur_data["depth_hint_mask_b_b1hw"].bool()] = cur_data["depth_hint_b1hw"][
+            cur_data["depth_hint_mask_b_b1hw"].bool()
+        ]
+
+        hint_to_use_b1hw = F.interpolate(
+            hint_to_use_b1hw,
+            size=cur_feats[self.run_opts.matching_scale].shape[-2:],
+            mode="nearest",
         )
-
-        if flip:
-            # now (carefully) flip matching features back for correct MVS.
-            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
-            matching_src_feats = torch.flip(matching_src_feats, (-1,))
-
-        # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(self.run_opts.min_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-        max_depth = torch.tensor(self.run_opts.max_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-
-        # Compute the cost volume. Should be size bdhw.
-        cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
-            cur_feats=matching_cur_feats,
-            src_feats=matching_src_feats,
-            src_extrinsics=src_cam_T_cur_cam,
-            src_poses=cur_cam_T_src_cam,
-            src_Ks=src_K,
-            cur_invK=cur_invK,
-            min_depth=min_depth,
-            max_depth=max_depth,
-            return_mask=return_mask,
-        )
-
-        if flip:
-            # OK, we've computed the cost volume, now we need to flip the cost
-            # volume to have it aligned with flipped image prior features
-            cost_volume = torch.flip(cost_volume, (-1,))
 
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
-                cost_volume,
+                hint_to_use_b1hw,
                 cur_feats[self.run_opts.matching_scale :],
             )
             cur_feats = cur_feats[: self.run_opts.matching_scale] + cost_volume_features
@@ -426,8 +320,10 @@ class DepthModel(pl.LightningModule):
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
-        depth_outputs["lowest_cost_bhw"] = lowest_cost
-        depth_outputs["overall_mask_bhw"] = overall_mask_bhw
+        depth_outputs["lowest_cost_bhw"] = torch.zeros_like(
+            depth_outputs["depth_pred_s0_b1hw"]
+        ).squeeze(1)
+        depth_outputs["overall_mask_bhw"] = torch.zeros_like(depth_outputs["depth_pred_s0_b1hw"])
 
         return depth_outputs
 
@@ -522,7 +418,7 @@ class DepthModel(pl.LightningModule):
         }
         return losses
 
-    def step(self, phase, batch, batch_idx):
+    def step(self, phase, batch, batch_idx, dataloader_idx):
         """Takes a training/validation step through the model.
 
         phase: "train" or "val". "train" will signal this function and
@@ -534,7 +430,9 @@ class DepthModel(pl.LightningModule):
         cur_data, src_data = batch
 
         # forward pass through the model.
-        outputs = self(phase, cur_data, src_data)
+        outputs = self(
+            phase, cur_data, src_data, null_plane_sweep=dataloader_idx == 3 and phase != "train"
+        )
 
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
@@ -543,6 +441,10 @@ class DepthModel(pl.LightningModule):
         depth_gt = cur_data["depth_b1hw"]
         mask = cur_data["mask_b1hw"]
         mask_b = cur_data["mask_b_b1hw"]
+
+        depth_hint = cur_data["depth_hint_b1hw"]
+        hint_mask = cur_data["depth_hint_mask_b1hw"]
+        hint_mask_b = cur_data["depth_hint_mask_b_b1hw"]
 
         # estimate normals for groundtruth
         normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
@@ -561,7 +463,16 @@ class DepthModel(pl.LightningModule):
         # logging and validation
         with torch.inference_mode():
             # log images for train.
-            if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
+            log_images = (is_train and self.global_step % self.trainer.log_every_n_steps == 0) or (
+                not is_train and batch_idx == 0
+            )
+
+            if is_train:
+                prefix = "train_"
+            else:
+                prefix = f"val_{dataloader_idx}_"
+
+            if log_images:
                 for i in range(4):
                     mask_i = mask[i].float().cpu()
                     depth_gt_viz_i, vmin, vmax = colormap_image(
@@ -569,6 +480,12 @@ class DepthModel(pl.LightningModule):
                     )
                     depth_pred_viz_i = colormap_image(
                         depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                    )
+                    depth_hint_viz_i = colormap_image(
+                        depth_hint[i].float().cpu(),
+                        hint_mask[i].float().cpu(),
+                        vmin=vmin,
+                        vmax=vmax,
                     )
                     cv_min_viz_i = colormap_image(
                         cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
@@ -581,21 +498,26 @@ class DepthModel(pl.LightningModule):
 
                     self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
                     self.logger.experiment.add_image(
-                        f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                        f"{prefix}depth_gt/{i}", depth_gt_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                        f"{prefix}depth_pred/{i}", depth_pred_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+                        f"{prefix}depth_hint/{i}", depth_hint_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
+                        f"{prefix}depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                        f"{prefix}normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
                     )
-                    self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
+                    self.logger.experiment.add_image(
+                        f"{prefix}normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                    )
+                    self.logger.experiment.add_image(
+                        f"{prefix}cv_min/{i}", cv_min_viz_i, self.global_step
+                    )
 
                 self.logger.experiment.flush()
 
@@ -607,6 +529,7 @@ class DepthModel(pl.LightningModule):
                     sync_dist=True,
                     on_step=is_train,
                     on_epoch=not is_train,
+                    add_dataloader_idx=False,
                 )
 
             # high_res_validation: it isn't always wise to load in high
@@ -636,22 +559,25 @@ class DepthModel(pl.LightningModule):
 
             for metric_name, metric_val in metrics.items():
                 self.log(
-                    f"{phase}_metrics/{metric_name}",
+                    f"{phase}_metrics/{metric_name}"
+                    if phase == "train"
+                    else f"{phase}_{dataloader_idx}_metrics/{metric_name}",
                     metric_val,
                     sync_dist=True,
                     on_step=is_train,
                     on_epoch=not is_train,
+                    add_dataloader_idx=False,
                 )
 
         return losses["loss"]
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""
-        return self.step("train", batch, batch_idx)
+        return self.step("train", batch, batch_idx, 0)
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx):
         """Runs a validation step."""
-        return self.step("val", batch, batch_idx)
+        return self.step("val", batch, batch_idx, dataloader_idx)
 
     def configure_optimizers(self):
         """Configuring optmizers and learning rate schedules.

@@ -233,6 +233,22 @@ class ResultsAverager:
         with open(filepath, "w") as file:
             json.dump(scores_dict, file, indent=4)
 
+    def load_scores(self, filepath, print_running_metrics=False):
+        """
+        Load metrics from a json file.
+        Args:
+            filepath: file path where scores are
+            print_running_metrics: should we print running metrics or the
+                final average?
+        """
+
+        with open(filepath, "r") as file:
+            scores_dict = json.load(file)
+
+        self.elem_metrics_list = [None]
+
+        self.final_metrics = scores_dict["scores"]
+
     def pretty_print_results(self, print_exp_name=True, print_running_metrics=True):
         """
         Pretty print for easy(ier) reading

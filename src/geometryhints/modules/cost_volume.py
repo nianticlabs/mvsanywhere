@@ -1946,7 +1946,7 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             if return_mask:
                 # build a mask using depth validity and pixel coordinate
                 # validity by checking bounds of source views.
-                depth_mask = torch.any(mask_b, dim=1)
+                depth_mask_bkhw = mask_b
                 pix_coords_bk2hw = pix_coords_B2hw.view(
                     batch_size,
                     num_src_frames,
@@ -1954,8 +1954,10 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                     self.matching_height,
                     self.matching_width,
                 )
-                bounds_mask = torch.any(self.get_mask(pix_coords_bk2hw), dim=1)
-                overall_mask_bhw = torch.logical_and(depth_mask, bounds_mask)
+                bounds_mask_bkhw = self.get_mask(
+                    pix_coords_bk2hw
+                )  # torch.any(self.get_mask(pix_coords_bk2hw), dim=1)
+                overall_mask_bhw = torch.logical_and(depth_mask_bkhw, bounds_mask_bkhw)
 
             # compute rays to world points for current frame
             cur_points_rays_B3hw = F.normalize(world_points_B4N[:, :3, :], dim=1).view(
