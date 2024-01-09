@@ -117,6 +117,7 @@ from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
+from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 from geometryhints.tools import fusers_helper
@@ -126,6 +127,7 @@ from geometryhints.utils.metrics_utils import (
     ResultsAverager,
     compute_depth_metrics_batched,
 )
+from geometryhints.utils.model_utils import get_model_class
 from geometryhints.utils.visualization_utils import quick_viz_export
 
 
@@ -196,16 +198,9 @@ def main(opts):
     # You can change this at inference by passing in 'opts=opts,' but there
     # be dragons if you're not careful.
 
-    if opts.model_type == "depth_model":
-        model_class_to_use = DepthModel
-    elif opts.model_type == "cv_hint_depth_model":
-        model_class_to_use = DepthModelCVHint
-    else:
-        raise ValueError(f"Unknown model type: {opts.model_type}")
+    model_class_to_use = get_model_class(opts)
 
-    model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
-    if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
-        model.cost_volume = model.cost_volume.to_fast()
+    model = load_model_inference(opts, model_class_to_use)
 
     model = model.cuda().eval()
 

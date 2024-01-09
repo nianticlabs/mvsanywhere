@@ -284,21 +284,22 @@ class DensificationModel(pl.LightningModule):
         # prior.
         cur_feats = self.encoder(cur_image)
 
-            
         hint_to_use_b1hw = torch.ones_like(cur_data["depth_hint_b1hw"])
-        hint_to_use_b1hw[cur_data["depth_hint_mask_b_b1hw"]] = cur_data["depth_hint_b1hw"][cur_data["depth_hint_mask_b_b1hw"]]
-        
+        hint_to_use_b1hw[cur_data["depth_hint_mask_b_b1hw"].bool()] = cur_data["depth_hint_b1hw"][
+            cur_data["depth_hint_mask_b_b1hw"].bool()
+        ]
+
         hint_to_use_b1hw = F.interpolate(
             hint_to_use_b1hw,
             size=cur_feats[self.run_opts.matching_scale].shape[-2:],
             mode="nearest",
         )
-        
+
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
                 hint_to_use_b1hw,
-                cur_feats[self.run_opts.matching_scale:],
+                cur_feats[self.run_opts.matching_scale :],
             )
             cur_feats = cur_feats[: self.run_opts.matching_scale] + cost_volume_features
 
