@@ -255,22 +255,7 @@ class DensificationModel(pl.LightningModule):
 
         # get all tensors from the batch dictioanries.
         cur_image = cur_data["image_b3hw"]
-        src_cam_T_world = src_data["cam_T_world_b44"]
-        src_world_T_cam = src_data["world_T_cam_b44"]
-
-        cur_cam_T_world = cur_data["cam_T_world_b44"]
-        cur_world_T_cam = cur_data["world_T_cam_b44"]
-
-        with torch.cuda.amp.autocast(False):
-            # Compute src_cam_T_cur_cam, a transformation for going from 3D
-            # coords in current view coordinate frame to source view coords
-            # coordinate frames.
-            src_cam_T_cur_cam = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
-
-            # Compute cur_cam_T_src_cam the opposite of src_cam_T_cur_cam. From
-            # source view to current view.
-            cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(1) @ src_world_T_cam
-
+        
         # flip transformation! Figure out if we're flipping. Should be true if
         # we are training and a coin flip says we should.
         flip_threshold = 0.5 if phase == "train" else 0.0
@@ -321,9 +306,12 @@ class DensificationModel(pl.LightningModule):
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
         depth_outputs["lowest_cost_bhw"] = torch.zeros_like(
-            depth_outputs["depth_pred_s0_b1hw"]
+            depth_outputs["depth_pred_s1_b1hw"]
         ).squeeze(1)
-        depth_outputs["overall_mask_bhw"] = torch.zeros_like(depth_outputs["depth_pred_s0_b1hw"])
+        if return_mask:
+            depth_outputs["overall_mask_bhw"] = torch.zeros_like(depth_outputs["depth_pred_s1_b1hw"]).squeeze(1)
+        else:
+            depth_outputs["overall_mask_bhw"] = None
 
         return depth_outputs
 

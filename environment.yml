@@ -34,4 +34,8 @@ dependencies:
     - scipy # transformations and a few others
     - protobuf<4.21.0 # lighting/tensorboard fix
     - setuptools==59.5.0 # fix for tensorboard
+    - pytest==7.2.2
+    - pytest-cov==2.7.1
+    - pytest-timeout==2.1.0
+    - pytest-fail-slow==0.3.0
     - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes

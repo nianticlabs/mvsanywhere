@@ -19,7 +19,7 @@ class TSDF:
 
     def __init__(
         self,
-        voxel_coords: torch.tensor,
+        voxel_coords_3hwd: torch.tensor,
         tsdf_values: torch.tensor,
         tsdf_weights: torch.tensor,
         voxel_size: float,
@@ -28,7 +28,7 @@ class TSDF:
         """
         Sets interal class attributes.
         """
-        self.voxel_coords = voxel_coords.half()
+        self.voxel_coords_3hwd = voxel_coords_3hwd.half()
         self.tsdf_values = tsdf_values.half()
         self.tsdf_weights = tsdf_weights.half()
         self.voxel_size = voxel_size
@@ -45,9 +45,9 @@ class TSDF:
 
         tsdf_weights = torch.ones_like(tsdf_values)
 
-        voxel_coords = cls.generate_voxel_coords(origin, tsdf_values.shape[1:], voxel_size)
+        voxel_coords_3hwd = cls.generate_voxel_coords(origin, tsdf_values.shape[1:], voxel_size)
 
-        return TSDF(voxel_coords, tsdf_values, tsdf_weights, voxel_size)
+        return TSDF(voxel_coords_3hwd, tsdf_values, tsdf_weights, voxel_size)
 
     @classmethod
     def from_mesh(cls, mesh: trimesh.Trimesh, voxel_size: float):
@@ -96,15 +96,15 @@ class TSDF:
 
         origin = torch.FloatTensor([bounds["xmin"], bounds["ymin"], bounds["zmin"]])
 
-        voxel_coords = cls.generate_voxel_coords(
+        voxel_coords_3hwd = cls.generate_voxel_coords(
             origin, (num_voxels_x, num_voxels_y, num_voxels_z), voxel_size
         ).half()
 
         # init to -1s
-        tsdf_values = -torch.ones_like(voxel_coords[0]).half()
-        tsdf_weights = torch.zeros_like(voxel_coords[0]).half()
+        tsdf_values = -torch.ones_like(voxel_coords_3hwd[0]).half()
+        tsdf_weights = torch.zeros_like(voxel_coords_3hwd[0]).half()
 
-        return TSDF(voxel_coords, tsdf_values, tsdf_weights, voxel_size, origin)
+        return TSDF(voxel_coords_3hwd, tsdf_values, tsdf_weights, voxel_size, origin)
 
     @classmethod
     def generate_voxel_coords(
@@ -114,20 +114,20 @@ class TSDF:
 
         grid = torch.meshgrid([torch.arange(vd) for vd in volume_dims])
 
-        voxel_coords = origin.view(3, 1, 1, 1) + torch.stack(grid, 0) * voxel_size
+        voxel_coords_3hwd = origin.view(3, 1, 1, 1) + torch.stack(grid, 0) * voxel_size
 
-        return voxel_coords
+        return voxel_coords_3hwd
 
     def cuda(self):
         """Moves TSDF to gpu memory."""
-        self.voxel_coords = self.voxel_coords.cuda()
+        self.voxel_coords_3hwd = self.voxel_coords_3hwd.cuda()
         self.tsdf_values = self.tsdf_values.cuda()
         if self.tsdf_weights is not None:
             self.tsdf_weights = self.tsdf_weights.cuda()
 
     def cpu(self):
         """Moves TSDF to cpu memory."""
-        self.voxel_coords = self.voxel_coords.cpu()
+        self.voxel_coords_3hwd = self.voxel_coords_3hwd.cpu()
         self.tsdf_values = self.tsdf_values.cpu()
         if self.tsdf_weights is not None:
             self.tsdf_weights = self.tsdf_weights.cpu()
@@ -177,6 +177,66 @@ class TSDF:
                 mesh, os.path.join(savepath, filename).replace(".bin", ".ply"), "ply"
             )
 
+    def sample_tsdf(self, world_points_N3, what_to_sample="tsdf"):
+        """Samples the TSDF volume at world coordinates provided.
+        Args:
+            world_points_N3 (torch.Tensor): Tensor of shape (N, 3) containing
+                world coordinates to sample the volume at.
+            what_to_sample (str): what to sample from the TSDF volume. Can be one of
+                "tsdf", "weights", ...
+        Returns:
+            torch.Tensor: Tensor of shape (N,) containing the values of the
+                volume at the provided world coordinates.
+        """
+
+        if not (world_points_N3.shape[1] == 3 and world_points_N3.ndim == 2):
+            raise ValueError(
+                "world_points_N3 must have shape (N, 3)! Instead got shape {}".format(
+                    world_points_N3.shape
+                )
+            )
+
+        world_points_N3 = world_points_N3.to(self.voxel_coords_3hwd.device)
+
+        # convert world coordinates to voxel coordinates
+        voxel_coords_N3 = world_points_N3 - self.origin.view(1, 3).to(world_points_N3.device)
+        voxel_coords_N3 = voxel_coords_N3 / self.voxel_size
+
+        # divide by the volume_size - 1 for align corners True!
+        dim_size_3 = torch.tensor(
+            self.voxel_coords_3hwd.shape[1:],
+            dtype=world_points_N3.dtype,
+            device=world_points_N3.device,
+        )
+        voxel_coords_N3 = voxel_coords_N3 / (dim_size_3.view(1, 3) - 1)
+        # convert from 0-1 to [-1, 1] range
+        voxel_coords_N3 = voxel_coords_N3 * 2 - 1
+        voxel_coords_111N3 = voxel_coords_N3[None, None, None]
+
+        # sample the volume
+        # grid_sample expects y, x, z and we have x, y, z
+        # swap the axes of the coords to match the pytorch grid_sample convention
+        voxel_coords_111N3 = voxel_coords_111N3[:, :, :, :, [2, 1, 0]]
+
+        if what_to_sample == "tsdf":
+            volume_to_sample_chwd = self.tsdf_values.unsqueeze(0)
+        elif what_to_sample == "weights":
+            volume_to_sample_chwd = self.tsdf_weights.unsqueeze(0)
+        
+        # in case we're asked to support fp16 and cpu, we need to cast to fp32 for the
+        # grid_sample call
+        if volume_to_sample_chwd.device == torch.device("cpu"):
+            tensor_dtype = torch.float32
+        else:
+            tensor_dtype = volume_to_sample_chwd.dtype
+
+        values_N = torch.nn.functional.grid_sample(
+            volume_to_sample_chwd.unsqueeze(0).type(tensor_dtype),
+            voxel_coords_111N3.type(tensor_dtype),
+            align_corners=True,
+        ).squeeze()
+
+        return values_N
 
 class TSDFFuser:
     """
@@ -203,12 +263,12 @@ class TSDFFuser:
 
         # Create homogeneous coords once only
         self.hom_voxel_coords_14hwd = torch.cat(
-            (self.voxel_coords, torch.ones_like(self.voxel_coords[:1])), 0
+            (self.voxel_coords_3hwd, torch.ones_like(self.voxel_coords_3hwd[:1])), 0
         ).unsqueeze(0)
 
     @property
-    def voxel_coords(self):
-        return self.tsdf.voxel_coords
+    def voxel_coords_3hwd(self):
+        return self.tsdf.voxel_coords_3hwd
 
     @property
     def tsdf_values(self):
@@ -224,7 +284,7 @@ class TSDFFuser:
 
     @property
     def shape(self):
-        return self.voxel_coords.shape[1:]
+        return self.voxel_coords_3hwd.shape[1:]
 
     @property
     def truncation(self):
