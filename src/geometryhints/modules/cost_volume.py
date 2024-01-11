@@ -1750,8 +1750,8 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
         
         mlp_channels = [3, 8, 8, 1]
         self.hint_mlp = MLP(channel_list=mlp_channels, disable_final_activation=True)
-        print(f"".center(80, "#"))
         print(f" Number of hint MLP channels: ".ljust(30, " ") + f"{mlp_channels}  ")
+        print(f"".center(80, "#"))
         print("")
 
     def build_cost_volume(
