@@ -40,14 +40,12 @@ class TSDF:
         tsdf_data = np.load(tsdf_file)
 
         tsdf_values = torch.from_numpy(tsdf_data["tsdf_values"])
+        tsdf_weights = torch.from_numpy(tsdf_data["tsdf_weights"])
         origin = torch.from_numpy(tsdf_data["origin"])
+        voxel_coords_3hwd = torch.from_numpy(tsdf_data["voxel_coords_3hwd"])
         voxel_size = tsdf_data["voxel_size"].item()
 
-        tsdf_weights = torch.ones_like(tsdf_values)
-
-        voxel_coords_3hwd = cls.generate_voxel_coords(origin, tsdf_values.shape[1:], voxel_size)
-
-        return TSDF(voxel_coords_3hwd, tsdf_values, tsdf_weights, voxel_size)
+        return TSDF(voxel_coords_3hwd, tsdf_values, tsdf_weights, voxel_size, origin)
 
     @classmethod
     def from_mesh(cls, mesh: trimesh.Trimesh, voxel_size: float):
@@ -166,16 +164,25 @@ class TSDF:
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=norms)
         return mesh
 
-    def save(self, savepath, filename, save_mesh=True):
+    def save_mesh(self, savepath, filename):
         """Saves a mesh to disk."""
         self.cpu()
         os.makedirs(savepath, exist_ok=True)
 
-        if save_mesh:
-            mesh = self.to_mesh()
-            trimesh.exchange.export.export_mesh(
-                mesh, os.path.join(savepath, filename).replace(".bin", ".ply"), "ply"
-            )
+        mesh = self.to_mesh()
+        trimesh.exchange.export.export_mesh(
+            mesh, os.path.join(savepath, filename).replace(".bin", ".ply"), "ply"
+        )
+
+    def save_tsdf(self, filepath):
+        np.savez_compressed(
+            filepath,
+            tsdf_values=self.tsdf_values.cpu().numpy().astype(np.float16),
+            tsdf_weights=self.tsdf_weights.cpu().numpy().astype(np.float16),
+            origin=self.origin.cpu().numpy().astype(np.float16),
+            voxel_coords_3hwd=self.voxel_coords_3hwd.cpu().numpy().astype(np.float16),
+            voxel_size=self.voxel_size,
+        )
 
     def sample_tsdf(self, world_points_N3, what_to_sample="tsdf"):
         """Samples the TSDF volume at world coordinates provided.
@@ -222,7 +229,7 @@ class TSDF:
             volume_to_sample_chwd = self.tsdf_values.unsqueeze(0)
         elif what_to_sample == "weights":
             volume_to_sample_chwd = self.tsdf_weights.unsqueeze(0)
-        
+
         # in case we're asked to support fp16 and cpu, we need to cast to fp32 for the
         # grid_sample call
         if volume_to_sample_chwd.device == torch.device("cpu"):
@@ -237,6 +244,7 @@ class TSDF:
         ).squeeze()
 
         return values_N
+
 
 class TSDFFuser:
     """

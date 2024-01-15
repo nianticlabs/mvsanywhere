@@ -132,7 +132,10 @@ from geometryhints.utils.metrics_utils import (
 )
 from geometryhints.utils.model_utils import get_model_class, load_model_inference
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
-from geometryhints.utils.visualization_utils import load_and_merge_images, quick_viz_export
+from geometryhints.utils.visualization_utils import (
+    load_and_merge_images,
+    quick_viz_export,
+)
 
 
 def main(opts):
@@ -262,14 +265,14 @@ def main(opts):
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
             backprojector = BackprojectDepth(height=192, width=256).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=192, width=256)
-            
+
             frame_ids = []
             for batch_ind, batch in enumerate(tqdm(dataloader)):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
                 src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
-                
+
                 for i in range(len(cur_data["frame_id_string"])):
                     frame_ids.append(cur_data["frame_id_string"][i])
 
@@ -302,20 +305,23 @@ def main(opts):
                     cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                     # transform to world
                     world_points_b4N = cur_data["world_T_cam_b44"] @ cam_points_b4N
-                    
+
                     # sample tsdf
-                    sampled_weights_N = fuser.sample_tsdf(world_points_b4N[:,:3,:].squeeze(0).transpose(0, 1), what_to_sample="weights")
-                    
+                    sampled_weights_N = fuser.sample_tsdf(
+                        world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
+                        what_to_sample="weights",
+                    )
+
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, 192, 256)
                     sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
-                    
+
                     threshold = 0.2
                     # print((sampled_weights_b1hw > threshold).float().mean())
                     cur_data["depth_hint_b1hw"][sampled_weights_b1hw < threshold] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                    
+
                     # if cur_data["depth_hint_mask_b1hw"].mean() < 0.8:
                     # cur_data["depth_hint_b1hw"][:] = float("nan")
                     # cur_data["depth_hint_mask_b1hw"][:] = 0.0
@@ -333,7 +339,7 @@ def main(opts):
                     cur_data["depth_hint_b1hw"][:] = float("nan")
                     cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
-                    
+
                     sampled_weights_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     rendered_depth_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
 
@@ -459,12 +465,12 @@ def main(opts):
                     # make a dir for this scan
                     viz_output_path = os.path.join(viz_output_dir, scan)
                     Path(viz_output_path).mkdir(parents=True, exist_ok=True)
-                    
-                    if 'sampled_weights_b1hw' in locals():
+
+                    if "sampled_weights_b1hw" in locals():
                         outputs["sampled_weights_b1hw"] = sampled_weights_b1hw
                     if "rendered_depth_b1hw" in locals():
                         outputs["rendered_depth_b1hw"] = rendered_depth_b1hw
-                        
+
                     quick_viz_export(
                         viz_output_path,
                         outputs,
@@ -533,7 +539,7 @@ def main(opts):
         all_frame_metrics.output_json(
             os.path.join(scores_output_dir, f"all_frame_avg_metrics_{opts.split}.json")
         )
-        
+
         if opts.dump_depth_visualization:
             load_and_merge_images(frame_ids, viz_output_path, fps=10)
 

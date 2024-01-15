@@ -6,6 +6,7 @@ from pathlib import Path
 
 import trimesh
 from geometryhints.options import OptionsHandler
+from geometryhints.tools.tsdf import TSDF
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import readlines
 import os
@@ -15,6 +16,7 @@ import open3d as o3d
 import torch
 import tqdm
 from PIL import Image
+from geometryhints.utils.geometry_utils import BackprojectDepth
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 
 
@@ -107,6 +109,8 @@ def render_scene_meshes(
     tuple_filepath: Path,
     render_output_path: Path,
     mesh_path: Path,
+    data_to_render: str,
+    tsdf_path: Path = None,
     batch_size: int = 4,
 ):
     """Renders a scene's mesh with a depth renderer.
@@ -133,6 +137,9 @@ def render_scene_meshes(
     width = 256
 
     mesh_trimesh = trimesh.exchange.load.load(mesh_path)
+    if data_to_render == "both":
+        tsdf = TSDF.from_file(tsdf_path)
+        backprojector = BackprojectDepth(height=height, width=width).cuda()
 
     mesh = Meshes(
         verts=[torch.tensor(mesh_trimesh.vertices).float()],
@@ -144,6 +151,9 @@ def render_scene_meshes(
 
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
+
+    
+    
     image_list = []
     for batch in tqdm.tqdm(dataloader):
         with torch.no_grad():
@@ -157,9 +167,37 @@ def render_scene_meshes(
 
             numpy_depth = (depth_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
             Image.fromarray(numpy_depth).save(depth_path)
-
+            
+            sampled_weights_1hw = None
+            if data_to_render == "both":
+                K_b44 = batch["K_b44"][elem_ind][None].cuda()
+                K_b44[:,0] *= width
+                K_b44[:,1] *= height
+                invK_b44 = torch.linalg.inv(K_b44)
+                cam_points_b4N = backprojector(depth_1hw[None], invK_b44)
+                world_points_b4N = batch["world_T_cam_b44"][elem_ind][None].cuda() @ cam_points_b4N.cuda()
+                sampled_weights_N = tsdf.sample_tsdf(world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1), what_to_sample="weights")
+                sampled_weights_1hw = sampled_weights_N.view(1, 192, 256)
+                sampled_weights_1hw[~mask_1hw] = 0.0
+                
+                weights_path = render_output_path / f"{batch['frame_id_str'][elem_ind]}.png"
+                
+                numpy_weights  = (sampled_weights_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
+                Image.fromarray(numpy_weights).save(weights_path)
+                
+                
             # for debug. make and dump a video.
             colormapped_depth = colormap_image(depth_1hw, mask_1hw.float(), vmin=0.0, vmax=4)
+            if sampled_weights_1hw is not None:
+                colormapped_weights = colormap_image(
+                    sampled_weights_1hw,
+                    vmin=0,
+                    vmax=1,
+                    colormap="magma",
+                    flip="False",
+                )
+                colormapped_depth = torch.cat([colormapped_depth.cpu(), colormapped_weights.cpu()], dim=2)
+                
             numpy_depth = np.uint8(colormapped_depth.permute(1, 2, 0).cpu().detach().numpy() * 255)
             image_list.append(numpy_depth)
 
@@ -177,9 +215,11 @@ def render_scenes(
     output_root: Path,
     meshes_paths: Path,
     batch_size: int,
+    data_to_render: str,
 ):
     for scan_id in tqdm.tqdm(scan_list):
         mesh_path = meshes_paths / f"{scan_id}.ply"
+        tsdf_path = meshes_paths / f"{scan_id}_tsdf.npz"
         render_output_path = output_root / scan_id
         render_scene_meshes(
             scan_id=scan_id,
@@ -187,7 +227,9 @@ def render_scenes(
             tuple_filepath=tuple_filepath,
             render_output_path=render_output_path,
             mesh_path=mesh_path,
+            tsdf_path=tsdf_path,
             batch_size=batch_size,
+            data_to_render=data_to_render,
         )
 
 
@@ -206,6 +248,12 @@ if __name__ == "__main__":
         type=Path,
         required=True,
         help="Path to the ScanNet dataset.",
+    )
+    option_handler.parser.add_argument(
+        "--data_to_render",
+        type=str,
+        required=True,
+        help="Data to render and save. Can be 'depth' or 'both' for mesh depth renders and sampled TSDF weights.",
     )
 
     option_handler.parse_and_merge_options(ignore_cl_args=False)
@@ -229,4 +277,5 @@ if __name__ == "__main__":
         output_root=opts.output_root,
         meshes_paths=opts.meshes_paths,
         batch_size=opts.batch_size,
+        data_to_render=opts.data_to_render,
     )
