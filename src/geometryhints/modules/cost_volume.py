@@ -1736,7 +1736,7 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             + num_mask_channels
             + num_num_dot_channels
             + num_pose_penalty_channels
-            + 1
+            + 2
         )
 
         # initialize the MLP
@@ -1855,6 +1855,12 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
 
         prev_mesh_hint_depth_b1hw = F.interpolate(
             cv_depth_hint_dict["depth_hint_b1hw"],
+            size=depth_planes_bdhw.shape[-2:],
+            mode="nearest",
+        )
+        
+        depth_hint_sampled_weights_b1hw = F.interpolate(
+            cv_depth_hint_dict["sampled_weights_b1hw"],
             size=depth_planes_bdhw.shape[-2:],
             mode="nearest",
         )
@@ -2046,6 +2052,7 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                     r_measure_bkhw,
                     t_measure_bkhw,
                     current_hint_map_b1hw,
+                    depth_hint_sampled_weights_b1hw,
                 ],
                 dim=1,
             )

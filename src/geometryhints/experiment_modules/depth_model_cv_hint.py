@@ -602,6 +602,7 @@ class DepthModelCVHint(pl.LightningModule):
         depth_hint = cur_data["depth_hint_b1hw"]
         hint_mask = cur_data["depth_hint_mask_b1hw"]
         hint_mask_b = cur_data["depth_hint_mask_b_b1hw"]
+        sampled_weights_1hw = cur_data["sampled_weights_b1hw"]
 
         # estimate normals for groundtruth
         normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
@@ -644,6 +645,9 @@ class DepthModelCVHint(pl.LightningModule):
                         vmin=vmin,
                         vmax=vmax,
                     )
+                    sampled_weights_viz_i = colormap_image(
+                        sampled_weights_1hw[i].cpu(), vmin=0, vmax=1, colormap="magma", flip="False"
+                    )
                     cv_min_viz_i = colormap_image(
                         cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
                     )
@@ -662,6 +666,9 @@ class DepthModelCVHint(pl.LightningModule):
                     )
                     self.logger.experiment.add_image(
                         f"{prefix}depth_hint/{i}", depth_hint_viz_i, self.global_step
+                    )
+                    self.logger.experiment.add_image(
+                        f"{prefix}sampled_weights/{i}", sampled_weights_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
                         f"{prefix}depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
