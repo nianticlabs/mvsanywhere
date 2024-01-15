@@ -70,6 +70,9 @@ class OurFuser(DepthFuser):
             path,
         )
 
+    def save_tsdf(self, path):
+        self.tsdf_fuser_pred.tsdf.save_tsdf(path)
+
     def sample_tsdf(self, world_points_N3, what_to_sample="tsdf"):
         """Samples the TSDF volume at world coordinates provided.
         Args:

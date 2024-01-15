@@ -5,7 +5,6 @@ from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHin
 from geometryhints.options import Options
 
 
-
 @pytest.mark.parametrize("batch", (1, 2))
 @pytest.mark.parametrize("views", (2, 4))
 @pytest.mark.parametrize("return_mask", (True, False))
@@ -30,7 +29,7 @@ def test_depth_model_cv_hint_mlp_feature_volume(batch: int, views: int, return_m
 
     model = DepthModelCVHint(opts=opts)
 
-    rand_mask = (torch.rand((batch, 1, 384, 512)) > 0.5)
+    rand_mask = torch.rand((batch, 1, 384, 512)) > 0.5
 
     cur_data = {
         "image_b3hw": torch.rand((batch, 3, 384, 512)),
@@ -49,7 +48,7 @@ def test_depth_model_cv_hint_mlp_feature_volume(batch: int, views: int, return_m
         "cam_T_world_b44": torch.eye(4)[None, None, :, :].repeat(batch, views, 1, 1),
         "world_T_cam_b44": torch.eye(4)[None, None, :, :].repeat(batch, views, 1, 1),
     }
-    
+
     prediction = model.forward(
         phase="test", cur_data=cur_data, src_data=src_data, return_mask=return_mask
     )

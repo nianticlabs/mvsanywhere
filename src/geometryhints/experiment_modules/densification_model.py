@@ -255,7 +255,7 @@ class DensificationModel(pl.LightningModule):
 
         # get all tensors from the batch dictioanries.
         cur_image = cur_data["image_b3hw"]
-        
+
         # flip transformation! Figure out if we're flipping. Should be true if
         # we are training and a coin flip says we should.
         flip_threshold = 0.5 if phase == "train" else 0.0
@@ -309,7 +309,9 @@ class DensificationModel(pl.LightningModule):
             depth_outputs["depth_pred_s1_b1hw"]
         ).squeeze(1)
         if return_mask:
-            depth_outputs["overall_mask_bhw"] = torch.zeros_like(depth_outputs["depth_pred_s1_b1hw"]).squeeze(1)
+            depth_outputs["overall_mask_bhw"] = torch.zeros_like(
+                depth_outputs["depth_pred_s1_b1hw"]
+            ).squeeze(1)
         else:
             depth_outputs["overall_mask_bhw"] = None
 

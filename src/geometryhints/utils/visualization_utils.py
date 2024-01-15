@@ -1,8 +1,8 @@
 import math
 import os
 from typing import Union
-import cv2
 
+import cv2
 import matplotlib.pyplot as plt
 import moviepy.editor as mpy
 import numpy as np
@@ -70,6 +70,7 @@ def colormap_image(
         return image_cm_3hw, vmin, vmax
     else:
         return image_cm_3hw
+
 
 def image_tensor3hw_to_numpyhw3(
     image: torch.Tensor,
@@ -235,7 +236,7 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
             # these will be the same when the depth map is all ones.
             sample_vmin = cur_data["full_res_depth_b1hw"][elem_ind][valid_mask_b[elem_ind]].min()
             sample_vmax = cur_data["full_res_depth_b1hw"][elem_ind][valid_mask_b[elem_ind]].max()
-        
+
         # if no meaningful gt depth in dataloader, don't viz gt and
         # set vmin/max to default
         if sample_vmax != sample_vmin:
@@ -279,7 +280,11 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
 
         if "sampled_weights_b1hw" in outputs:
             sampled_weights_3hw = colormap_image(
-                outputs["sampled_weights_b1hw"][elem_ind], vmin=0, vmax=1, colormap="magma", flip="False",
+                outputs["sampled_weights_b1hw"][elem_ind],
+                vmin=0,
+                vmax=1,
+                colormap="magma",
+                flip="False",
             )
             pil_image = Image.fromarray(
                 np.uint8(sampled_weights_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
@@ -295,6 +300,7 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
             )
             pil_image.save(os.path.join(output_path, f"{frame_id}_rendered_depth.png"))
 
+
 def load_and_merge_images(frame_ids, quick_viz_directory, fps=30):
     """
     Loads images, depth maps, and cost volumes from a quick viz directory and
@@ -302,42 +308,49 @@ def load_and_merge_images(frame_ids, quick_viz_directory, fps=30):
     """
     image_list = []
     stacked_images = []
-    
+
     for frame_id in frame_ids:
         rgb_image = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_color.png"))
         rgb_image = np.array(rgb_image)
-        
+
         height, width = rgb_image.shape[:2]
-        
+
         depth = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_pred_depth.png"))
         # resize to RGB image size
         depth = np.array(depth.resize([width, height]))
 
-        lowest_cost = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_lowest_cost_pred.png"))
+        lowest_cost = Image.open(
+            os.path.join(quick_viz_directory, f"{frame_id}_lowest_cost_pred.png")
+        )
         # resize to RGB image size
         lowest_cost = np.array(lowest_cost.resize([width, height]))
 
         gt_depth = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_gt_depth.png"))
         # resize to RGB image size
         gt_depth = np.array(gt_depth.resize([width, height]))
-        
-        sampled_weights = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_sampled_weights.png"))
+
+        sampled_weights = Image.open(
+            os.path.join(quick_viz_directory, f"{frame_id}_sampled_weights.png")
+        )
         # resize to RGB image size
         sampled_weights = np.array(sampled_weights.resize([width, height]))
 
-        rendered_depth = Image.open(os.path.join(quick_viz_directory, f"{frame_id}_rendered_depth.png"))
+        rendered_depth = Image.open(
+            os.path.join(quick_viz_directory, f"{frame_id}_rendered_depth.png")
+        )
         # resize to RGB image size
         rendered_depth = np.array(rendered_depth.resize([width, height]))
-        
-        
-        merged_image = tile_images([
-            rgb_image, 
-            depth, 
-            lowest_cost, 
-            gt_depth, 
-            sampled_weights,
-            rendered_depth,
-        ])
+
+        merged_image = tile_images(
+            [
+                rgb_image,
+                depth,
+                lowest_cost,
+                gt_depth,
+                sampled_weights,
+                rendered_depth,
+            ]
+        )
         stacked_images.append(merged_image)
-    
+
     save_viz_video_frames(stacked_images, os.path.join(quick_viz_directory, "merged.mp4"), fps=fps)

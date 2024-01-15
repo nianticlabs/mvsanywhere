@@ -5,7 +5,6 @@ from geometryhints.experiment_modules.densification_model import DensificationMo
 from geometryhints.options import Options
 
 
-
 @pytest.mark.parametrize("batch", (1, 2))
 @pytest.mark.parametrize("views", (2, 4))
 @pytest.mark.parametrize("return_mask", (True, False))
@@ -30,7 +29,7 @@ def test_depth_model_cv_hint_mlp_feature_volume(batch: int, views: int, return_m
 
     model = DensificationModel(opts=opts)
 
-    rand_mask = (torch.rand((batch, 1, 384, 512)) > 0.5)
+    rand_mask = torch.rand((batch, 1, 384, 512)) > 0.5
 
     cur_data = {
         "image_b3hw": torch.rand((batch, 3, 384, 512)),
@@ -42,9 +41,8 @@ def test_depth_model_cv_hint_mlp_feature_volume(batch: int, views: int, return_m
         "depth_hint_mask_b1hw": rand_mask.float(),
         "depth_hint_mask_b_b1hw": rand_mask,
     }
-    src_data = {
-    }
-    
+    src_data = {}
+
     prediction = model.forward(
         phase="test", cur_data=cur_data, src_data=src_data, return_mask=return_mask
     )
