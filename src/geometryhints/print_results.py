@@ -12,7 +12,6 @@ def print_results(results_path: Path):
     print(f"Scores for {results_path}")
 
     loaded_metrics = ResultsAverager("", f"frame metrics")
-    loaded_metrics = ResultsAverager("", f"scene metrics")
 
     loaded_metrics.load_scores(results_path)
     loaded_metrics.pretty_print_results(print_running_metrics=False)

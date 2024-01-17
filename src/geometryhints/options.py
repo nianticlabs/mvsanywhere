@@ -221,6 +221,7 @@ class Options:
     plane_sweep_ablation_ratio: float = 0.0
     load_empty_hint: bool = False
     null_plane_sweep: bool = False
+    wiggle_render_pose: bool = False
 
 
 class OptionsHandler:
