@@ -1871,6 +1871,8 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             mode="nearest",
         ).bool()
 
+        depth_hint_sampled_weights_b1hw[~prev_mesh_hint_depth_mask_b1hw] = -1
+    
         # handle plane sweep ignore
         plane_sweep_ignore_b = cv_depth_hint_dict["plane_sweep_ignore_b"]
         nuke_mask_b = torch.ones_like(plane_sweep_ignore_b)
