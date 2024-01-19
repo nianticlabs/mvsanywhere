@@ -304,7 +304,7 @@ def main(opts):
 
                     cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                     # transform to world
-                    pose_to_use = cur_data["cam_T_world_b44"].clone()
+                    pose_to_use = cur_data["world_T_cam_b44"].clone()
                     if opts.wiggle_render_pose:
                         rand_t = (torch.randn(3) * 0.04).type_as(pose_to_use)
                         rand_rot = torch.randn(3) * 0.03
@@ -326,7 +326,7 @@ def main(opts):
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, 192, 256)
                     sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
 
-                    threshold = 0.2
+                    threshold = 0.1
                     # print((sampled_weights_b1hw > threshold).float().mean())
                     cur_data["depth_hint_b1hw"][sampled_weights_b1hw < threshold] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
