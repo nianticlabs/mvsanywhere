@@ -184,13 +184,15 @@ class TSDF:
             voxel_size=self.voxel_size,
         )
 
-    def sample_tsdf(self, world_points_N3, what_to_sample="tsdf"):
+    def sample_tsdf(self, world_points_N3, what_to_sample="tsdf", sampling_method="bilinear"):
         """Samples the TSDF volume at world coordinates provided.
         Args:
             world_points_N3 (torch.Tensor): Tensor of shape (N, 3) containing
                 world coordinates to sample the volume at.
             what_to_sample (str): what to sample from the TSDF volume. Can be one of
                 "tsdf", "weights", ...
+            sampling_method (str): sampling method to use. Can be one of
+                "nearest", "bilinear", "trilinear".
         Returns:
             torch.Tensor: Tensor of shape (N,) containing the values of the
                 volume at the provided world coordinates.
@@ -241,6 +243,7 @@ class TSDF:
             volume_to_sample_chwd.unsqueeze(0).type(tensor_dtype),
             voxel_coords_111N3.type(tensor_dtype),
             align_corners=True,
+            mode=sampling_method,
         ).squeeze()
 
         return values_N

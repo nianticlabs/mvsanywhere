@@ -320,13 +320,14 @@ def main(opts):
                     sampled_weights_N = fuser.sample_tsdf(
                         world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
                         what_to_sample="weights",
+                        sampling_method="nearest",
                     )
 
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, 192, 256)
                     sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
 
-                    threshold = 0.1
+                    threshold = 0.2
                     # print((sampled_weights_b1hw > threshold).float().mean())
                     cur_data["depth_hint_b1hw"][sampled_weights_b1hw < threshold] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
