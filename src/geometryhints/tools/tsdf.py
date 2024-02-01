@@ -166,11 +166,16 @@ class TSDF:
         return mesh
 
     def to_mesh_pytorch3d(self, scale_to_world=True):
-        mesh_pytorch3d = marching_cubes(self.tsdf_values[None].float(), isolevel=0.0, return_local_coords=False)
-        verts = mesh_pytorch3d[0][0]
-        faces = mesh_pytorch3d[1][0]
+        
+        tsdf_vals = self.tsdf_values.clone()
+        
+        tsdf_vals[tsdf_vals == -1] = 1
+        batched_verts, batched_faces = marching_cubes(tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False)
+        verts = batched_verts[0]
+        faces = batched_faces[0]
+        
         if scale_to_world:
-            verts = self.origin.view(1, 3) + verts * self.voxel_size
+            verts = self.origin.view(1, 3).cuda() + verts * self.voxel_size
         
         return Meshes(verts=[verts], faces=[faces]), verts, faces
 
