@@ -21,18 +21,18 @@ echo $CONFIG
 # --run_fusion \
 # --name sep_mlp_no_hint;
 
-# CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
-# --config_file $CONFIG \
-# --load_weights_from_checkpoint $CHECKPOINT \
-# --data_config configs/data/scannet_default_test.yaml \
-# --num_workers 8 \
-# --batch_size 4 \
-# --output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/ \
-# --dataset_path /mnt/scannet \
-# --depth_hint_aug 0.0 \
-# --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
-# --run_fusion \
-# --name sep_mlp_with_hint;
+CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
+--config_file $CONFIG \
+--load_weights_from_checkpoint $CHECKPOINT \
+--data_config configs/data/scannet_default_test.yaml \
+--num_workers 8 \
+--batch_size 4 \
+--output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/ \
+--dataset_path /mnt/scannet \
+--depth_hint_aug 0.0 \
+--depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
+--run_fusion \
+--name sep_mlp_with_hint;
 
 # CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 # --config_file $CONFIG \

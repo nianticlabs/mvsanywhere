@@ -191,6 +191,8 @@ class Open3DFuser(DepthFuser):
 
         return mesh
 
+    def save_tsdf(self, path):
+        return
 
 def get_fuser(opts, scan):
     """Returns the depth fuser required. Our fuser doesn't allow for"""
