@@ -6,7 +6,8 @@ import torch
 import torch.nn.functional as TF
 import trimesh
 from skimage import measure
-
+from geometryhints.utils.pytorch3d_extras import marching_cubes
+from pytorch3d.structures import Meshes
 
 class TSDF:
 
@@ -163,6 +164,15 @@ class TSDF:
 
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=norms)
         return mesh
+
+    def to_mesh_pytorch3d(self, scale_to_world=True):
+        mesh_pytorch3d = marching_cubes(self.tsdf_values[None].float(), isolevel=0.0, return_local_coords=False)
+        verts = mesh_pytorch3d[0][0]
+        faces = mesh_pytorch3d[1][0]
+        if scale_to_world:
+            verts = self.origin.view(1, 3) + verts * self.voxel_size
+        
+        return Meshes(verts=[verts], faces=[faces]), verts, faces
 
     def save_mesh(self, savepath, filename):
         """Saves a mesh to disk."""
