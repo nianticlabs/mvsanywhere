@@ -91,6 +91,8 @@ class OurFuser(DepthFuser):
     def get_mesh(self, export_single_mesh=True, convert_to_trimesh=True):
         return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh)
 
+    def get_mesh_pytorch3d(self, scale_to_world=True):
+        return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(scale_to_world=scale_to_world)
 
 class Open3DFuser(DepthFuser):
     """

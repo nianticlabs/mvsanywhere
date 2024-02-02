@@ -290,18 +290,10 @@ def main(opts):
                 
                 # get mesh render for hint, but after 12 keyframes have passed.
                 if batch_ind * opts.batch_size > 0:
+                    hint_start_time.record()
                     
-                    scene_trimesh_mesh = fuser.get_mesh(convert_to_trimesh=True)
+                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True)
                     
-                    # pytorch3d.ops.marching_cubes()
-
-                    
-                    mesh = Meshes(
-                        verts=[torch.tensor(scene_trimesh_mesh.vertices).float()],
-                        faces=[torch.tensor(scene_trimesh_mesh.faces).float()],
-                    ).cuda()
-                    
-                    # hint_start_time.record()
                     
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s1_b44"].clone()
@@ -316,10 +308,6 @@ def main(opts):
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
-                    # hint_end_time.record()
-                    # torch.cuda.synchronize()
-                    # elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
-                    # print(f"Hint time: {elapsed_hint_time} ms")
                     
                     cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s1_b44"])
                     # transform to world
@@ -357,6 +345,10 @@ def main(opts):
                     # cur_data["depth_hint_b1hw"][:] = float("nan")
                     # cur_data["depth_hint_mask_b1hw"][:] = 0.0
                     # cur_data["depth_hint_mask_b_b1hw"][:] = False
+
+                    hint_end_time.record()
+                    torch.cuda.synchronize()
+                    elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
 
                     del mesh
 
