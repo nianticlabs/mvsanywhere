@@ -589,7 +589,6 @@ class ScannetDataset(GenericMVSDataset):
             depth_hint_dict: depth hint dict.
         """
         depth_hint_path = os.path.join(self.depth_hint_dir, scan_id, f"rendered_depth_{int(frame_id)}.png")
-        
 
         depth_hint_dict = {}
         depth_hint_1hw = read_image_file(depth_hint_path, value_scale_factor=1 / 256)
