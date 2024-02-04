@@ -116,7 +116,6 @@ import torch
 import torch.nn.functional as F
 from pytorch3d.renderer import TexturesVertex
 from pytorch3d.structures import Meshes
-import pytorch3d
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
@@ -126,7 +125,7 @@ from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHin
 from geometryhints.tools import fusers_helper
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import cache_model_outputs, to_gpu
-from geometryhints.utils.geometry_utils import BackprojectDepth, rotx, roty, rotz
+from geometryhints.utils.geometry_utils import BackprojectDepth
 from geometryhints.utils.metrics_utils import (
     ResultsAverager,
     compute_depth_metrics_batched,
@@ -223,9 +222,6 @@ def main(opts):
         start_time = torch.cuda.Event(enable_timing=True)
         end_time = torch.cuda.Event(enable_timing=True)
 
-        hint_start_time = torch.cuda.Event(enable_timing=True)
-        hint_end_time = torch.cuda.Event(enable_timing=True)
-
         # loop over scans
         for scan in tqdm(scans):
             # initialize fuser if we need to fuse
@@ -267,16 +263,9 @@ def main(opts):
 
             # initialize scene averager
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
+            backprojector = BackprojectDepth(height=192, width=256).cuda()
+            mesh_renderer = PyTorch3DMeshDepthRenderer(height=192, width=256)
 
-            render_height = int(192/2)
-            render_width = int(256/2)
-            # render_height = 192
-            # render_width = 256
-            backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
-            mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
-
-            scene_trimesh_mesh = None
-            elapsed_hint_time = 0.0
             frame_ids = []
             for batch_ind, batch in enumerate(tqdm(dataloader)):
                 # get data, move to GPU
@@ -287,18 +276,23 @@ def main(opts):
                 for i in range(len(cur_data["frame_id_string"])):
                     frame_ids.append(cur_data["frame_id_string"][i])
 
-                
                 # get mesh render for hint, but after 12 keyframes have passed.
                 if batch_ind * opts.batch_size > 0:
-                    hint_start_time.record()
-                    
-                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True)
-                    
-                    
+                    scene_trimesh_mesh = fuser.get_mesh(convert_to_trimesh=True)
+                    mesh = Meshes(
+                        verts=[torch.tensor(scene_trimesh_mesh.vertices).float()],
+                        faces=[torch.tensor(scene_trimesh_mesh.faces).float()],
+                        textures=TexturesVertex(
+                            torch.tensor(scene_trimesh_mesh.visual.vertex_colors)
+                            .unsqueeze(0)
+                            .float()
+                            / 255.0
+                        ),
+                    )
                     # renderer expects normalized intrinsics.
-                    K_b44 = cur_data["K_s1_b44"].clone()
-                    K_b44[:, 0] /= render_width
-                    K_b44[:, 1] /= render_height
+                    K_b44 = cur_data["K_s0_b44"].clone()
+                    K_b44[:, 0] /= 256
+                    K_b44[:, 1] /= 192
                     rendered_depth_b1hw = mesh_renderer.render(
                         mesh, cur_data["cam_T_world_b44"].clone(), K_b44
                     )
@@ -308,36 +302,27 @@ def main(opts):
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
+                    # cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
+                    # # transform to world
+                    # world_points_b4N = cur_data["world_T_cam_b44"] @ cam_points_b4N
+
+                    # # sample tsdf
+                    # sampled_weights_N = fuser.sample_tsdf(
+                    #     world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
+                    #     what_to_sample="weights",
+                    # )
+
+                    # # set weights
+                    # sampled_weights_b1hw = sampled_weights_N.view(1, 1, 192, 256)
+                    # sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
+
+                    delta = torch.abs(rendered_depth_b1hw - cur_data["depth_b1hw"])
+                    delta[~cur_data["mask_b_b1hw"].bool()] = 0.0
+                    delta[rendered_depth_b1hw < 0.001] = 10.0
                     
-                    cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s1_b44"])
-                    # transform to world
-                    pose_to_use = cur_data["world_T_cam_b44"].clone()
-                    if opts.wiggle_render_pose:
-                        rand_t = (torch.randn(3) * 0.04).type_as(pose_to_use)
-                        rand_rot = torch.randn(3) * 0.03
-                        rot_mat = torch.tensor(rotx(rand_rot[0]) @ roty(rand_rot[1]) @ rotz(rand_rot[2])).type_as(pose_to_use)
-                        rand_T = torch.eye(4).cuda().type_as(pose_to_use)
-                        rand_T[:3,:3] = rot_mat
-                        rand_T[:3,3] = rand_t
-                        pose_to_use = rand_T.unsqueeze(0) @ pose_to_use
-                        
-                    world_points_b4N = pose_to_use @ cam_points_b4N
-
-                   
-                    # sample tsdf
-                    sampled_weights_N = fuser.sample_tsdf(
-                        world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
-                        what_to_sample="weights",
-                        sampling_method="nearest",
-                    )
-
-                    # set weights
-                    sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
-                    sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
-
                     threshold = 0.2
                     # print((sampled_weights_b1hw > threshold).float().mean())
-                    cur_data["depth_hint_b1hw"][sampled_weights_b1hw < threshold] = float("nan")
+                    cur_data["depth_hint_b1hw"][delta > threshold] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
@@ -345,10 +330,6 @@ def main(opts):
                     # cur_data["depth_hint_b1hw"][:] = float("nan")
                     # cur_data["depth_hint_mask_b1hw"][:] = 0.0
                     # cur_data["depth_hint_mask_b_b1hw"][:] = False
-
-                    hint_end_time.record()
-                    torch.cuda.synchronize()
-                    elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
 
                     del mesh
 
@@ -418,7 +399,6 @@ def main(opts):
 
                         # get per frame time in the batch
                         element_metrics["model_time"] = elapsed_model_time / depth_gt.shape[0]
-                        element_metrics["hint_time"] = elapsed_hint_time / depth_gt.shape[0]
 
                         # both this scene and all frame averagers
                         scene_frame_metrics.update_results(element_metrics)

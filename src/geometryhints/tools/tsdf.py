@@ -6,7 +6,8 @@ import torch
 import torch.nn.functional as TF
 import trimesh
 from skimage import measure
-
+from geometryhints.utils.pytorch3d_extras import marching_cubes
+from pytorch3d.structures import Meshes
 
 class TSDF:
 
@@ -164,6 +165,20 @@ class TSDF:
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=norms)
         return mesh
 
+    def to_mesh_pytorch3d(self, scale_to_world=True):
+        
+        tsdf_vals = self.tsdf_values.clone()
+        
+        tsdf_vals[tsdf_vals == -1] = 1
+        batched_verts, batched_faces = marching_cubes(tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False)
+        verts = batched_verts[0]
+        faces = batched_faces[0]
+        
+        if scale_to_world:
+            verts = self.origin.view(1, 3).cuda() + verts * self.voxel_size
+        
+        return Meshes(verts=[verts], faces=[faces]), verts, faces
+
     def save_mesh(self, savepath, filename):
         """Saves a mesh to disk."""
         self.cpu()
@@ -184,13 +199,15 @@ class TSDF:
             voxel_size=self.voxel_size,
         )
 
-    def sample_tsdf(self, world_points_N3, what_to_sample="tsdf"):
+    def sample_tsdf(self, world_points_N3, what_to_sample="tsdf", sampling_method="bilinear"):
         """Samples the TSDF volume at world coordinates provided.
         Args:
             world_points_N3 (torch.Tensor): Tensor of shape (N, 3) containing
                 world coordinates to sample the volume at.
             what_to_sample (str): what to sample from the TSDF volume. Can be one of
                 "tsdf", "weights", ...
+            sampling_method (str): sampling method to use. Can be one of
+                "nearest", "bilinear", "trilinear".
         Returns:
             torch.Tensor: Tensor of shape (N,) containing the values of the
                 volume at the provided world coordinates.
@@ -241,6 +258,7 @@ class TSDF:
             volume_to_sample_chwd.unsqueeze(0).type(tensor_dtype),
             voxel_coords_111N3.type(tensor_dtype),
             align_corners=True,
+            mode=sampling_method,
         ).squeeze()
 
         return values_N

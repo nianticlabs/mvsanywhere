@@ -13,7 +13,7 @@ dependencies:
   - torchvision
   - pytorch-cuda=11.7
   - pytorch-lightning=1.5.4 # training utils
-  - pytorch3d=0.7.5 # mesh rendering
+  - pytorch3d=0.7.4 # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op
   - tensorboard # logging
   - matplotlib # plotting
