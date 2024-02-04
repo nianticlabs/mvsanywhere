@@ -147,7 +147,7 @@ def render_scene_meshes(
         textures=TexturesVertex(
             torch.tensor(mesh_trimesh.visual.vertex_colors).unsqueeze(0).float() / 255.0
         ),
-    )
+    ).cuda()
 
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
@@ -161,7 +161,7 @@ def render_scene_meshes(
 
         for elem_ind, depth_1hw in enumerate(depth_b1hw):
             # save the depth map
-            depth_path = render_output_path / f"{batch['frame_id_str'][elem_ind]}.png"
+            depth_path = render_output_path / f"rendered_depth_{batch['frame_id_str'][elem_ind]}.png"
             depth_1hw[depth_1hw == -1] = 0
             mask_1hw = depth_1hw != 0
 
@@ -180,7 +180,7 @@ def render_scene_meshes(
                 sampled_weights_1hw = sampled_weights_N.view(1, 192, 256)
                 sampled_weights_1hw[~mask_1hw] = 0.0
                 
-                weights_path = render_output_path / f"{batch['frame_id_str'][elem_ind]}.png"
+                weights_path = render_output_path / f"sampled_weights_{batch['frame_id_str'][elem_ind]}.png"
                 
                 numpy_weights  = (sampled_weights_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
                 Image.fromarray(numpy_weights).save(weights_path)

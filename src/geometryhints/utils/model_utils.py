@@ -19,6 +19,8 @@ def get_model_class(opts):
 
 
 def load_model_inference(opts, model_class_to_use):
+    # model = model_class_to_use(opts)
+    # model.load_state_dict(torch.load(opts.load_weights_from_checkpoint)["state_dict"])
     model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
     if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
         model.cost_volume = model.cost_volume.to_fast()
