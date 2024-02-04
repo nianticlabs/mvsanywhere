@@ -326,7 +326,6 @@ def main(opts):
                     sampled_weights_N = fuser.sample_tsdf(
                         world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
                         what_to_sample="weights",
-                        sampling_method="nearest",
                     )
 
                     # set weights
