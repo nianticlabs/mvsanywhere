@@ -377,6 +377,12 @@ def main(opts):
                     output_path = os.path.join(viz_output_dir, scan)
                     Path(output_path).mkdir(parents=True, exist_ok=True)
 
+
+                    if "sampled_weights_b1hw" in cur_data:
+                        outputs["sampled_weights_b1hw"] = cur_data["sampled_weights_b1hw"]
+                    if "rendered_depth_b1hw" in cur_data:
+                        outputs["rendered_depth_b1hw"] = cur_data["rendered_depth_b1hw"]
+
                     quick_viz_export(
                         output_path,
                         outputs,

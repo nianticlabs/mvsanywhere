@@ -268,14 +268,14 @@ def main(opts):
             # initialize scene averager
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
 
-            render_height = int(192/2)
-            render_width = int(256/2)
-            # render_height = 192
-            # render_width = 256
+            # render_height = int(192/2)
+            # render_width = int(256/2)
+            render_height = 192
+            render_width = 256
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
 
-            scene_trimesh_mesh = None
+
             elapsed_hint_time = 0.0
             frame_ids = []
             for batch_ind, batch in enumerate(tqdm(dataloader)):
@@ -296,7 +296,7 @@ def main(opts):
                     
                     
                     # renderer expects normalized intrinsics.
-                    K_b44 = cur_data["K_s1_b44"].clone()
+                    K_b44 = cur_data["K_s0_b44"].clone()
                     K_b44[:, 0] /= render_width
                     K_b44[:, 1] /= render_height
                     rendered_depth_b1hw = mesh_renderer.render(
@@ -308,7 +308,7 @@ def main(opts):
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
                     
-                    cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s1_b44"])
+                    cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                     # transform to world
                     pose_to_use = cur_data["world_T_cam_b44"].clone()
                     if opts.wiggle_render_pose:
@@ -330,8 +330,6 @@ def main(opts):
 
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
-                    sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
-
                     cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
                     
                     hint_end_time.record()
