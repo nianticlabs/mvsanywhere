@@ -2,7 +2,7 @@
 
 conda activate geometryhints;
 
-CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/cv_hint_depth_sampled_weights_better_contd_contd_contd/version_0/checkpoints/epoch=11-step=79071.ckpt'
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/cv_hint_depth_sampled_weights_better_contd_contd_contd/version_0/checkpoints/last.ckpt'
 CONFIG='/mnt/nas/personal/mohameds/geometry_hints/weights/cv_hint_depth_sampled_weights_better_contd_contd_contd/version_0/config.yaml'
 
 echo $CHECKPOINT
@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 1.0 \
 --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
---name cv_hint_depth_sampled_weights_no_hint;
+--name cv_hint_depth_sampled_weights_better_no_hint;
 
 CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --config_file $CONFIG \
@@ -30,7 +30,7 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 0.0 \
 --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
---name cv_hint_depth_sampled_weights_with_hint;
+--name cv_hint_depth_sampled_weights_better_with_hint;
 
 CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --config_file $CONFIG \
@@ -42,5 +42,19 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 0.0 \
 --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
---name cv_hint_depth_sampled_weights_no_sweep_with_hints \
+--name cv_hint_depth_sampled_weights_better_with_hint_null \
 --null_plane_sweep;
+
+CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test_incremental_render  \
+--config_file $CONFIG \
+--load_weights_from_checkpoint $CHECKPOINT \
+--data_config configs/data/scannet_default_test.yaml  \
+--num_workers 12  \
+--batch_size 1  \
+--output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/  \
+--dataset_path /mnt/scannet  \
+--depth_hint_aug 0.0  \
+--name cv_hint_depth_sampled_weights_better_incremental \
+--run_fusion \
+--plane_sweep_ablation_ratio 0.0  \
+--load_empty_hint;

@@ -303,7 +303,6 @@ def main(opts):
                         mesh, cur_data["cam_T_world_b44"].clone(), K_b44
                     )
                     cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
-
                     cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
@@ -322,7 +321,6 @@ def main(opts):
                         pose_to_use = rand_T.unsqueeze(0) @ pose_to_use
                         
                     world_points_b4N = pose_to_use @ cam_points_b4N
-
                    
                     # sample tsdf
                     sampled_weights_N = fuser.sample_tsdf(
@@ -335,26 +333,13 @@ def main(opts):
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
                     sampled_weights_b1hw[rendered_depth_b1hw < 0.001] = 0
 
-                    threshold = 0.2
-                    # print((sampled_weights_b1hw > threshold).float().mean())
-                    cur_data["depth_hint_b1hw"][sampled_weights_b1hw < threshold] = float("nan")
-                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-
-                    # if cur_data["depth_hint_mask_b1hw"].mean() < 0.8:
-                    # cur_data["depth_hint_b1hw"][:] = float("nan")
-                    # cur_data["depth_hint_mask_b1hw"][:] = 0.0
-                    # cur_data["depth_hint_mask_b_b1hw"][:] = False
-
+                    cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
+                    
                     hint_end_time.record()
                     torch.cuda.synchronize()
                     elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
 
                     del mesh
-
-                    # cur_data["depth_hint_b1hw"][:] = torch.nan
-                    # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
                 else:
                     # load empty hints
@@ -362,6 +347,8 @@ def main(opts):
                     cur_data["depth_hint_b1hw"][:] = float("nan")
                     cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
+                    cur_data["sampled_weights_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"]) 
+                    
 
                     sampled_weights_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     rendered_depth_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
