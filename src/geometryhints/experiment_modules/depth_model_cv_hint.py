@@ -34,6 +34,8 @@ from geometryhints.utils.generic_utils import (
 from geometryhints.utils.geometry_utils import NormalGenerator
 from geometryhints.utils.metrics_utils import compute_depth_metrics
 from geometryhints.utils.visualization_utils import colormap_image
+from geometryhints.utils.augmentation_utils import CustomColorJitter
+
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +223,8 @@ class DepthModelCVHint(pl.LightningModule):
             )
 
         self.tensor_formatter = TensorFormatter()
+        
+        self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
 
     def compute_matching_feats(
         self,
@@ -585,6 +589,14 @@ class DepthModelCVHint(pl.LightningModule):
             source views.
         """
         cur_data, src_data = batch
+
+        if phase == "train":
+            cur_data["image_b3hw"] = self.color_aug(cur_data["image_b3hw"], denormalize_first=True)
+            for src_ind in range(src_data["image_b3hw"].shape[1]):
+                src_data["image_b3hw"][:, src_ind] = self.color_aug(
+                    src_data["image_b3hw"][:, src_ind], denormalize_first=True
+                )
+
 
         # forward pass through the model.
         outputs = self(

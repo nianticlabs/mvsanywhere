@@ -550,9 +550,9 @@ class GenericMVSDataset(Dataset):
         # Load image
         image = self.load_color(scan_id, frame_id)
 
-        # Augment images
-        if self.split == "train":
-            image = self.color_transform(image)
+        # # Augment images
+        # if self.split == "train":
+        #     image = self.color_transform(image)
 
         if flip:
             image = torch.flip(image, (-1,))
