@@ -1736,21 +1736,18 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             + num_mask_channels
             + num_num_dot_channels
             + num_pose_penalty_channels
+            + 2
         )
 
         # initialize the MLP
         self.mlp = MLP(channel_list=mlp_channels, disable_final_activation=True)
+
         # tell the world what's happening here.
         print(f"".center(80, "#"))
         print(f" Using FeatureVolumeManager ".center(80, "#"))
         print(f" Number of source views: ".ljust(30, " ") + f"{num_source_views}  ")
         print(f" Using all metadata.  ")
         print(f" Number of channels: ".ljust(30, " ") + f"{mlp_channels}  ")
-        
-        
-        mlp_channels = [4, 12, 12, 1]
-        self.hint_mlp = MLP(channel_list=mlp_channels, disable_final_activation=True)
-        print(f" Number of hint MLP channels: ".ljust(30, " ") + f"{mlp_channels}  ")
         print(f"".center(80, "#"))
         print("")
 
@@ -1861,7 +1858,7 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             size=depth_planes_bdhw.shape[-2:],
             mode="nearest",
         )
-
+        
         depth_hint_sampled_weights_b1hw = F.interpolate(
             cv_depth_hint_dict["sampled_weights_b1hw"],
             size=depth_planes_bdhw.shape[-2:],
@@ -1881,6 +1878,11 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
         nuke_mask_b = torch.ones_like(plane_sweep_ignore_b)
         nuke_mask_b[plane_sweep_ignore_b] = 0.0
         nuke_mask_b = nuke_mask_b.view(nuke_mask_b.shape[0], 1, 1, 1)
+
+        if not nuke_mask_b.all():
+            frame_pose_dist_bkhw = frame_pose_dist_bkhw * nuke_mask_b
+            r_measure_bkhw = r_measure_bkhw * nuke_mask_b
+            t_measure_bkhw = t_measure_bkhw * nuke_mask_b
 
         all_dps = []
         # Intialize the cost volume and the countsx
@@ -2028,6 +2030,16 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                 3,
             )
 
+            if not nuke_mask_b.all():
+                # handle plane sweep ignore
+                combined_visual_features_bchw = combined_visual_features_bchw * nuke_mask_b
+                mask = mask * nuke_mask_b
+                depths *= nuke_mask_b
+                depth_plane_b1hw *= nuke_mask_b
+                dot_product_bkhw *= nuke_mask_b
+                ray_angle_bkhw *= nuke_mask_b
+                all_rays_bchw *= nuke_mask_b
+
             # concat all input visual and metadata features.
             mlp_input_features_bchw = torch.cat(
                 [
@@ -2041,27 +2053,15 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
                     frame_pose_dist_bkhw,
                     r_measure_bkhw,
                     t_measure_bkhw,
+                    current_hint_map_b1hw,
+                    depth_hint_sampled_weights_b1hw,
                 ],
                 dim=1,
             )
 
             # run through the MLP!
             mlp_input_features_bhwc = mlp_input_features_bchw.permute(0, 2, 3, 1)
-            plane_sweep_features_bhw1 = self.mlp(mlp_input_features_bhwc)
-            
-            
-            if not nuke_mask_b.all():
-                # handle plane sweep ignore
-                plane_sweep_features_bhw1 = plane_sweep_features_bhw1 * nuke_mask_b
-                
-            feature_b1hw = self.hint_mlp(
-                torch.cat([
-                    plane_sweep_features_bhw1,
-                    current_hint_map_b1hw.permute(0, 2, 3, 1),
-                    depth_hint_sampled_weights_b1hw.permute(0, 2, 3, 1),
-                    depth_plane_b1hw.permute(0, 2, 3, 1),
-                ], dim=-1)
-            ).squeeze(-1).unsqueeze(1)
+            feature_b1hw = self.mlp(mlp_input_features_bhwc).squeeze(-1).unsqueeze(1)
 
             # append MLP output to the final cost volume output.
             all_dps.append(feature_b1hw)
