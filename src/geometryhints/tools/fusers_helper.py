@@ -44,6 +44,9 @@ class OurFuser(DepthFuser):
         if gt_path is not None:
             gt_mesh = trimesh.load(gt_path, force="mesh")
             tsdf_pred = TSDF.from_mesh(gt_mesh, voxel_size=fusion_resolution)
+            # scan_name = gt_path.split("/")[-1].strip("_vh_clean_2.ply")
+            # tsdf_pred = TSDF.from_file(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/{scan_name}_tsdf.npz")
+            # tsdf_pred.cuda()
         else:
             bounds = {}
             bounds["xmin"] = -10.0

@@ -184,12 +184,12 @@ def main(opts):
         print(f"".center(80, "#"))
         print("")
 
+
+    viz_output_folder_name = "quick_viz"
+    viz_output_dir = os.path.join(results_path, "viz", viz_output_folder_name)
+    Path(viz_output_dir).mkdir(parents=True, exist_ok=True)
     # set up directories for quick depth visualizations
     if opts.dump_depth_visualization:
-        viz_output_folder_name = "quick_viz"
-        viz_output_dir = os.path.join(results_path, "viz", viz_output_folder_name)
-
-        Path(viz_output_dir).mkdir(parents=True, exist_ok=True)
         print(f"".center(80, "#"))
         print(f" Saving quick viz.".center(80, "#"))
         print(f"Output directory:\n{viz_output_dir} ".center(80, "#"))
@@ -278,6 +278,7 @@ def main(opts):
 
             elapsed_hint_time = 0.0
             frame_ids = []
+            weights_list = []
             for batch_ind, batch in enumerate(tqdm(dataloader)):
                 # get data, move to GPU
                 cur_data, src_data = batch
@@ -330,6 +331,13 @@ def main(opts):
 
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
+                    
+                    # sampled_weights_b1hw[sampled_weights_b1hw < 0.1] = 0.0
+                    # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.1] = float("nan")
+                    # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                    # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+                    
+                    weights_list.append(sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item())
                     cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
                     
                     hint_end_time.record()
@@ -526,6 +534,26 @@ def main(opts):
                 print_running_metrics=True,
             )
 
+            # make a histogram of weights using matplotlib
+            if len(weights_list) > 0:
+                import matplotlib.pyplot as plt
+                import numpy as np
+                # clear the current figure
+                plt.clf()
+                # save weights list to disk
+                np.save(os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_avg.npy"), np.array(weights_list))
+                plt.hist(np.array(weights_list), bins=np.linspace(0,0.7, 15), alpha=0.5, color='b', edgecolor='black')
+                # set xlim and ylim
+                plt.xlim(0, 0.7)
+                # set x and y axis labels
+                plt.xlabel("Weight")
+                plt.ylabel("Frame Mean Frequency")
+                plt.savefig(os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_histogram.png"))
+
+
+            if opts.dump_depth_visualization:
+                load_and_merge_images(frame_ids, viz_output_path, fps=10)
+
         # compute and print final average
         print("\nFinal metrics:")
         all_scene_metrics.compute_final_average()
@@ -547,9 +575,6 @@ def main(opts):
         all_frame_metrics.output_json(
             os.path.join(scores_output_dir, f"all_frame_avg_metrics_{opts.split}.json")
         )
-
-        if opts.dump_depth_visualization:
-            load_and_merge_images(frame_ids, viz_output_path, fps=10)
 
 
 if __name__ == "__main__":
