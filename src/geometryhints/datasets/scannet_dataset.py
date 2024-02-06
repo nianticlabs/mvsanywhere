@@ -103,6 +103,7 @@ class ScannetDataset(GenericMVSDataset):
         load_empty_hints=False,
         depth_hint_aug=0.0,
         depth_hint_dir=None,
+        disable_flip=False,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -129,6 +130,7 @@ class ScannetDataset(GenericMVSDataset):
             load_empty_hints=load_empty_hints,
             depth_hint_dir=depth_hint_dir,
             depth_hint_aug=depth_hint_aug,
+            disable_flip=disable_flip,
         )
 
         """

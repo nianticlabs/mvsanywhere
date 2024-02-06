@@ -244,6 +244,7 @@ def main(opts):
                 depth_hint_aug=opts.depth_hint_aug,
                 depth_hint_dir=opts.depth_hint_dir,
                 load_empty_hints=opts.load_empty_hint,
+                disable_flip=True,
             )
 
             dataloader = torch.utils.data.DataLoader(

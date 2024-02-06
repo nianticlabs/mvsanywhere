@@ -75,6 +75,7 @@ class GenericMVSDataset(Dataset):
         load_empty_hints=False,
         depth_hint_aug=0.0,
         depth_hint_dir=None,
+        disable_flip=False,
     ):
         """
         Args:
@@ -215,6 +216,8 @@ class GenericMVSDataset(Dataset):
         self.load_empty_hints = load_empty_hints
         self.depth_hint_dir = depth_hint_dir
         self.depth_hint_aug = depth_hint_aug
+        
+        self.disable_flip = disable_flip
 
     def __len__(self):
         return len(self.frame_tuples)
@@ -662,7 +665,7 @@ class GenericMVSDataset(Dataset):
             src_data: stacked frame data for each source frame
         """
 
-        flip_threshold = 0.5 if self.split == "train" else 0.0
+        flip_threshold = 0.5 if self.split == "train" and not self.disable_flip else 0.0
         flip = torch.rand(1).item() < flip_threshold
 
         # get the index of the tuple
