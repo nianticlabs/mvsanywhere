@@ -592,7 +592,7 @@ class ScannetDataset(GenericMVSDataset):
         """
         depth_hint_dict = {}
         
-        partial_hint = torch.rand(1).item() < 0.5 and split != "test":
+        partial_hint = torch.rand(1).item() < 0.5 and self.split != "test":
         
         if partial_hint:
             depth_hint_root = self.depth_hint_dir.replace("/renders", "/partial_renders")
