@@ -332,12 +332,13 @@ def main(opts):
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
                     
-                    sampled_weights_b1hw[sampled_weights_b1hw < 0.1] = 0.0
-                    cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.1] = float("nan")
-                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+                    # sampled_weights_b1hw[sampled_weights_b1hw < 0.1] = 0.0
+                    # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.1] = float("nan")
+                    # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                    # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
                     
                     weights_list.append(sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item())
+                    sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                     cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
                     
                     hint_end_time.record()
