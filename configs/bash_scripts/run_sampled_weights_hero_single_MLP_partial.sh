@@ -4,6 +4,7 @@ conda activate geometryhints;
 
 CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/hero_model_sampled_weights_single_MLP_partial/version_2/checkpoints/epoch=7-step=88141.ckpt'
 CONFIG='/mnt/nas/personal/mohameds/geometry_hints/weights/hero_model_sampled_weights_single_MLP_partial/version_2/config.yaml'
+RENDER_DIR='~/geometryhints/data/renders'
 
 echo $CHECKPOINT
 echo $CONFIG
@@ -17,7 +18,7 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/ \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 1.0 \
---depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
+--depth_hint_dir $RENDER_DIR  \
 --name hero_model_sampled_weights_single_MLP_partial_no_hint;
 
 CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
@@ -29,7 +30,7 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/ \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 0.0 \
---depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
+--depth_hint_dir $RENDER_DIR  \
 --name hero_model_sampled_weights_single_MLP_partial_with_hint;
 
 CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
@@ -41,7 +42,7 @@ CUDA_VISIBLE_DEVICES=$1 python -m geometryhints.test \
 --output_base_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/ \
 --dataset_path /mnt/scannet \
 --depth_hint_aug 0.0 \
---depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders/  \
+--depth_hint_dir $RENDER_DIR  \
 --name hero_model_sampled_weights_single_MLP_partial_with_hint_null \
 --null_plane_sweep;
 
