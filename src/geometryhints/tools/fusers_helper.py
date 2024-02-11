@@ -214,12 +214,14 @@ def get_fuser(opts, scan):
                 "Color will not be fused."
             )
 
-        return OurFuser(
+        fuser = OurFuser(
             gt_path=gt_path,
             fusion_resolution=opts.fusion_resolution,
             max_fusion_depth=opts.fusion_max_depth,
             fuse_color=False,
         )
+        fuser.tsdf_fuser_pred.tsdf.cuda()
+        return fuser
     if opts.depth_fuser == "open3d":
         return Open3DFuser(
             gt_path=gt_path,
