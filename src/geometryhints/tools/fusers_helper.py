@@ -89,13 +89,16 @@ class OurFuser(DepthFuser):
             torch.Tensor: Tensor of shape (N,) containing the values of the
                 volume at the provided world coordinates.
         """
-        return self.tsdf_fuser_pred.tsdf.sample_tsdf(world_points_N3, what_to_sample=what_to_sample, sampling_method=sampling_method)
+        return self.tsdf_fuser_pred.tsdf.sample_tsdf(
+            world_points_N3, what_to_sample=what_to_sample, sampling_method=sampling_method
+        )
 
     def get_mesh(self, export_single_mesh=True, convert_to_trimesh=True):
         return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh)
 
     def get_mesh_pytorch3d(self, scale_to_world=True):
         return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(scale_to_world=scale_to_world)
+
 
 class Open3DFuser(DepthFuser):
     """
@@ -198,6 +201,7 @@ class Open3DFuser(DepthFuser):
 
     def save_tsdf(self, path):
         return
+
 
 def get_fuser(opts, scan):
     """Returns the depth fuser required. Our fuser doesn't allow for"""

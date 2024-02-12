@@ -107,18 +107,19 @@
                     --batch_size 4;
 """
 
-import pytorch_lightning as pl
-
 import os
 from pathlib import Path
 
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from pytorch3d.renderer import TexturesVertex
+from pytorch3d.structures import Meshes
 from tqdm import tqdm
-from geometryhints.datasets.scannet_dataset import ScannetDataset
 
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
+from geometryhints.datasets.scannet_dataset import ScannetDataset
 from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
@@ -134,8 +135,6 @@ from geometryhints.utils.metrics_utils import (
 from geometryhints.utils.model_utils import get_model_class, load_model_inference
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 from geometryhints.utils.visualization_utils import quick_viz_export
-from pytorch3d.structures import Meshes
-from pytorch3d.renderer import TexturesVertex
 
 
 def main(opts):
@@ -264,14 +263,14 @@ def main(opts):
                 gt_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
             else:
                 gt_path = None
-            
+
             hint_fuser = fusers_helper.OurFuser(
                 gt_path=gt_path,
                 fusion_resolution=0.04,
                 max_fusion_depth=opts.fusion_max_depth,
                 fuse_color=False,
             )
-            for batch_ind, batch in enumerate(tqdm(dataloader, desc='First pass')):
+            for batch_ind, batch in enumerate(tqdm(dataloader, desc="First pass")):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
@@ -353,12 +352,10 @@ def main(opts):
                     color_frame,
                 )
 
-            
             # tsdf_pred = TSDF.from_file(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/{scan}_tsdf.npz")
             # tsdf_pred.cuda()
             # hint_fuser.tsdf_fuser_pred.tsdf = tsdf_pred
             pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
-
 
             # scene_trimesh_mesh = hint_fuser.get_mesh(convert_to_trimesh=True)
             # pytorch_hint_mesh = Meshes(
@@ -401,31 +398,30 @@ def main(opts):
                 num_workers=opts.num_workers,
                 drop_last=False,
             )
-            
+
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
-            
+
             if opts.run_fusion:
                 fuser = fusers_helper.get_fuser(opts, scan)
-        
-            
+
             hint_start_time = torch.cuda.Event(enable_timing=True)
             hint_end_time = torch.cuda.Event(enable_timing=True)
             render_height = 192
             render_width = 256
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
-            
-            for batch_ind, batch in enumerate(tqdm(dataloader, desc='Second pass')):
+
+            for batch_ind, batch in enumerate(tqdm(dataloader, desc="Second pass")):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
                 src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
 
                 depth_gt = cur_data["full_res_depth_b1hw"]
-                
+
                 # render hints and sample tsdf
                 hint_start_time.record()
-                
+
                 # renderer expects normalized intrinsics.
                 K_b44 = cur_data["K_s0_b44"].clone()
                 K_b44[:, 0] /= render_width
@@ -438,11 +434,10 @@ def main(opts):
                 cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                 cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
-                
                 cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                 # transform to world
                 world_points_b4N = cur_data["world_T_cam_b44"] @ cam_points_b4N
-                
+
                 # sample tsdf
                 sampled_weights_N_list = []
                 for world_points_4N in world_points_b4N:
@@ -454,12 +449,13 @@ def main(opts):
                     sampled_weights_N_list.append(sampled_weights_N)
 
                 # sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
-                sampled_weights_b1hw = torch.stack(sampled_weights_N_list, 0).view(cur_data["image_b3hw"].shape[0], 1, render_height, render_width)
-                
-            
+                sampled_weights_b1hw = torch.stack(sampled_weights_N_list, 0).view(
+                    cur_data["image_b3hw"].shape[0], 1, render_height, render_width
+                )
+
                 sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                 cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
-                
+
                 hint_end_time.record()
                 torch.cuda.synchronize()
                 elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
@@ -580,7 +576,6 @@ def main(opts):
                     output_path = os.path.join(viz_output_dir, scan)
                     Path(output_path).mkdir(parents=True, exist_ok=True)
 
-
                     if "sampled_weights_b1hw" in cur_data:
                         outputs["sampled_weights_b1hw"] = cur_data["sampled_weights_b1hw"]
                     if "rendered_depth_b1hw" in cur_data:
@@ -657,7 +652,6 @@ def main(opts):
         all_frame_metrics.output_json(
             os.path.join(scores_output_dir, f"all_frame_avg_metrics_{opts.split}.json")
         )
-
 
 
 if __name__ == "__main__":

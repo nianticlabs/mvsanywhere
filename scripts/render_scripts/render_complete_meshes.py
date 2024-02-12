@@ -151,9 +151,6 @@ def render_scene_meshes(
 
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
-
-    
-    
     image_list = []
     for batch in tqdm.tqdm(dataloader):
         with torch.no_grad():
@@ -161,31 +158,38 @@ def render_scene_meshes(
 
         for elem_ind, depth_1hw in enumerate(depth_b1hw):
             # save the depth map
-            depth_path = render_output_path / f"rendered_depth_{batch['frame_id_str'][elem_ind]}.png"
+            depth_path = (
+                render_output_path / f"rendered_depth_{batch['frame_id_str'][elem_ind]}.png"
+            )
             depth_1hw[depth_1hw == -1] = 0
             mask_1hw = depth_1hw != 0
 
             numpy_depth = (depth_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
             Image.fromarray(numpy_depth).save(depth_path)
-            
+
             sampled_weights_1hw = None
             if data_to_render == "both":
                 K_b44 = batch["K_b44"][elem_ind][None].cuda()
-                K_b44[:,0] *= width
-                K_b44[:,1] *= height
+                K_b44[:, 0] *= width
+                K_b44[:, 1] *= height
                 invK_b44 = torch.linalg.inv(K_b44)
                 cam_points_b4N = backprojector(depth_1hw[None], invK_b44)
-                world_points_b4N = batch["world_T_cam_b44"][elem_ind][None].cuda() @ cam_points_b4N.cuda()
-                sampled_weights_N = tsdf.sample_tsdf(world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1), what_to_sample="weights")
+                world_points_b4N = (
+                    batch["world_T_cam_b44"][elem_ind][None].cuda() @ cam_points_b4N.cuda()
+                )
+                sampled_weights_N = tsdf.sample_tsdf(
+                    world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1), what_to_sample="weights"
+                )
                 sampled_weights_1hw = sampled_weights_N.view(1, 192, 256)
                 sampled_weights_1hw[~mask_1hw] = 0.0
-                
-                weights_path = render_output_path / f"sampled_weights_{batch['frame_id_str'][elem_ind]}.png"
-                
-                numpy_weights  = (sampled_weights_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
+
+                weights_path = (
+                    render_output_path / f"sampled_weights_{batch['frame_id_str'][elem_ind]}.png"
+                )
+
+                numpy_weights = (sampled_weights_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
                 Image.fromarray(numpy_weights).save(weights_path)
-                
-                
+
             # for debug. make and dump a video.
             colormapped_depth = colormap_image(depth_1hw, mask_1hw.float(), vmin=0.0, vmax=4)
             if sampled_weights_1hw is not None:
@@ -196,8 +200,10 @@ def render_scene_meshes(
                     colormap="magma",
                     flip="False",
                 )
-                colormapped_depth = torch.cat([colormapped_depth.cpu(), colormapped_weights.cpu()], dim=2)
-                
+                colormapped_depth = torch.cat(
+                    [colormapped_depth.cpu(), colormapped_weights.cpu()], dim=2
+                )
+
             numpy_depth = np.uint8(colormapped_depth.permute(1, 2, 0).cpu().detach().numpy() * 255)
             image_list.append(numpy_depth)
 

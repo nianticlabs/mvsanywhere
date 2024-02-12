@@ -111,12 +111,12 @@
 import os
 from pathlib import Path
 
+import pytorch3d
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from pytorch3d.renderer import TexturesVertex
 from pytorch3d.structures import Meshes
-import pytorch3d
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
@@ -183,7 +183,6 @@ def main(opts):
         print(f"Output directory:\n{depth_output_dir} ".center(80, "#"))
         print(f"".center(80, "#"))
         print("")
-
 
     viz_output_folder_name = "quick_viz"
     viz_output_dir = os.path.join(results_path, "viz", viz_output_folder_name)
@@ -275,7 +274,6 @@ def main(opts):
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
 
-
             elapsed_hint_time = 0.0
             frame_ids = []
             weights_list = []
@@ -288,14 +286,12 @@ def main(opts):
                 for i in range(len(cur_data["frame_id_string"])):
                     frame_ids.append(cur_data["frame_id_string"][i])
 
-                
                 # get mesh render for hint, but after 12 keyframes have passed.
                 if batch_ind * opts.batch_size > 0:
                     hint_start_time.record()
-                    
+
                     mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True)
-                    
-                    
+
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s0_b44"].clone()
                     K_b44[:, 0] /= render_width
@@ -308,21 +304,22 @@ def main(opts):
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
-                    
                     cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                     # transform to world
                     pose_to_use = cur_data["world_T_cam_b44"].clone()
                     if opts.wiggle_render_pose:
                         rand_t = (torch.randn(3) * 0.04).type_as(pose_to_use)
                         rand_rot = torch.randn(3) * 0.03
-                        rot_mat = torch.tensor(rotx(rand_rot[0]) @ roty(rand_rot[1]) @ rotz(rand_rot[2])).type_as(pose_to_use)
+                        rot_mat = torch.tensor(
+                            rotx(rand_rot[0]) @ roty(rand_rot[1]) @ rotz(rand_rot[2])
+                        ).type_as(pose_to_use)
                         rand_T = torch.eye(4).cuda().type_as(pose_to_use)
-                        rand_T[:3,:3] = rot_mat
-                        rand_T[:3,3] = rand_t
+                        rand_T[:3, :3] = rot_mat
+                        rand_T[:3, 3] = rand_t
                         pose_to_use = rand_T.unsqueeze(0) @ pose_to_use
-                        
+
                     world_points_b4N = pose_to_use @ cam_points_b4N
-                   
+
                     # sample tsdf
                     sampled_weights_N = fuser.sample_tsdf(
                         world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
@@ -331,16 +328,18 @@ def main(opts):
 
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
-                    
+
                     # sampled_weights_b1hw[sampled_weights_b1hw < 0.1] = 0.0
                     # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.1] = float("nan")
                     # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                     # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                    
-                    weights_list.append(sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item())
+
+                    weights_list.append(
+                        sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item()
+                    )
                     sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                     cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
-                    
+
                     hint_end_time.record()
                     torch.cuda.synchronize()
                     elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
@@ -353,8 +352,7 @@ def main(opts):
                     cur_data["depth_hint_b1hw"][:] = float("nan")
                     cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
-                    cur_data["sampled_weights_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"]) 
-                    
+                    cur_data["sampled_weights_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
 
                     sampled_weights_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
                     rendered_depth_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
@@ -539,18 +537,29 @@ def main(opts):
             if len(weights_list) > 0:
                 import matplotlib.pyplot as plt
                 import numpy as np
+
                 # clear the current figure
                 plt.clf()
                 # save weights list to disk
-                np.save(os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_avg.npy"), np.array(weights_list))
-                plt.hist(np.array(weights_list), bins=np.linspace(0,0.7, 15), alpha=0.5, color='b', edgecolor='black')
+                np.save(
+                    os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_avg.npy"),
+                    np.array(weights_list),
+                )
+                plt.hist(
+                    np.array(weights_list),
+                    bins=np.linspace(0, 0.7, 15),
+                    alpha=0.5,
+                    color="b",
+                    edgecolor="black",
+                )
                 # set xlim and ylim
                 plt.xlim(0, 0.7)
                 # set x and y axis labels
                 plt.xlabel("Weight")
                 plt.ylabel("Frame Mean Frequency")
-                plt.savefig(os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_histogram.png"))
-
+                plt.savefig(
+                    os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_histogram.png")
+                )
 
             if opts.dump_depth_visualization:
                 load_and_merge_images(frame_ids, viz_output_path, fps=10)

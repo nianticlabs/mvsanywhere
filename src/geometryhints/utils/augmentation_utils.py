@@ -4,7 +4,10 @@ import kornia
 import torch
 from torch import Tensor
 
-from geometryhints.utils.generic_utils import imagenet_normalize, reverse_imagenet_normalize
+from geometryhints.utils.generic_utils import (
+    imagenet_normalize,
+    reverse_imagenet_normalize,
+)
 
 
 class CustomColorJitter(torch.nn.Module):

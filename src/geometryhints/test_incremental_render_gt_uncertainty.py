@@ -319,7 +319,7 @@ def main(opts):
                     delta = torch.abs(rendered_depth_b1hw - cur_data["depth_b1hw"])
                     delta[~cur_data["mask_b_b1hw"].bool()] = 0.0
                     delta[rendered_depth_b1hw < 0.001] = 10.0
-                    
+
                     threshold = 0.2
                     # print((sampled_weights_b1hw > threshold).float().mean())
                     cur_data["depth_hint_b1hw"][delta > threshold] = float("nan")

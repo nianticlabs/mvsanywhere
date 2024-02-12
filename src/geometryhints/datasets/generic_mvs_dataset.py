@@ -216,7 +216,7 @@ class GenericMVSDataset(Dataset):
         self.load_empty_hints = load_empty_hints
         self.depth_hint_dir = depth_hint_dir
         self.depth_hint_aug = depth_hint_aug
-        
+
         self.disable_flip = disable_flip
 
     def __len__(self):

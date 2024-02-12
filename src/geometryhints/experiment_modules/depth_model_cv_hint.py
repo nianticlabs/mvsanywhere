@@ -12,13 +12,10 @@ from geometryhints.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from geometryhints.modules.cost_volume import (
-    CostVolumeManager,
-    FeatureHintVolumeManager,
-    FeatureMeshHintVolumeManager,
-    FeatureVolumeManager,
-)
+from geometryhints.modules.cost_volume import CostVolumeManager
+from geometryhints.modules.feature_volume import FeatureVolumeManager
 from geometryhints.modules.layers import TensorFormatter
+from geometryhints.modules.mesh_hint_volume import FeatureMeshHintVolumeManager
 from geometryhints.modules.networks import (
     CVEncoder,
     DepthDecoderPP,
@@ -26,6 +23,7 @@ from geometryhints.modules.networks import (
     UNetMatchingEncoder,
 )
 from geometryhints.modules.networks_fast import SkipDecoderRegression
+from geometryhints.utils.augmentation_utils import CustomColorJitter
 from geometryhints.utils.generic_utils import (
     reverse_imagenet_normalize,
     tensor_B_to_bM,
@@ -34,8 +32,6 @@ from geometryhints.utils.generic_utils import (
 from geometryhints.utils.geometry_utils import NormalGenerator
 from geometryhints.utils.metrics_utils import compute_depth_metrics
 from geometryhints.utils.visualization_utils import colormap_image
-from geometryhints.utils.augmentation_utils import CustomColorJitter
-
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +219,7 @@ class DepthModelCVHint(pl.LightningModule):
             )
 
         self.tensor_formatter = TensorFormatter()
-        
+
         self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
 
     def compute_matching_feats(
@@ -596,7 +592,6 @@ class DepthModelCVHint(pl.LightningModule):
                 src_data["image_b3hw"][:, src_ind] = self.color_aug(
                     src_data["image_b3hw"][:, src_ind], denormalize_first=True
                 )
-
 
         # forward pass through the model.
         outputs = self(

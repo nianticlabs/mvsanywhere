@@ -12,13 +12,10 @@ from geometryhints.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from geometryhints.modules.cost_volume import (
-    CostVolumeManager,
-    FeatureHintVolumeManager,
-    FeatureMeshHintVolumeManager,
-    FeatureVolumeManager,
-)
+from geometryhints.modules.cost_volume import CostVolumeManager
+from geometryhints.modules.feature_volume import FeatureVolumeManager
 from geometryhints.modules.layers import TensorFormatter
+from geometryhints.modules.mesh_hint_volume import FeatureMeshHintVolumeManager
 from geometryhints.modules.networks import (
     CVEncoder,
     DepthDecoderPP,

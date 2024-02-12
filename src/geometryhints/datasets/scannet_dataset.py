@@ -591,7 +591,7 @@ class ScannetDataset(GenericMVSDataset):
             depth_hint_dict: depth hint dict.
         """
         depth_hint_dict = {}
-        
+
         if mark_all_empty:
             depth_hint_1hw = torch.zeros(1, self.depth_height, self.depth_width)
             depth_hint_1hw[:] = torch.nan
@@ -599,24 +599,26 @@ class ScannetDataset(GenericMVSDataset):
             depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_1hw).bool()
             sampled_weights_1hw = torch.zeros_like(depth_hint_1hw)
         else:
-            
             partial_hint = torch.rand(1).item() < 0.5 and self.split != "test"
-            
+
             if partial_hint:
                 depth_hint_root = self.depth_hint_dir.replace("/renders", "/partial_renders")
             else:
                 depth_hint_root = self.depth_hint_dir
-            
-            depth_hint_path = os.path.join(depth_hint_root, scan_id, f"rendered_depth_{int(frame_id)}.png")
+
+            depth_hint_path = os.path.join(
+                depth_hint_root, scan_id, f"rendered_depth_{int(frame_id)}.png"
+            )
 
             depth_hint_1hw = read_image_file(depth_hint_path, value_scale_factor=1 / 256)
             depth_hint_mask_1hw = (depth_hint_1hw > 0).float()
             depth_hint_mask_b_1hw = depth_hint_1hw > 0
             depth_hint_1hw[~depth_hint_mask_b_1hw] = torch.nan
-            
-            sampled_weights_path = os.path.join(depth_hint_root, scan_id, f"sampled_weights_{int(frame_id)}.png")
-            sampled_weights_1hw = read_image_file(sampled_weights_path, value_scale_factor=1 / 256)
 
+            sampled_weights_path = os.path.join(
+                depth_hint_root, scan_id, f"sampled_weights_{int(frame_id)}.png"
+            )
+            sampled_weights_1hw = read_image_file(sampled_weights_path, value_scale_factor=1 / 256)
 
             if flip:
                 depth_hint_1hw = torch.flip(depth_hint_1hw, (-1,))
