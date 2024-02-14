@@ -40,8 +40,8 @@ class MSM(ConfidenceMetric):
         return conf
 
 
-class MM(ConfidenceMetric):
-    """Maximum Margin confidence measure"""
+class MMN(ConfidenceMetric):
+    """Maximum Margin Naive confidence measure"""
 
     def __init__(self, is_cost: bool, use_sigmoid: bool = False):
         """
@@ -54,7 +54,7 @@ class MM(ConfidenceMetric):
         self.use_sigmoid = use_sigmoid
 
     def forward(self, volume: torch.Tensor):
-        """Maximum Margin confidence.
+        """Maximum Margin Naive confidence.
         It computes the difference between the top2 min (max) and the top1 min(max) of the
         cost (similarity) for each depth plane.
 
