@@ -153,8 +153,11 @@ class PartialFuser:
                 # pick the right depth
                 cached_data = self.cached_depths[frame_id_to_fuse]
                 # fuse
+                noise = torch.rand(1) * 0.05
+                noise = noise * (-1 if torch.rand(1) > 0.5 else 1)
+                noise = 1 + noise 
                 self.fuser.fuse_frames(
-                    depths_b1hw=cached_data["depth_pred_s0_b1hw"],
+                    depths_b1hw=cached_data["depth_pred_s0_b1hw"] * noise.cuda(),
                     K_b44=cached_data["K_s0_b44"],
                     cam_T_world_b44=cached_data["cam_T_world_b44"],
                     color_b3hw=None,
