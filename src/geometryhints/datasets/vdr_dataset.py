@@ -53,6 +53,11 @@ class VDRDataset(GenericMVSDataset):
         verbose_init=True,
         native_depth_width=256,
         native_depth_height=192,
+        fill_depth_hints=False,
+        load_empty_hints=False,
+        depth_hint_aug=0.0,
+        depth_hint_dir=None,
+        disable_flip=False,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -77,6 +82,11 @@ class VDRDataset(GenericMVSDataset):
             verbose_init=verbose_init,
             native_depth_width=native_depth_width,
             native_depth_height=native_depth_height,
+            fill_depth_hints=fill_depth_hints,
+            load_empty_hints=load_empty_hints,
+            depth_hint_dir=depth_hint_dir,
+            depth_hint_aug=depth_hint_aug,
+            disable_flip=disable_flip,
         )
 
         self.capture_metadata = {}
@@ -554,3 +564,30 @@ class VDRDataset(GenericMVSDataset):
 
         # instead return the default image
         return os.path.join(scene_path, f"frame_{frame_id}.jpg")
+
+    def load_depth_hint(self, scan_id, frame_id, flip=False, mark_all_empty=False):
+        """Loads a depth hint for a frame if it exists.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+            flip: if the hint should be flipped along x.
+            mark_all_empty: if the hint should be marked as empty.
+
+        Returns:
+            depth_hint_dict: depth hint dict.
+        """
+        depth_hint_dict = {}
+
+        depth_hint_1hw = torch.zeros(1, self.depth_height, self.depth_width)
+        depth_hint_1hw[:] = torch.nan
+        depth_hint_mask_1hw = torch.zeros_like(depth_hint_1hw)
+        depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_1hw).bool()
+        sampled_weights_1hw = torch.zeros_like(depth_hint_1hw)
+        
+        depth_hint_dict["depth_hint_b1hw"] = depth_hint_1hw
+        depth_hint_dict["depth_hint_mask_b1hw"] = depth_hint_mask_1hw
+        depth_hint_dict["depth_hint_mask_b_b1hw"] = depth_hint_mask_b_1hw
+        depth_hint_dict["sampled_weights_b1hw"] = sampled_weights_1hw
+
+        return depth_hint_dict
