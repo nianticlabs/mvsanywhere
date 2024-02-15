@@ -33,6 +33,7 @@ from geometryhints.utils.generic_utils import (
 from geometryhints.utils.geometry_utils import NormalGenerator
 from geometryhints.utils.metrics_utils import compute_depth_metrics
 from geometryhints.utils.visualization_utils import colormap_image
+from src.geometryhints.modules.confidence import VolumeEntropyConfidence
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,11 @@ class DepthModelCVHint(pl.LightningModule):
 
         self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
 
+        # prepare the module that extracts the confidence from the cost volume.
+        # We want a bounded confidence (between [0,1], where the higher the value
+        # the better the confidence).
+        self.cv_confidence_manager = VolumeEntropyConfidence(bound=True)
+
     def compute_matching_feats(
         self,
         cur_image,
@@ -285,6 +291,7 @@ class DepthModelCVHint(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
+        return_confidence=False,
         null_plane_sweep=False,
     ):
         """
@@ -324,6 +331,8 @@ class DepthModelCVHint(pl.LightningModule):
                 information.
             return_mask: return a 2D mask from the cost volume for areas
                 where there is source view information.
+            return_confidence: returna a confidence map (B,1,H,W) between 1 and 0 where 1 means high
+                confidence and 0 means low confidence.
         Returns:
             depth_outputs: a dictionary with outputs including
                 "log_depth_pred_s{i}_b1hw" log depths where i is the
@@ -482,6 +491,12 @@ class DepthModelCVHint(pl.LightningModule):
         # overall source view mask.
         depth_outputs["lowest_cost_bhw"] = lowest_cost
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
+
+        # include also the confidence
+        cv_confidence = torch.zeros_like(lowest_cost)
+        if return_confidence:
+            cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
+        depth_outputs["cv_confidence"] = cv_confidence
 
         return depth_outputs
 
