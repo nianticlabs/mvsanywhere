@@ -1,23 +1,17 @@
-import einops
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from geometryhints.modules.cost_volume import CostVolumeManager
-from geometryhints.modules.networks import MLP
-from geometryhints.utils.generic_utils import (
+from src.geometryhints.modules.cost_volume import CostVolumeManager
+from src.geometryhints.modules.networks import MLP
+from src.geometryhints.tools.keyframe_buffer import pose_distance
+from src.geometryhints.utils.generic_utils import (
     combine_dims,
-    get_generic_eps,
     tensor_B_to_bM,
     tensor_bM_to_B,
 )
-from geometryhints.utils.geometry_utils import (
-    BackprojectDepth,
-    Project3D,
-    get_camera_rays,
-    pose_distance,
-)
+from src.geometryhints.utils.geometry_utils import get_camera_rays
+
 
 class FeatureHintVolumeManager(CostVolumeManager):
 

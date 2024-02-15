@@ -137,7 +137,7 @@ class GenericMVSDataset(Dataset):
         if mv_tuple_file_suffix is not None:
             # tuple info should be available
             tuple_information_filepath = os.path.join(
-                tuple_info_file_location, f"{split}{mv_tuple_file_suffix}"
+                os.environ["PWD"], tuple_info_file_location, f"{split}{mv_tuple_file_suffix}"
             )
 
             # check if this file exists
