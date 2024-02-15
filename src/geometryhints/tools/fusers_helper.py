@@ -44,6 +44,9 @@ class OurFuser(DepthFuser):
         if gt_path is not None:
             gt_mesh = trimesh.load(gt_path, force="mesh")
             tsdf_pred = TSDF.from_mesh(gt_mesh, voxel_size=fusion_resolution)
+            # scan_name = gt_path.split("/")[-1].strip("_vh_clean_2.ply")
+            # tsdf_pred = TSDF.from_file(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/{scan_name}_tsdf.npz")
+            # tsdf_pred.cuda()
         else:
             bounds = {}
             bounds["xmin"] = -10.0
@@ -86,13 +89,16 @@ class OurFuser(DepthFuser):
             torch.Tensor: Tensor of shape (N,) containing the values of the
                 volume at the provided world coordinates.
         """
-        return self.tsdf_fuser_pred.tsdf.sample_tsdf(world_points_N3, what_to_sample=what_to_sample, sampling_method=sampling_method)
+        return self.tsdf_fuser_pred.tsdf.sample_tsdf(
+            world_points_N3, what_to_sample=what_to_sample, sampling_method=sampling_method
+        )
 
     def get_mesh(self, export_single_mesh=True, convert_to_trimesh=True):
         return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh)
 
     def get_mesh_pytorch3d(self, scale_to_world=True):
         return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(scale_to_world=scale_to_world)
+
 
 class Open3DFuser(DepthFuser):
     """
@@ -196,6 +202,7 @@ class Open3DFuser(DepthFuser):
     def save_tsdf(self, path):
         return
 
+
 def get_fuser(opts, scan):
     """Returns the depth fuser required. Our fuser doesn't allow for"""
 
@@ -211,12 +218,14 @@ def get_fuser(opts, scan):
                 "Color will not be fused."
             )
 
-        return OurFuser(
+        fuser = OurFuser(
             gt_path=gt_path,
             fusion_resolution=opts.fusion_resolution,
             max_fusion_depth=opts.fusion_max_depth,
             fuse_color=False,
         )
+        fuser.tsdf_fuser_pred.tsdf.cuda()
+        return fuser
     if opts.depth_fuser == "open3d":
         return Open3DFuser(
             gt_path=gt_path,

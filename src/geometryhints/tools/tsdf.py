@@ -5,9 +5,11 @@ import numpy as np
 import torch
 import torch.nn.functional as TF
 import trimesh
-from skimage import measure
-from geometryhints.utils.pytorch3d_extras import marching_cubes
 from pytorch3d.structures import Meshes
+from skimage import measure
+
+from geometryhints.utils.pytorch3d_extras import marching_cubes
+
 
 class TSDF:
 
@@ -166,17 +168,18 @@ class TSDF:
         return mesh
 
     def to_mesh_pytorch3d(self, scale_to_world=True):
-        
         tsdf_vals = self.tsdf_values.clone()
-        
+
         tsdf_vals[tsdf_vals == -1] = 1
-        batched_verts, batched_faces = marching_cubes(tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False)
+        batched_verts, batched_faces = marching_cubes(
+            tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False
+        )
         verts = batched_verts[0]
         faces = batched_faces[0]
-        
+
         if scale_to_world:
             verts = self.origin.view(1, 3).cuda() + verts * self.voxel_size
-        
+
         return Meshes(verts=[verts], faces=[faces]), verts, faces
 
     def save_mesh(self, savepath, filename):

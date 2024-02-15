@@ -12,13 +12,10 @@ from geometryhints.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from geometryhints.modules.cost_volume import (
-    CostVolumeManager,
-    FeatureHintVolumeManager,
-    FeatureMeshHintVolumeManager,
-    FeatureVolumeManager,
-)
+from geometryhints.modules.cost_volume import CostVolumeManager
+from geometryhints.modules.feature_volume import FeatureVolumeManager
 from geometryhints.modules.layers import TensorFormatter
+from geometryhints.modules.mesh_hint_volume import FeatureMeshHintVolumeManager
 from geometryhints.modules.networks import (
     CVEncoder,
     DepthDecoderPP,
@@ -26,6 +23,8 @@ from geometryhints.modules.networks import (
     UNetMatchingEncoder,
 )
 from geometryhints.modules.networks_fast import SkipDecoderRegression
+from geometryhints.modules.one_frame_hint_volume import FeatureHintVolumeManager
+from geometryhints.utils.augmentation_utils import CustomColorJitter
 from geometryhints.utils.generic_utils import (
     reverse_imagenet_normalize,
     tensor_B_to_bM,
@@ -221,6 +220,8 @@ class DepthModelCVHint(pl.LightningModule):
             )
 
         self.tensor_formatter = TensorFormatter()
+
+        self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
 
     def compute_matching_feats(
         self,
@@ -586,6 +587,13 @@ class DepthModelCVHint(pl.LightningModule):
         """
         cur_data, src_data = batch
 
+        if phase == "train":
+            cur_data["image_b3hw"] = self.color_aug(cur_data["image_b3hw"], denormalize_first=True)
+            for src_ind in range(src_data["image_b3hw"].shape[1]):
+                src_data["image_b3hw"][:, src_ind] = self.color_aug(
+                    src_data["image_b3hw"][:, src_ind], denormalize_first=True
+                )
+
         # forward pass through the model.
         outputs = self(
             phase, cur_data, src_data, null_plane_sweep=dataloader_idx == 3 and phase != "train"
@@ -602,6 +610,7 @@ class DepthModelCVHint(pl.LightningModule):
         depth_hint = cur_data["depth_hint_b1hw"]
         hint_mask = cur_data["depth_hint_mask_b1hw"]
         hint_mask_b = cur_data["depth_hint_mask_b_b1hw"]
+        sampled_weights_1hw = cur_data["sampled_weights_b1hw"]
 
         # estimate normals for groundtruth
         normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
@@ -644,6 +653,9 @@ class DepthModelCVHint(pl.LightningModule):
                         vmin=vmin,
                         vmax=vmax,
                     )
+                    sampled_weights_viz_i = colormap_image(
+                        sampled_weights_1hw[i].cpu(), vmin=0, vmax=1, colormap="magma", flip="False"
+                    )
                     cv_min_viz_i = colormap_image(
                         cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
                     )
@@ -662,6 +674,9 @@ class DepthModelCVHint(pl.LightningModule):
                     )
                     self.logger.experiment.add_image(
                         f"{prefix}depth_hint/{i}", depth_hint_viz_i, self.global_step
+                    )
+                    self.logger.experiment.add_image(
+                        f"{prefix}sampled_weights/{i}", sampled_weights_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
                         f"{prefix}depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step

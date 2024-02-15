@@ -244,6 +244,7 @@ def main(opts):
                 depth_hint_aug=opts.depth_hint_aug,
                 depth_hint_dir=opts.depth_hint_dir,
                 load_empty_hints=opts.load_empty_hint,
+                disable_flip=True,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -376,6 +377,11 @@ def main(opts):
                     # make a dir for this scan
                     output_path = os.path.join(viz_output_dir, scan)
                     Path(output_path).mkdir(parents=True, exist_ok=True)
+
+                    if "sampled_weights_b1hw" in cur_data:
+                        outputs["sampled_weights_b1hw"] = cur_data["sampled_weights_b1hw"]
+                    if "rendered_depth_b1hw" in cur_data:
+                        outputs["rendered_depth_b1hw"] = cur_data["rendered_depth_b1hw"]
 
                     quick_viz_export(
                         output_path,
