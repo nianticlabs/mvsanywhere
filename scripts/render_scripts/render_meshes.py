@@ -101,7 +101,6 @@ class SimpleScanNetDataset(torch.utils.data.Dataset):
         return item_dict
 
 
-
 def render_scene_meshes(
     scan_id: str,
     dataset_root: Path,
@@ -143,7 +142,9 @@ def render_scene_meshes(
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
     get_mesh_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan_id)
-    partial_mesher = PartialFuser(gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise)
+    partial_mesher = PartialFuser(
+        gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise
+    )
 
     image_list = []
     with torch.no_grad():
@@ -151,7 +152,6 @@ def render_scene_meshes(
         for batch in tqdm.tqdm(dataloader):
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
-
                 depth_1hw = mesh_renderer.render(
                     mesh,
                     batch["cam_T_world_b44"][elem_ind][None],
@@ -262,13 +262,15 @@ def render_scene_meshes_partial(
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
     get_mesh_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan_id)
-    partial_mesher = PartialFuser(gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise)
+    partial_mesher = PartialFuser(
+        gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise
+    )
 
     image_list = []
     with torch.no_grad():
         for batch in tqdm.tqdm(dataloader):
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
-            
+
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
                 mesh = partial_mesher.get_mesh(query_frame_id=int(batch["frame_id_str"][elem_ind]))
                 if mesh is not None:
@@ -342,6 +344,7 @@ def render_scene_meshes_partial(
         fps=10,
     )
 
+
 def render_scenes(
     dataset_root: Path,
     scan_list: list[str],
@@ -366,7 +369,6 @@ def render_scenes(
             data_to_render=data_to_render,
             depth_noise=depth_noise,
         )
-
 
 
 if __name__ == "__main__":
@@ -396,9 +398,9 @@ if __name__ == "__main__":
         type=float,
         required=True,
         help="Noise to add to depth maps before fusing.",
-        default=0.0
+        default=0.0,
     )
-    
+
     option_handler.parse_and_merge_options(ignore_cl_args=False)
     option_handler.pretty_print_options()
     opts = option_handler.options

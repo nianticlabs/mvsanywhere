@@ -21,12 +21,14 @@ def get_model_class(opts):
 
 def load_model_inference(opts, model_class_to_use):
     try:
-        model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
+        model = model_class_to_use.load_from_checkpoint(
+            opts.load_weights_from_checkpoint, args=None
+        )
     except:
         print("Failed to load model normally. Using manual loading via state_dict.")
         model = model_class_to_use(opts)
         model.load_state_dict(torch.load(opts.load_weights_from_checkpoint)["state_dict"])
-        
+
     if opts.fast_cost_volume and (
         isinstance(model.cost_volume, feature_volume.FeatureVolumeManager)
         or isinstance(model.cost_volume, mesh_hint_volume.FeatureMeshHintVolumeManager)

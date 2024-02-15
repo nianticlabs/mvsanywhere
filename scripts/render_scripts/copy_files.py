@@ -2,10 +2,13 @@ import os
 import shutil
 from tqdm import tqdm
 
+
 def copy_directories(source_dir, destination_dir, names_file):
-    with open(names_file, 'r') as file:
+    with open(names_file, "r") as file:
         directory_names = file.read().splitlines()
-        print(f"Copying {len(directory_names)} directories from '{source_dir}' to '{destination_dir}'.")
+        print(
+            f"Copying {len(directory_names)} directories from '{source_dir}' to '{destination_dir}'."
+        )
     for name in tqdm(directory_names):
         source_path = os.path.join(source_dir, name)
         destination_path = os.path.join(destination_dir, name)
@@ -16,8 +19,9 @@ def copy_directories(source_dir, destination_dir, names_file):
         else:
             print(f"Directory '{name}' does not exist in the source directory.")
 
+
 source_directory = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model/scannet/default/meshes/0.04_3.0_ours/partial_renders/"
-destination_directory = '/home/mohameds/geometryhints/data/noisy_renders/partial_renders_noise'
+destination_directory = "/home/mohameds/geometryhints/data/noisy_renders/partial_renders_noise"
 names_file = "data_splits/ScanNetv2/standard_split/scannetv2_val.txt"
 
 

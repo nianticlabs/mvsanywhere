@@ -139,9 +139,18 @@ from geometryhints.utils.visualization_utils import (
     quick_viz_export,
 )
 
-class TSDFRaycaster(torch.nn.Module):
-    def __init__(self, tsdf: TSDF, invK: torch.tensor, height: int = 96, width: int = 128, num_samples: int = 128, min_depth: float = 0.2, max_depth: float = 10.0) -> None:
 
+class TSDFRaycaster(torch.nn.Module):
+    def __init__(
+        self,
+        tsdf: TSDF,
+        invK: torch.tensor,
+        height: int = 96,
+        width: int = 128,
+        num_samples: int = 128,
+        min_depth: float = 0.2,
+        max_depth: float = 10.0,
+    ) -> None:
         super(TSDFRaycaster, self).__init__()
         self.tsdf = tsdf.tsdf_values
 
@@ -157,28 +166,30 @@ class TSDFRaycaster(torch.nn.Module):
 
         self.depth_samples = None
         self.points_camera_space = None
-        
+
         self.min_depth = min_depth
         self.max_depth = max_depth
 
         self.set_depth_samples(num_samples, min_depth, max_depth)
         self.set_points_camera_space(invK, self.depth_samples)
-    
+
     def set_depth_samples(self, num_samples: int, min_depth: float, max_depth: float) -> None:
         depth_samples = torch.linspace(min_depth, max_depth, num_samples).float()
         depth_samples = depth_samples.repeat(self.height, self.width, 1).permute(2, 0, 1).flatten(1)
         self.depth_samples = depth_samples.half().cuda()
         # self.register_buffer('depth_samples', depth_samples)
-    
+
     def set_points_camera_space(self, invK: torch.Tensor, depth_samples: torch.tensor) -> None:
-        xs, ys = torch.meshgrid(torch.arange(self.width), torch.arange(self.height), indexing='xy')
+        xs, ys = torch.meshgrid(torch.arange(self.width), torch.arange(self.height), indexing="xy")
         xs = xs.float() + 0.5
         ys = ys.float() + 0.5
 
-        cam_points = torch.stack([xs, ys, torch.ones_like(xs), torch.ones_like(xs)], 0).flatten(1).cuda()
+        cam_points = (
+            torch.stack([xs, ys, torch.ones_like(xs), torch.ones_like(xs)], 0).flatten(1).cuda()
+        )
         cam_points = (invK @ cam_points).repeat(depth_samples.shape[0], 1, 1)
         cam_points[:, :3] *= depth_samples.unsqueeze(1)
-        
+
         self.points_camera_space = cam_points.half().cuda()
         # self.register_buffer('points_camera_space', cam_points)
 
@@ -191,12 +202,16 @@ class TSDFRaycaster(torch.nn.Module):
         tsdf_points = ((tsdf_points - 0.5) * 2).permute(0, 2, 1).unsqueeze(0).unsqueeze(0)
 
         # reoder to zyx for grid sample convention
-        tsdf_points = torch.stack((tsdf_points[..., 2], tsdf_points[..., 1], tsdf_points[..., 0]), -1)
+        tsdf_points = torch.stack(
+            (tsdf_points[..., 2], tsdf_points[..., 1], tsdf_points[..., 0]), -1
+        )
 
         # get tsdf values using grid sample
         tsdf = self.tsdf.clone()
         tsdf[tsdf == -1] = 1
-        vals = F.grid_sample(tsdf.unsqueeze(0).unsqueeze(0), tsdf_points.half(), align_corners=True, mode='bilinear').squeeze()
+        vals = F.grid_sample(
+            tsdf.unsqueeze(0).unsqueeze(0), tsdf_points.half(), align_corners=True, mode="bilinear"
+        ).squeeze()
 
         diff = torch.logical_and(vals[1:] < 0, vals[:-1] > 0).float()
         pos = diff.argmax(0, True)
@@ -212,6 +227,7 @@ class TSDFRaycaster(torch.nn.Module):
         depth[depth < self.min_depth] = -1
 
         return depth.reshape((self.height, self.width))
+
 
 def main(opts):
     # get dataset
@@ -347,14 +363,14 @@ def main(opts):
             render_width = 128
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
-            
+
             ray_caster = TSDFRaycaster(
-                tsdf=fuser.tsdf_fuser_pred.tsdf, 
-                invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(), 
-                height=render_height, 
-                width=render_width, 
-                num_samples=128, 
-                min_depth=0.05, 
+                tsdf=fuser.tsdf_fuser_pred.tsdf,
+                invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(),
+                height=render_height,
+                width=render_width,
+                num_samples=128,
+                min_depth=0.05,
                 max_depth=10.0,
             )
 
@@ -383,9 +399,11 @@ def main(opts):
                     # rendered_depth_b1hw = mesh_renderer.render(
                     #     mesh, cur_data["cam_T_world_b44"].clone(), K_b44
                     # )
-                    
-                    rendered_depth_b1hw = ray_caster.raycast_tsdf(cur_data["world_T_cam_b44"].squeeze(0))[None, None]
-                    
+
+                    rendered_depth_b1hw = ray_caster.raycast_tsdf(
+                        cur_data["world_T_cam_b44"].squeeze(0)
+                    )[None, None]
+
                     cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
                     cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
                     cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
@@ -430,7 +448,6 @@ def main(opts):
                     hint_end_time.record()
                     torch.cuda.synchronize()
                     elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
-
 
                 else:
                     # load empty hints

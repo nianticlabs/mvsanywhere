@@ -21,3 +21,4 @@ lr_steps: [70000, 80000]
 
 fill_depth_hints: True
 depth_hint_aug: 0.5
+plane_sweep_ablation_ratio: 0.2

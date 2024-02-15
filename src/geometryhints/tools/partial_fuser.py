@@ -1,13 +1,11 @@
-from collections import OrderedDict
+import os
 import pickle
-import torch
-
+from collections import OrderedDict
 from pathlib import Path
 
-from geometryhints.tools.fusers_helper import OurFuser
-import os
-
 import torch
+
+from geometryhints.tools.fusers_helper import OurFuser
 
 
 class PartialFuser:
@@ -38,7 +36,7 @@ class PartialFuser:
 
         self.frame_ids = list(self.cached_depths.keys())
         self.frame_ids.sort()
-        
+
         self.depth_noise = depth_noise
 
     def get_mesh(self, query_frame_id: int):
@@ -61,7 +59,7 @@ class PartialFuser:
                 if self.depth_noise > 0:
                     noise = torch.rand(1) * self.depth_noise
                     noise = noise * (-1 if torch.rand(1) > 0.5 else 1)
-                    noise = 1 + noise 
+                    noise = 1 + noise
                 else:
                     noise = torch.tensor(1)
                 self.fuser.fuse_frames(
@@ -95,7 +93,7 @@ class PartialFuser:
             if self.depth_noise > 0:
                 noise = torch.rand(1) * self.depth_noise
                 noise = noise * (-1 if torch.rand(1) > 0.5 else 1)
-                noise = 1 + noise 
+                noise = 1 + noise
             else:
                 noise = torch.tensor(1)
             self.fuser.fuse_frames(
@@ -104,7 +102,7 @@ class PartialFuser:
                 cam_T_world_b44=cached_data["cam_T_world_b44"],
                 color_b3hw=None,
             )
-        
+
         self.mesh, _, _ = self.fuser.get_mesh_pytorch3d(scale_to_world=True)
 
         return self.mesh

@@ -23,6 +23,7 @@ from geometryhints.modules.networks import (
     UNetMatchingEncoder,
 )
 from geometryhints.modules.networks_fast import SkipDecoderRegression
+from geometryhints.modules.one_frame_hint_volume import FeatureHintVolumeManager
 from geometryhints.utils.augmentation_utils import CustomColorJitter
 from geometryhints.utils.generic_utils import (
     reverse_imagenet_normalize,

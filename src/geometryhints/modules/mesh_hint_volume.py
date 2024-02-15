@@ -912,7 +912,9 @@ class FastFeatureMeshHintVolumeManager(FeatureMeshHintVolumeManager):
             "b c d h w -> (b d) h w c",
         )
 
-        prev_mesh_hint_depth_mask_bdhw = prev_mesh_hint_depth_mask_b1hw.expand(depth_planes_bdhw.shape)
+        prev_mesh_hint_depth_mask_bdhw = prev_mesh_hint_depth_mask_b1hw.expand(
+            depth_planes_bdhw.shape
+        )
         hint_map_bdhw = torch.abs(prev_mesh_hint_depth_b1hw - depth_planes_bdhw)
         hint_map_bdhw[~prev_mesh_hint_depth_mask_bdhw] = -1
 

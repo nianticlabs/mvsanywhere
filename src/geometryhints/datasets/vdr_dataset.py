@@ -584,7 +584,7 @@ class VDRDataset(GenericMVSDataset):
         depth_hint_mask_1hw = torch.zeros_like(depth_hint_1hw)
         depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_1hw).bool()
         sampled_weights_1hw = torch.zeros_like(depth_hint_1hw)
-        
+
         depth_hint_dict["depth_hint_b1hw"] = depth_hint_1hw
         depth_hint_dict["depth_hint_mask_b1hw"] = depth_hint_mask_1hw
         depth_hint_dict["depth_hint_mask_b_b1hw"] = depth_hint_mask_b_1hw
