@@ -16,7 +16,7 @@ MAMBA_INSTALL_SCRIPT := Mambaforge-$(SYSTEM_NAME)-$(SYSTEM_ARCHITECTURE).sh
 
 GCP_PROJECT := niantic-masala
 GCP_REPOSITORY_NAME := research-docker
-DOCKER_IMG_PATH := europe-west4-docker.pkg.dev/$(GCP_PROJECT)/$(GCP_REPOSITORY_NAME)/ar-planes
+DOCKER_IMG_PATH := europe-west4-docker.pkg.dev/$(GCP_PROJECT)/$(GCP_REPOSITORY_NAME)/geometryhints
 
 MAMBA_ENV_NAME := geometryhints
 PACKAGE_FOLDER := src/geometryhints
@@ -187,14 +187,13 @@ e2e-tests:
 
 # HELP: docker-build: [Docker] Build Docker image
 .PHONY: docker-build
-docker-build: require-gitlab-envs docker-build-pip-conf
+docker-build: require-gitlab-envs
 	@echo "🏗  Building Docker image"
 	docker buildx build \
 		--tag $(DOCKER_IMG_PATH):$(CI_COMMIT_SHA) \
 		--tag $(DOCKER_IMG_PATH):$(CI_COMMIT_REF_SLUG) \
-		--target ar-planes \
+		--target geometryhints \
 		--build-arg CI_COMMIT_SHA=$(CI_COMMIT_SHA) \
-		--secret id=pip_conf,src=pip.conf \
 		--cache-to type=inline \
 		--cache-from $(DOCKER_IMG_PATH):$(CI_COMMIT_SHA) \
 		--cache-from $(DOCKER_IMG_PATH):$(CI_COMMIT_REF_SLUG) \

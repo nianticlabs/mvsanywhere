@@ -1,6 +1,6 @@
 import logging
 
-import pytorch_lightning as pl
+import lightning as pl
 import timm
 import torch
 import torch.nn.functional as F
