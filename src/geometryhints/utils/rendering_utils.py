@@ -9,12 +9,16 @@ class PyTorch3DMeshDepthRenderer:
         self.width = width
 
         self.raster_settings = RasterizationSettings(
-            image_size=(height, width), blur_radius=0.0, faces_per_pixel=1, bin_size=None,
+            image_size=(height, width),
+            blur_radius=0.0,
+            faces_per_pixel=1,
+            bin_size=None,
         )
 
         self.rasterizer = MeshRasterizer(
             raster_settings=self.raster_settings,
         )
+
     def render(self, mesh, cam_T_world_b44, K_b44):
         """Renders a mesh with a given pose and **normalized** intrinsics."""
         image_size = (
@@ -26,8 +30,10 @@ class PyTorch3DMeshDepthRenderer:
         K = K_b44.clone()
         K[:, 0] *= self.width
         K[:, 1] *= self.height
-        cams = cameras_from_opencv_projection(R=R, tvec=T, camera_matrix=K, image_size=image_size).cuda()
-        
+        cams = cameras_from_opencv_projection(
+            R=R, tvec=T, camera_matrix=K, image_size=image_size
+        ).cuda()
+
         _mesh = mesh.extend(len(cams))
 
         fragments = self.rasterizer(_mesh, cameras=cams)

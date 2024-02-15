@@ -281,6 +281,7 @@ def cache_model_outputs(
         # include some auxiliary information
         elem_output_dict["K_full_depth_b44"] = cur_data["K_full_depth_b44"][elem_ind].unsqueeze(0)
         elem_output_dict["K_s0_b44"] = cur_data["K_s0_b44"][elem_ind].unsqueeze(0)
+        elem_output_dict["cam_T_world_b44"] = cur_data["cam_T_world_b44"][elem_ind].unsqueeze(0)
 
         elem_output_dict["frame_id"] = cur_data["frame_id_string"][elem_ind]
         elem_output_dict["src_ids"] = []

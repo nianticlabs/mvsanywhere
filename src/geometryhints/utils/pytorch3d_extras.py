@@ -6,6 +6,7 @@ from pytorch3d.ops.marching_cubes_data import EDGE_TO_VERTICES, FACE_TABLE, INDE
 from pytorch3d.transforms import Translate
 from torch.autograd import Function
 
+
 class _marching_cubes(Function):
     """
     Torch Function wrapper for marching_cubes implementation.
@@ -32,7 +33,7 @@ def marching_cubes(
     Run marching cubes over a volume scalar field with a designated isolevel.
     Returns vertices and faces of the obtained mesh.
     This operation is non-differentiable.
-    
+
     Handles verts and faces flips from pytorch3d to match trimesh.
 
     Args:
@@ -71,11 +72,11 @@ def marching_cubes(
                 verts_[inverse_idx] = verts
                 verts = verts_
                 faces = inverse_idx[faces]
-            
+
             # Flip verts and faces to come back from pytorch3d to our coord convention
             verts = verts[:, [2, 1, 0]]
             faces = faces.flip(1)
-            
+
             batched_verts.append(verts)
             batched_faces.append(faces)
         else:
