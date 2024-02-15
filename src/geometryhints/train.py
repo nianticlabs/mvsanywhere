@@ -229,10 +229,6 @@ def prepare_callbacks(
         dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
     )
 
-    # if we are resuming, set "_continue" in the ckpt name
-    if is_resume:
-        checkpoint_callback.CHECKPOINT_NAME_LAST = "last_continue"
-
     # keep track of changes in learning rate
     lr_monitor = LearningRateMonitor(logging_interval="step")
     callbacks = [checkpoint_callback, lr_monitor]
