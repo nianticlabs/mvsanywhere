@@ -4,23 +4,26 @@
 ## Testing
 
 ### Incremental rendering
-```
-CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt'
-CONFIG='configs/models/hero_model_mesh_hint.yaml'
-SCANNET_DIR='/mnt/scannet/'
 
-echo $CHECKPOINT
-echo $CONFIG
-echo $SCANNET_DIR
+```
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt';
+CONFIG='configs/models/hero_model_mesh_hint.yaml';
+SCANNET_DIR='/mnt/scannet/';
+OUTPUT_DIR='/mnt/nas3/personal/mohameds/geometry_hints/outputs/';
+
+echo $CHECKPOINT;
+echo $CONFIG;
+echo $SCANNET_DIR;
+echo $OUTPUT_DIR;
 
 CUDA_VISIBLE_DEVICES=1 python -m geometryhints.test_incremental_render  \
 --config_file $CONFIG \
---load_weights_from_checkpoint $CHECKPOINT
+--load_weights_from_checkpoint $CHECKPOINT \
 --data_config configs/data/scannet_default_test.yaml  \
 --dataset_path $SCANNET_DIR \
 --num_workers 12  \
 --batch_size 1  \
---output_base_path YOUR_OUTPUT_DIR  \
+--output_base_path $OUTPUT_DIR  \
 --depth_hint_aug 0.0  \
 --load_empty_hint \
 --name sampled_weights_dual_mlp_partial_lessablate_twopass \
@@ -29,23 +32,30 @@ CUDA_VISIBLE_DEVICES=1 python -m geometryhints.test_incremental_render  \
 ```
 
 ### Two pass
+
 ```
-CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt'
-CONFIG='configs/models/hero_model_mesh_hint.yaml'
-SCANNET_DIR='/mnt/scannet/'
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt';
+CONFIG='configs/models/hero_model_mesh_hint.yaml';
+SCANNET_DIR='/mnt/scannet/';
+OUTPUT_DIR='/mnt/nas3/personal/mohameds/geometry_hints/outputs/';
+
+echo $CHECKPOINT;
+echo $CONFIG;
+echo $SCANNET_DIR;
+echo $OUTPUT_DIR;
 
 echo $CHECKPOINT
 echo $CONFIG
 echo $SCANNET_DIR
-
+echo $OUTPUT_DIR
 CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test_two_pass \
 --config_file $CONFIG \
---load_weights_from_checkpoint $CHECKPOINT
+--load_weights_from_checkpoint $CHECKPOINT \
 --data_config configs/data/scannet_default_test.yaml  \
 --dataset_path $SCANNET_DIR \
 --num_workers 8 \
 --batch_size 4 \
---output_base_path YOUR_OUTPUT_DIR \
+--output_base_path $OUTPUT_DIR  \
 --dataset_path $SCANNET_DIR \
 --depth_hint_aug 0.0 \
 --load_empty_hint \
