@@ -1,5 +1,6 @@
 import einops
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
@@ -7,10 +8,16 @@ from geometryhints.modules.cost_volume import CostVolumeManager
 from geometryhints.modules.networks import MLP
 from geometryhints.utils.generic_utils import (
     combine_dims,
+    get_generic_eps,
     tensor_B_to_bM,
     tensor_bM_to_B,
 )
-from geometryhints.utils.geometry_utils import get_camera_rays, pose_distance
+from geometryhints.utils.geometry_utils import (
+    BackprojectDepth,
+    Project3D,
+    get_camera_rays,
+    pose_distance,
+)
 
 
 class FeatureMeshHintVolumeManager(CostVolumeManager):

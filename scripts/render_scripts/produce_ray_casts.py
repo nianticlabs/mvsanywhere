@@ -12,6 +12,8 @@ from geometryhints.utils.generic_utils import readlines, to_gpu
 import numpy as np
 import open3d as o3d
 import torch
+import torch.nn.functional as F
+
 import tqdm
 from PIL import Image
 from geometryhints.utils.geometry_utils import BackprojectDepth
@@ -228,23 +230,23 @@ def render_scene_meshes(
 
 
     ray_caster = TSDFRaycaster(
-        tsdf=fuser.tsdf_fuser_pred.tsdf, 
-        invK=torch.tensor(dataset[0][0]["invK_s0_b44"]).squeeze(0).cuda(), 
+        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf, 
+        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(), 
         height=96, 
         width=128, 
         num_samples=128, 
-        min_depth=0.05, 
+        min_depth=0.05,
         max_depth=10.0,
     )
     
     image_list = []
     with torch.no_grad():
-        mesh = partial_mesher.fuse_all_frames()
+        _ = partial_mesher.fuse_all_frames()
         for batch in tqdm.tqdm(dataloader):
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
 
-                
+                depth_1hw = ray_caster.raycast_tsdf(batch["world_T_cam_b44"][elem_ind][None].cuda())
 
                 # save the depth map
                 depth_path = (
@@ -352,6 +354,16 @@ def render_scene_meshes_partial(
     get_mesh_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan_id)
     partial_mesher = PartialFuser(gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise)
 
+    ray_caster = TSDFRaycaster(
+        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf, 
+        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(), 
+        height=96, 
+        width=128, 
+        num_samples=128, 
+        min_depth=0.05,
+        max_depth=10.0,
+    )
+
     image_list = []
     with torch.no_grad():
         for batch in tqdm.tqdm(dataloader):
@@ -360,11 +372,7 @@ def render_scene_meshes_partial(
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
                 mesh = partial_mesher.get_mesh(query_frame_id=int(batch["frame_id_str"][elem_ind]))
                 if mesh is not None:
-                    depth_1hw = mesh_renderer.render(
-                        mesh,
-                        batch["cam_T_world_b44"][elem_ind][None],
-                        batch["K_b44"][elem_ind][None],
-                    )[0]
+                    depth_1hw = ray_caster.raycast_tsdf(batch["world_T_cam_b44"][elem_ind][None].cuda())
                 else:
                     depth_1hw = torch.zeros(1, height, width).cuda()
 
