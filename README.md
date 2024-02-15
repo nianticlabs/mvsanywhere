@@ -1,5 +1,135 @@
 # GeometryHints
 
+
+## Testing
+
+### Incremental rendering
+```
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt'
+CONFIG='configs/models/hero_model_mesh_hint.yaml'
+SCANNET_DIR='/mnt/scannet/'
+
+echo $CHECKPOINT
+echo $CONFIG
+echo $SCANNET_DIR
+
+CUDA_VISIBLE_DEVICES=1 python -m geometryhints.test_incremental_render  \
+--config_file $CONFIG \
+--load_weights_from_checkpoint $CHECKPOINT
+--data_config configs/data/scannet_default_test.yaml  \
+--dataset_path $SCANNET_DIR \
+--num_workers 12  \
+--batch_size 1  \
+--output_base_path YOUR_OUTPUT_DIR  \
+--depth_hint_aug 0.0  \
+--load_empty_hint \
+--name sampled_weights_dual_mlp_partial_lessablate_twopass \
+--run_fusion \
+--plane_sweep_ablation_ratio 0.0;
+```
+
+### Two pass
+```
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt'
+CONFIG='configs/models/hero_model_mesh_hint.yaml'
+SCANNET_DIR='/mnt/scannet/'
+
+echo $CHECKPOINT
+echo $CONFIG
+echo $SCANNET_DIR
+
+CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test_two_pass \
+--config_file $CONFIG \
+--load_weights_from_checkpoint $CHECKPOINT
+--data_config configs/data/scannet_default_test.yaml  \
+--dataset_path $SCANNET_DIR \
+--num_workers 8 \
+--batch_size 4 \
+--output_base_path YOUR_OUTPUT_DIR \
+--dataset_path $SCANNET_DIR \
+--depth_hint_aug 0.0 \
+--load_empty_hint \
+--name sampled_weights_dual_mlp_partial_lessablate_twopass \
+--run_fusion \
+--fusion_resolution 0.02 \
+--mv_tuple_file_suffix _eight_view_deepvmvs_offline.txt;
+```
+
+## Rendering data
+
+### Full
+```
+CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
+--data_config configs/data/scannet_default_train.yaml \
+--cached_depth_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model/scannet/default/depths \
+--output_root ~/geometryhints/data/noisy_renders/renders \
+--dataset_path /mnt/scannet \
+--batch_size 4 \
+--data_to_render both;
+```
+
+```
+CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
+--data_config configs/data/scannet_default_val.yaml \
+--cached_depth_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model/scannet/default/depths \
+--output_root ~/geometryhints/data/noisy_renders/renders \
+--dataset_path /mnt/scannet \
+--batch_size 4 \
+--data_to_render both;
+```
+
+### Partial
+```
+CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
+--data_config configs/data/scannet_default_train.yaml \
+--cached_depth_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model/scannet/default/depths \
+--output_root ~/geometryhints/data/renders_partial \
+--dataset_path /mnt/scannet \
+--batch_size 4 \
+--data_to_render both \
+--partial;
+```
+
+```
+CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
+--data_config configs/data/scannet_default_val.yaml \
+--cached_depth_path /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model/scannet/default/depths \
+--output_root ~/geometryhints/data/renders_partial \
+--dataset_path /mnt/scannet \
+--batch_size 4 \
+--data_to_render both \
+--partial;
+```
+
+## Training
+
+```
+SCANNET_DIR='/mnt/scannet/'
+
+echo $SCANNET_DIR
+
+python -m geometryhints.train \
+--config configs/models/hero_model_mesh_hint.yaml \
+--data_config configs/data/scannet_default_train.yaml \
+--gpus 2 \
+--dataset_path $SCANNET_DIR \
+--log_dir ~/logs/geometryhints \
+--batch_size 16 \
+--lazy_load_weights_from_checkpoint /mnt/nas3/personal/mohameds/hero_model_sr_int_flip_removed_opts.ckpt  \
+--depth_hint_dir ~/geometryhints/data/renders/ \
+--plane_sweep_ablation_ratio 0.2 \
+--val_batches 80 \
+--val_batch_size 6 \
+--name sampled_weights_dual_mlp_partial_lessablate  \
+--val_interval 2000;
+```
+
+## Rendering data
+
+
+
+## Anything below this line, is SimpleRecon public README.
+
 Internal copy of the publicly released research code for experimentation.
 
 This is the reference PyTorch implementation for training and testing MVS depth estimation models using the method described in
