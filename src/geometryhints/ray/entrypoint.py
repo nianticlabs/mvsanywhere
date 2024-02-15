@@ -69,20 +69,12 @@ def ray_train_func(opts: options.Options) -> None:
         # check if we are resuming a model
         resume_ckpt = None
         is_resume = False
-        ckpt_path_last = Path(opts.log_dir) / opts.name / "checkpoints" / "last.ckpt"
-        ckpt_path_last_continue = (
-            Path(opts.log_dir) / opts.name / "checkpoints" / "last_continue.ckpt"
-        )
+        ckpt_path_last = Path(opts.log_dir) / opts.name / "last.ckpt"
 
         if ckpt_path_last.exists():
             # in this case we have to resume but it is the first time
+            logger.info(f"Found a checkpoint to resume: {ckpt_path_last}")
             resume_ckpt = ckpt_path_last
-            is_resume = True
-
-        if ckpt_path_last_continue.exists():
-            # oh no! We have failed 2+ times. No worries, we can resume, but we want to resume
-            # last_continue.ckpt and not last.ckpt!
-            resume_ckpt = ckpt_path_last_continue
             is_resume = True
 
         # prepare the trainer
