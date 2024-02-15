@@ -1,6 +1,7 @@
 import torch
 
-import geometryhints.modules.cost_volume as cost_volume
+import geometryhints.modules.feature_volume as feature_volume
+import geometryhints.modules.mesh_hint_volume as mesh_hint_volume
 from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
@@ -19,10 +20,19 @@ def get_model_class(opts):
 
 
 def load_model_inference(opts, model_class_to_use):
-    # model = model_class_to_use(opts)
-    # model.load_state_dict(torch.load(opts.load_weights_from_checkpoint)["state_dict"])
-    model = model_class_to_use.load_from_checkpoint(opts.load_weights_from_checkpoint, args=None)
-    if opts.fast_cost_volume and isinstance(model.cost_volume, cost_volume.FeatureVolumeManager):
+    try:
+        model = model_class_to_use.load_from_checkpoint(
+            opts.load_weights_from_checkpoint, args=None
+        )
+    except:
+        print("Failed to load model normally. Using manual loading via state_dict.")
+        model = model_class_to_use(opts)
+        model.load_state_dict(torch.load(opts.load_weights_from_checkpoint)["state_dict"])
+
+    if opts.fast_cost_volume and (
+        isinstance(model.cost_volume, feature_volume.FeatureVolumeManager)
+        or isinstance(model.cost_volume, mesh_hint_volume.FeatureMeshHintVolumeManager)
+    ):
         model.cost_volume = model.cost_volume.to_fast()
     return model
 
