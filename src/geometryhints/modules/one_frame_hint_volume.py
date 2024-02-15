@@ -1,3 +1,18 @@
+import torch
+import torch.nn.functional as F
+from torch import Tensor
+
+from src.geometryhints.modules.cost_volume import CostVolumeManager
+from src.geometryhints.modules.networks import MLP
+from src.geometryhints.tools.keyframe_buffer import pose_distance
+from src.geometryhints.utils.generic_utils import (
+    combine_dims,
+    tensor_B_to_bM,
+    tensor_bM_to_B,
+)
+from src.geometryhints.utils.geometry_utils import get_camera_rays
+
+
 class FeatureHintVolumeManager(CostVolumeManager):
 
     """
@@ -61,7 +76,7 @@ class FeatureHintVolumeManager(CostVolumeManager):
 
         # tell the world what's happening here.
         print(f"".center(80, "#"))
-        print(f" Using FeatureVolumeManager ".center(80, "#"))
+        print(f" Using FeatureHintVolumeManager ".center(80, "#"))
         print(f" Number of source views: ".ljust(30, " ") + f"{num_source_views}  ")
         print(f" Using all metadata.  ")
         print(f" Number of channels: ".ljust(30, " ") + f"{mlp_channels}  ")

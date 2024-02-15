@@ -1,6 +1,6 @@
 import logging
 
-import pytorch_lightning as pl
+import lightning as pl
 import timm
 import torch
 import torch.nn.functional as F
@@ -696,7 +696,7 @@ class DepthModelCVHint(pl.LightningModule):
             # log losses
             for loss_name, loss_val in losses.items():
                 self.log(
-                    f"{phase}/{loss_name}",
+                    f"{prefix}/{loss_name}",
                     loss_val,
                     sync_dist=True,
                     on_step=is_train,

@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from geometryhints.datasets.arkit_dataset import ARKitDataset
 from geometryhints.datasets.colmap_dataset import ColmapDataset
 from geometryhints.datasets.scannet_dataset import ScannetDataset
@@ -29,6 +32,7 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             creating objects of that class.
         scans: a lit of scans in the split file.
     """
+    split_filepath = Path(os.environ["PWD"]) / split_filepath
     if dataset_name == "scannet":
         with open(split_filepath) as file:
             scans = file.readlines()

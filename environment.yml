@@ -12,7 +12,7 @@ dependencies:
   - pytorch=2.0.1
   - torchvision
   - pytorch-cuda=11.7
-  - pytorch-lightning=1.5.4 # training utils
+  - lightning=2.0.0
   - pytorch3d=0.7.4 # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op
   - tensorboard # logging
@@ -38,4 +38,7 @@ dependencies:
     - pytest-cov==2.7.1
     - pytest-timeout==2.1.0
     - pytest-fail-slow==0.3.0
+    - loguru==0.7.2
     - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes
+    - ray[default,data,train,tune]==2.9.1
+    - opencv-python==4.9.0.80
