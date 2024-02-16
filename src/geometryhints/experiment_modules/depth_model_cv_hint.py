@@ -33,7 +33,7 @@ from geometryhints.utils.generic_utils import (
 from geometryhints.utils.geometry_utils import NormalGenerator
 from geometryhints.utils.metrics_utils import compute_depth_metrics
 from geometryhints.utils.visualization_utils import colormap_image
-from src.geometryhints.modules.confidence import VolumeEntropyConfidence
+from src.geometryhints.modules.confidence import compute_volume_entropy
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +227,7 @@ class DepthModelCVHint(pl.LightningModule):
         # prepare the module that extracts the confidence from the cost volume.
         # We want a bounded confidence (between [0,1], where the higher the value
         # the better the confidence).
-        self.cv_confidence_manager = VolumeEntropyConfidence(bound=True)
+        # self.cv_confidence_manager = VolumeEntropyConfidence(bound=True)
 
     def compute_matching_feats(
         self,
@@ -495,7 +495,8 @@ class DepthModelCVHint(pl.LightningModule):
         # include also the confidence
         cv_confidence = torch.zeros_like(lowest_cost).unsqueeze(1)
         if return_confidence:
-            cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
+            # cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
+            cv_confidence = compute_volume_entropy(volume=cost_volume)
         depth_outputs["cv_confidence_b1hw"] = cv_confidence
 
         return depth_outputs

@@ -34,3 +34,9 @@ class VolumeEntropyConfidence(ConfidenceMetric):
             # when conf is low (good), we return a high value
             return 1.0 / (1.0 + conf)
         return conf
+
+
+def compute_volume_entropy(volume: torch.Tensor):
+    prob = torch.nn.functional.softmax(input=volume, dim=1)
+    conf = -torch.sum(prob * torch.log(prob + 1e-5), dim=1, keepdim=True)
+    return 1.0 / (1.0 + conf)
