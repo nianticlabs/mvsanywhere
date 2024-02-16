@@ -1,13 +1,14 @@
 import torch
 import torch.nn.functional as TF
 
-from src.geometryhints.tools.tsdf import TSDF
+from src.geometryhints.tools.tsdf import TSDFFuser
 
 
-class TSDFConf(TSDF):
+class TSDFConf(TSDFFuser):
     def confidence_to_log_odds(self, confidence: torch.Tensor) -> torch.Tensor:
         """Turn a confidence, expressed as a probability, as log odds"""
-        return torch.log(confidence / (1 - confidence))
+        EPS = 1e-5
+        return torch.log(confidence + EPS / (1 - confidence + EPS))
 
     def log_odds_to_confidence(self, log_odds: torch.Tensor) -> torch.Tensor:
         """Turn a log odds into a probability value"""
@@ -71,7 +72,7 @@ class TSDFConf(TSDF):
             padding_mode="zeros",
             align_corners=False,
         )
-        sampled_cv_confidence_b1N = sampled_cv_confidence_b1N.flatten(start_dim=2)
+        sampled_cv_confidence_b1N = sampled_cv_confidence_b1hw.flatten(start_dim=2)
 
         # Confidence from InfiniTAM
         tsdf_confidence_b1N = (
@@ -85,7 +86,7 @@ class TSDFConf(TSDF):
 
         # sum log odds of the two confidence scores
         tsdf_log_odds_b1N = self.confidence_to_log_odds(tsdf_confidence_b1N)
-        cv_log_odds_b1N = self.confidence_to_log_odds(cv_confidence_b1hw)
+        cv_log_odds_b1N = self.confidence_to_log_odds(sampled_cv_confidence_b1N)
         log_odds_b1N = tsdf_log_odds_b1N + cv_log_odds_b1N
 
         # turn the log odds back to a confidence (probability)

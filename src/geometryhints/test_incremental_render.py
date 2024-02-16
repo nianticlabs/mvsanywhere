@@ -371,6 +371,7 @@ def main(opts):
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
                     null_plane_sweep=opts.null_plane_sweep,
+                    return_confidence=True
                 )
                 end_time.record()
                 torch.cuda.synchronize()
@@ -461,6 +462,14 @@ def main(opts):
                         ).bool()
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
+                    
+
+                    cv_confidence_b1hw = outputs["cv_confidence_b1hw"]
+                    cv_confidence_b1hw = F.interpolate(
+                            cv_confidence_b1hw,
+                            size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                            mode="nearest",
+                        ).bool()
 
                     color_frame = (
                         cur_data["high_res_color_b3hw"]
@@ -473,6 +482,8 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
+                        cv_confidence_b1hw=cv_confidence_b1hw
+                        
                     )
 
                 ########################### Quick Viz ##########################
