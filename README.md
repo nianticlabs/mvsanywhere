@@ -111,6 +111,58 @@ CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
 --partial;
 ```
 
+
+## Remote training and testing with Ray
+
+### Training
+
+To train a model remotely on a cluster, prepare a training file as the following one:
+
+```bash
+python -m geometryhints.ray.train \
+    --config configs/models/hero_fast_mesh_hint.yaml \
+    --data_config configs/data/scannet_default_train_ray.yaml \
+    --gpus 4 \
+    --dataset_path /mnt/nas/shared/datasets/academic_use_only/scannet/ \
+    --log_dir /mnt/nas3/personal/faleotti/geometryhints_debug \
+    --batch_size 16 \
+    --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders \
+    --val_interval 200 \
+    --val_batches 80 \
+    --val_batch_size 6 \
+    --num_workers 12 \
+    --lazy_load_weights_from_checkpoint /mnt/nas3/personal/faleotti/geometryhints/hero_model_sr_int_flip_removed_opts.ckpt
+```
+
+**NOTES**
+- Paths to data/checkpoints must be absolute. That's why we use `scannet_default_train_ray.yaml` as config, or `/mnt/nas/shared/datasets/academic_use_only/scannet/`.
+- We hard-coded a100 as GPUs
+
+### Testing
+
+1. Prepare your testing bash script, and call it `test_remote.sh`.
+An example is:
+```bash
+python -m geometryhints.test_incremental_render \
+    --config_file $CONFIG \
+    --load_weights_from_checkpoint $CHECKPOINT \
+    --data_config configs/data/scannet_default_test_ray.yaml  \
+    --dataset_path $SCANNET_DIR \
+    --num_workers 12  \
+    --batch_size 1  \
+    --output_base_path $OUTPUT_DIR  \
+    --depth_hint_aug 0.0  \
+    --load_empty_hint \
+    --name debug \
+    --run_fusion \
+    --plane_sweep_ablation_ratio 0.0;
+```
+**NOTES**:
+- Remember to set `$OUTPUT_DIR` to a folder on the nas. By doing that, the remote machine will be able to save artifacts generated during the execution (such as meshes)
+- Set the script as rwx, so `chmod 777 test_remote.sh`
+
+2. Run `python -m geometryhints.ray.test`. The python script will zip your code, ship it to the remote cluster and execute remotely `test_remote.sh`
+
 ## Training
 
 ```
