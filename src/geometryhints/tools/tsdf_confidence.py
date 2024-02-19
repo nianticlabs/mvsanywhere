@@ -7,8 +7,8 @@ from src.geometryhints.tools.tsdf import TSDFFuser
 class TSDFConf(TSDFFuser):
     def confidence_to_log_odds(self, confidence: torch.Tensor) -> torch.Tensor:
         """Turn a confidence, expressed as a probability, as log odds"""
-        EPS = 1e-5
-        return torch.log(confidence + EPS / (1 - confidence + EPS))
+        EPS = torch.finfo(confidence.dtype).eps
+        return torch.log((confidence + EPS) / (1 - confidence + EPS))
 
     def log_odds_to_confidence(self, log_odds: torch.Tensor) -> torch.Tensor:
         """Turn a log odds into a probability value"""
@@ -64,16 +64,6 @@ class TSDFConf(TSDFFuser):
         )
         sampled_depth_b1N = sampled_depth_b1hw.flatten(start_dim=2)
 
-        # sample the confidence
-        sampled_cv_confidence_b1hw = TF.grid_sample(
-            input=cv_confidence_b1hw,
-            grid=pixel_coords_bhw2,
-            mode="nearest",
-            padding_mode="zeros",
-            align_corners=False,
-        )
-        sampled_cv_confidence_b1N = sampled_cv_confidence_b1hw.flatten(start_dim=2)
-
         # Confidence from InfiniTAM
         tsdf_confidence_b1N = (
             torch.clamp(
@@ -84,13 +74,38 @@ class TSDFConf(TSDFFuser):
             ** 2
         )
 
-        # sum log odds of the two confidence scores
-        tsdf_log_odds_b1N = self.confidence_to_log_odds(tsdf_confidence_b1N)
-        cv_log_odds_b1N = self.confidence_to_log_odds(sampled_cv_confidence_b1N)
-        log_odds_b1N = tsdf_log_odds_b1N + cv_log_odds_b1N
+        if cv_confidence_b1hw is not None:
+            # sample the confidence
+            sampled_cv_confidence_b1hw = TF.grid_sample(
+                input=cv_confidence_b1hw,
+                grid=pixel_coords_bhw2,
+                mode="nearest",
+                padding_mode="zeros",
+                align_corners=False,
+            )
+            sampled_cv_confidence_b1N = sampled_cv_confidence_b1hw.flatten(start_dim=2)
 
-        # turn the log odds back to a confidence (probability)
-        confidence_b1N = self.log_odds_to_confidence(log_odds_b1N)
+
+            # sum log odds of the two confidence scores
+            tsdf_log_odds_b1N = self.confidence_to_log_odds(tsdf_confidence_b1N)
+            cv_log_odds_b1N = self.confidence_to_log_odds(sampled_cv_confidence_b1N)
+            log_odds_b1N = tsdf_log_odds_b1N + cv_log_odds_b1N
+            
+
+
+            # turn the log odds back to a confidence (probability)
+            confidence_b1N = self.log_odds_to_confidence(log_odds_b1N)
+            
+            # print("cv_log_odds_b1N = ", cv_log_odds_b1N.mean())
+            # print("sampled_cv_confidence_b1N = ", sampled_cv_confidence_b1N.mean())
+            # print("tsdf_log_odds_b1N = ", tsdf_log_odds_b1N.mean())
+            # print("tsdf_confidence_b1N =", tsdf_confidence_b1N.mean())
+            # print("log_odds_b1N =", log_odds_b1N.mean())
+            # print("confidence_b1N =", confidence_b1N.mean())
+        else:
+            confidence_b1N = tsdf_confidence_b1N
+
+        
 
         # Calculate TSDF values from depth difference by normalizing to [-1, 1]
         dist_b1N = sampled_depth_b1N - vox_depth_b1N
@@ -102,6 +117,7 @@ class TSDFConf(TSDFFuser):
             & (dist_b1N > -self.truncation)
             & (sampled_depth_b1N > 0)
             & (vox_depth_b1N > 0)
+            # & (vox_depth_b1N < self.max_depth | sampled_depth_b1N > vox_depth_b1N + 0.5)
             & (vox_depth_b1N < self.max_depth)
             & (confidence_b1N > 0)
         )
