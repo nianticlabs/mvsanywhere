@@ -277,6 +277,8 @@ def cache_model_outputs(
             0
         )
         elem_output_dict["overall_mask_bhw"] = outputs["overall_mask_bhw"][elem_ind].unsqueeze(0)
+        
+        elem_output_dict["cv_confidence_b1hw"] = outputs["cv_confidence_b1hw"][elem_ind].unsqueeze(0)
 
         # include some auxiliary information
         elem_output_dict["K_full_depth_b44"] = cur_data["K_full_depth_b44"][elem_ind].unsqueeze(0)
