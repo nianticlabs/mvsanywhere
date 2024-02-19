@@ -400,6 +400,12 @@ if __name__ == "__main__":
         help="Noise to add to depth maps before fusing.",
         default=0.0,
     )
+    option_handler.parser.add_argument(
+        "--partial",
+        type=int,
+        default=0,
+    )
+
 
     option_handler.parse_and_merge_options(ignore_cl_args=False)
     option_handler.pretty_print_options()
@@ -414,6 +420,8 @@ if __name__ == "__main__":
 
     dataset_root = Path(opts.dataset_path) / dataset_class.get_sub_folder_dir(opts.split)
 
+    opts.partial = True if opts.partial == 1 else False
+    print(f"Partial: {opts.partial}")
     render_scenes(
         dataset_root=dataset_root,
         scan_list=scan_names,
@@ -424,4 +432,5 @@ if __name__ == "__main__":
         batch_size=opts.batch_size,
         data_to_render=opts.data_to_render,
         depth_noise=opts.depth_noise,
+        partial=opts.partial,
     )
