@@ -468,7 +468,7 @@ def main(opts):
                         cv_confidence_b1hw,
                         size=(depth_gt.shape[-2], depth_gt.shape[-1]),
                         mode="nearest",
-                    ).bool()
+                    )
 
                     color_frame = (
                         cur_data["high_res_color_b3hw"]
