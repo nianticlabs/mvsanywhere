@@ -66,7 +66,9 @@ class OurFuser(DepthFuser):
             depth_b1hw=depths_b1hw.half(),
             cam_T_world_T_b44=cam_T_world_b44.half(),
             K_b44=K_b44.half(),
-            cv_confidence_b1hw=cv_confidence_b1hw.half() if cv_confidence_b1hw is not None else None,
+            cv_confidence_b1hw=cv_confidence_b1hw.half()
+            if cv_confidence_b1hw is not None
+            else None,
         )
 
     def export_mesh(self, path, export_single_mesh=True):

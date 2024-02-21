@@ -493,7 +493,7 @@ class DepthModelCVHint(pl.LightningModule):
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
 
         # include also the confidence
-        cv_confidence = torch.zeros_like(lowest_cost).unsqueeze(1)
+        cv_confidence = None
         if return_confidence:
             # cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
             cv_confidence = compute_volume_entropy(volume=cost_volume)

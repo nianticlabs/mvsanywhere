@@ -267,7 +267,7 @@ def main(opts):
             hint_fuser = fusers_helper.OurFuser(
                 gt_path=gt_path,
                 fusion_resolution=0.04,
-                max_fusion_depth=3,#opts.fusion_max_depth,
+                max_fusion_depth=3,  # opts.fusion_max_depth,
                 fuse_color=False,
             )
             for batch_ind, batch in enumerate(tqdm(dataloader, desc="First pass")):

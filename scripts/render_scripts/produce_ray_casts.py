@@ -22,9 +22,18 @@ from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 
 from geometryhints.utils.visualization_utils import colormap_image, save_viz_video_frames
 
-class TSDFRaycaster(torch.nn.Module):
-    def __init__(self, tsdf: TSDF, invK: torch.tensor, height: int = 96, width: int = 128, num_samples: int = 128, min_depth: float = 0.2, max_depth: float = 10.0) -> None:
 
+class TSDFRaycaster(torch.nn.Module):
+    def __init__(
+        self,
+        tsdf: TSDF,
+        invK: torch.tensor,
+        height: int = 96,
+        width: int = 128,
+        num_samples: int = 128,
+        min_depth: float = 0.2,
+        max_depth: float = 10.0,
+    ) -> None:
         super(TSDFRaycaster, self).__init__()
         self.tsdf = tsdf.tsdf_values
 
@@ -40,13 +49,13 @@ class TSDFRaycaster(torch.nn.Module):
 
         self.depth_samples = None
         self.points_camera_space = None
-        
+
         self.min_depth = min_depth
         self.max_depth = max_depth
 
         self.set_depth_samples(num_samples, min_depth, max_depth)
         self.set_points_camera_space(invK, self.depth_samples)
-    
+
     def set_depth_samples(self, num_samples: int, min_depth: float, max_depth: float) -> None:
         depth_samples = torch.linspace(0, 1, self.num_depth_bins)
 
@@ -54,22 +63,22 @@ class TSDFRaycaster(torch.nn.Module):
             torch.log(min_depth) + torch.log(max_depth / min_depth) * depth_samples
         )[None, None]
         depth_samples_dhw = torch.exp(depth_samples_dhw)
-        
-        depth_samples_dhw = depth_samples_11d.repeat(self.height, self.width, 1).permute(2, 0, 1)
-        
 
+        depth_samples_dhw = depth_samples_11d.repeat(self.height, self.width, 1).permute(2, 0, 1)
 
         self.depth_samples = depth_samples_dhw.half().cuda()
-    
+
     def set_points_camera_space(self, invK: torch.Tensor, depth_samples: torch.tensor) -> None:
-        xs, ys = torch.meshgrid(torch.arange(self.width), torch.arange(self.height), indexing='xy')
+        xs, ys = torch.meshgrid(torch.arange(self.width), torch.arange(self.height), indexing="xy")
         xs = xs.float() + 0.5
         ys = ys.float() + 0.5
 
-        cam_points = torch.stack([xs, ys, torch.ones_like(xs), torch.ones_like(xs)], 0).flatten(1).cuda()
+        cam_points = (
+            torch.stack([xs, ys, torch.ones_like(xs), torch.ones_like(xs)], 0).flatten(1).cuda()
+        )
         cam_points = (invK @ cam_points).repeat(depth_samples.shape[0], 1, 1)
         cam_points[:, :3] *= depth_samples.unsqueeze(1)
-        
+
         self.points_camera_space = cam_points.half().cuda()
         # self.register_buffer('points_camera_space', cam_points)
 
@@ -82,12 +91,16 @@ class TSDFRaycaster(torch.nn.Module):
         tsdf_points = ((tsdf_points - 0.5) * 2).permute(0, 2, 1).unsqueeze(0).unsqueeze(0)
 
         # reoder to zyx for grid sample convention
-        tsdf_points = torch.stack((tsdf_points[..., 2], tsdf_points[..., 1], tsdf_points[..., 0]), -1)
+        tsdf_points = torch.stack(
+            (tsdf_points[..., 2], tsdf_points[..., 1], tsdf_points[..., 0]), -1
+        )
 
         # get tsdf values using grid sample
         tsdf = self.tsdf.clone()
         tsdf[tsdf == -1] = 1
-        vals = F.grid_sample(tsdf.unsqueeze(0).unsqueeze(0), tsdf_points.half(), align_corners=True, mode='bilinear').squeeze()
+        vals = F.grid_sample(
+            tsdf.unsqueeze(0).unsqueeze(0), tsdf_points.half(), align_corners=True, mode="bilinear"
+        ).squeeze()
 
         diff = torch.logical_and(vals[1:] < 0, vals[:-1] > 0).float()
         pos = diff.argmax(0, True)
@@ -103,6 +116,7 @@ class TSDFRaycaster(torch.nn.Module):
         depth[depth < self.min_depth] = -1
 
         return depth.reshape((self.height, self.width))
+
 
 class SimpleScanNetDataset(torch.utils.data.Dataset):
     """Simple Dataset for loading ScanNet frames."""
@@ -185,7 +199,6 @@ class SimpleScanNetDataset(torch.utils.data.Dataset):
         return item_dict
 
 
-
 def render_scene_meshes(
     scan_id: str,
     dataset_root: Path,
@@ -224,28 +237,27 @@ def render_scene_meshes(
     if data_to_render == "both":
         backprojector = BackprojectDepth(height=height, width=width).cuda()
 
-
     get_mesh_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan_id)
-    partial_mesher = PartialFuser(gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise)
-
+    partial_mesher = PartialFuser(
+        gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise
+    )
 
     ray_caster = TSDFRaycaster(
-        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf, 
-        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(), 
-        height=96, 
-        width=128, 
-        num_samples=128, 
+        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf,
+        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(),
+        height=96,
+        width=128,
+        num_samples=128,
         min_depth=0.05,
         max_depth=10.0,
     )
-    
+
     image_list = []
     with torch.no_grad():
         _ = partial_mesher.fuse_all_frames()
         for batch in tqdm.tqdm(dataloader):
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
-
                 depth_1hw = ray_caster.raycast_tsdf(batch["world_T_cam_b44"][elem_ind][None].cuda())
 
                 # save the depth map
@@ -352,14 +364,16 @@ def render_scene_meshes_partial(
     mesh_renderer = PyTorch3DMeshDepthRenderer(height=height, width=width)
 
     get_mesh_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan_id)
-    partial_mesher = PartialFuser(gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise)
+    partial_mesher = PartialFuser(
+        gt_mesh_path=get_mesh_path, cached_depth_path=cached_depth_path, depth_noise=depth_noise
+    )
 
     ray_caster = TSDFRaycaster(
-        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf, 
-        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(), 
-        height=96, 
-        width=128, 
-        num_samples=128, 
+        tsdf=partial_mesher.fuser.tsdf_fuser_pred.tsdf,
+        invK=torch.tensor(dataset[0][0]["invK_s1_b44"]).squeeze(0).cuda(),
+        height=96,
+        width=128,
+        num_samples=128,
         min_depth=0.05,
         max_depth=10.0,
     )
@@ -368,11 +382,13 @@ def render_scene_meshes_partial(
     with torch.no_grad():
         for batch in tqdm.tqdm(dataloader):
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
-            
+
             for elem_ind, depth_1hw in enumerate(batch["frame_id_str"]):
                 mesh = partial_mesher.get_mesh(query_frame_id=int(batch["frame_id_str"][elem_ind]))
                 if mesh is not None:
-                    depth_1hw = ray_caster.raycast_tsdf(batch["world_T_cam_b44"][elem_ind][None].cuda())
+                    depth_1hw = ray_caster.raycast_tsdf(
+                        batch["world_T_cam_b44"][elem_ind][None].cuda()
+                    )
                 else:
                     depth_1hw = torch.zeros(1, height, width).cuda()
 
@@ -438,6 +454,7 @@ def render_scene_meshes_partial(
         fps=10,
     )
 
+
 def render_scenes(
     dataset_root: Path,
     scan_list: list[str],
@@ -462,7 +479,6 @@ def render_scenes(
             data_to_render=data_to_render,
             depth_noise=depth_noise,
         )
-
 
 
 if __name__ == "__main__":
@@ -492,9 +508,9 @@ if __name__ == "__main__":
         type=float,
         required=True,
         help="Noise to add to depth maps before fusing.",
-        default=0.0
+        default=0.0,
     )
-    
+
     option_handler.parse_and_merge_options(ignore_cl_args=False)
     option_handler.pretty_print_options()
     opts = option_handler.options
