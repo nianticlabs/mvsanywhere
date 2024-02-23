@@ -432,9 +432,5 @@ if __name__ == "__main__":
         batch_size=opts.batch_size,
         data_to_render=opts.data_to_render,
         depth_noise=opts.depth_noise,
-<<<<<<< HEAD
-        partial=opts.partial == 1,
-=======
         partial=opts.partial,
->>>>>>> main
     )
