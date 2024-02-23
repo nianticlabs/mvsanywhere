@@ -280,7 +280,6 @@ class DepthModel(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
-        return_confidence=False,
         null_plane_sweep=False,
     ):
         """
@@ -434,13 +433,6 @@ class DepthModel(pl.LightningModule):
         # overall source view mask.
         depth_outputs["lowest_cost_bhw"] = lowest_cost
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
-
-        # include also the confidence
-        cv_confidence = None
-        if return_confidence:
-            # cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
-            cv_confidence = compute_volume_entropy(volume=cost_volume)
-        depth_outputs["cv_confidence_b1hw"] = cv_confidence
 
         return depth_outputs
 

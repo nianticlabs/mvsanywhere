@@ -329,10 +329,9 @@ def main(opts):
                     # set weights
                     sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
 
-                    # sampled_weights_b1hw[sampled_weights_b1hw < 0.1] = 0.0
-                    # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.1] = float("nan")
-                    # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+                    cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
+                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
                     weights_list.append(
                         sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item()
@@ -371,7 +370,6 @@ def main(opts):
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
                     null_plane_sweep=opts.null_plane_sweep,
-                    return_confidence=True,
                 )
                 end_time.record()
                 torch.cuda.synchronize()
@@ -463,12 +461,6 @@ def main(opts):
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 
-                    cv_confidence_b1hw = outputs["cv_confidence_b1hw"]
-                    cv_confidence_b1hw = F.interpolate(
-                        cv_confidence_b1hw,
-                        size=(depth_gt.shape[-2], depth_gt.shape[-1]),
-                        mode="nearest",
-                    )
 
                     color_frame = (
                         cur_data["high_res_color_b3hw"]
@@ -481,7 +473,6 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
-                        cv_confidence_b1hw=cv_confidence_b1hw,
                     )
 
                 ########################### Quick Viz ##########################

@@ -4,8 +4,7 @@ import torch
 import trimesh
 
 from geometryhints.datasets.scannet_dataset import ScannetDataset
-from geometryhints.tools.tsdf import TSDF
-from geometryhints.tools.tsdf_confidence import TSDFConf as TSDFFuser
+from geometryhints.tools.tsdf import TSDF, TSDFFuser
 from geometryhints.utils.generic_utils import reverse_imagenet_normalize
 
 
@@ -61,14 +60,11 @@ class OurFuser(DepthFuser):
 
         self.tsdf_fuser_pred = TSDFFuser(tsdf_pred, max_depth=max_fusion_depth)
 
-    def fuse_frames(self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw, cv_confidence_b1hw):
+    def fuse_frames(self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw):
         self.tsdf_fuser_pred.integrate_depth(
             depth_b1hw=depths_b1hw.half(),
             cam_T_world_T_b44=cam_T_world_b44.half(),
             K_b44=K_b44.half(),
-            cv_confidence_b1hw=cv_confidence_b1hw.half()
-            if cv_confidence_b1hw is not None
-            else None,
         )
 
     def export_mesh(self, path, export_single_mesh=True):

@@ -388,7 +388,7 @@ class TSDFFuser:
         confidence_b1N = (
             torch.clamp(
                 1.0 - (sampled_depth_b1N - self.min_depth) / (self.max_depth - self.min_depth),
-                min=0.0,
+                min=0.25,
                 max=1.0,
             )
             ** 2
@@ -421,8 +421,7 @@ class TSDFFuser:
             new_tsdf_vals = tsdf_val_1N[valid_points_1N]
             confidence = confidence_1N[valid_points_1N]
 
-            # More infiniTAM magic: update faster when the new samples are more confident
-            update_rate = torch.where(confidence < old_weights, 2.0, 5.0).half()
+            update_rate = 2.5
 
             # Compute the new weight and the normalization factor
             new_weights = confidence * update_rate / self.maxW

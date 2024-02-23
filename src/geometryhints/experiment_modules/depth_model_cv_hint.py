@@ -291,7 +291,6 @@ class DepthModelCVHint(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
-        return_confidence=False,
         null_plane_sweep=False,
     ):
         """
@@ -331,8 +330,6 @@ class DepthModelCVHint(pl.LightningModule):
                 information.
             return_mask: return a 2D mask from the cost volume for areas
                 where there is source view information.
-            return_confidence: returna a confidence map (B,1,H,W) between 1 and 0 where 1 means high
-                confidence and 0 means low confidence.
         Returns:
             depth_outputs: a dictionary with outputs including
                 "log_depth_pred_s{i}_b1hw" log depths where i is the
@@ -492,12 +489,6 @@ class DepthModelCVHint(pl.LightningModule):
         depth_outputs["lowest_cost_bhw"] = lowest_cost
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
 
-        # include also the confidence
-        cv_confidence = None
-        if return_confidence:
-            # cv_confidence = self.cv_confidence_manager.forward(volume=cost_volume)
-            cv_confidence = compute_volume_entropy(volume=cost_volume)
-        depth_outputs["cv_confidence_b1hw"] = cv_confidence
 
         return depth_outputs
 
