@@ -127,7 +127,7 @@ python -m geometryhints.ray.train \
     --log_dir /mnt/nas3/personal/faleotti/geometryhints_debug \
     --batch_size 16 \
     --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders \
-    --val_interval 200 \
+    --val_interval 2000 \
     --val_batches 80 \
     --val_batch_size 6 \
     --num_workers 12 \
