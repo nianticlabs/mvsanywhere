@@ -388,7 +388,7 @@ class TSDFFuser:
         confidence_b1N = (
             torch.clamp(
                 1.0 - (sampled_depth_b1N - self.min_depth) / (self.max_depth - self.min_depth),
-                min=0.25, # changed from 0
+                min=0.25,  # changed from 0
                 max=1.0,
             )
             ** 2
