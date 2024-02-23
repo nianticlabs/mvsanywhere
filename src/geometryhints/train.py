@@ -326,6 +326,7 @@ def prepare_trainer(
         num_sanity_val_steps=opts.num_sanity_val_steps,
         strategy=ddp_strategy,
         plugins=plugins,
+        profiler="simple",
     )
     return trainer
 

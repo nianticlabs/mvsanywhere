@@ -300,6 +300,19 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
             )
             pil_image.save(os.path.join(output_path, f"{frame_id}_rendered_depth.png"))
 
+        if "cv_confidence_b1hw" in outputs:
+            cv_confidence_3hw = colormap_image(
+                outputs["cv_confidence_b1hw"][elem_ind],
+                vmin=0,
+                vmax=1,
+                colormap="viridis",
+                flip=False,
+            )
+            pil_image = Image.fromarray(
+                np.uint8(cv_confidence_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
+            )
+            pil_image.save(os.path.join(output_path, f"{frame_id}_cv_confidence.png"))
+
 
 def load_and_merge_images(frame_ids, quick_viz_directory, fps=30):
     """

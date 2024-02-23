@@ -113,6 +113,7 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+import torchvision
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
