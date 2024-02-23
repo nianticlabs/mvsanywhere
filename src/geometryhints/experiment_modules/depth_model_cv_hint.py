@@ -224,11 +224,6 @@ class DepthModelCVHint(pl.LightningModule):
 
         self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
 
-        # prepare the module that extracts the confidence from the cost volume.
-        # We want a bounded confidence (between [0,1], where the higher the value
-        # the better the confidence).
-        # self.cv_confidence_manager = VolumeEntropyConfidence(bound=True)
-
     def compute_matching_feats(
         self,
         cur_image,
