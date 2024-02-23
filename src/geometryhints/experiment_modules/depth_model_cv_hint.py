@@ -489,7 +489,6 @@ class DepthModelCVHint(pl.LightningModule):
         depth_outputs["lowest_cost_bhw"] = lowest_cost
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
 
-
         return depth_outputs
 
     def compute_losses(self, cur_data, src_data, outputs):

@@ -557,7 +557,6 @@ def main(opts):
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 
-
                     color_frame = (
                         cur_data["high_res_color_b3hw"]
                         if "high_res_color_b3hw" in cur_data
