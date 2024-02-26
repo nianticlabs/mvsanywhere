@@ -7,6 +7,8 @@ import torch.nn.functional as TF
 import trimesh
 from pytorch3d.structures import Meshes
 from skimage import measure
+import open3d as o3d
+import time
 
 from geometryhints.utils.pytorch3d_extras import marching_cubes
 
@@ -36,6 +38,12 @@ class TSDF:
         self.tsdf_weights = tsdf_weights.half()
         self.voxel_size = voxel_size
         self.origin = origin.half()
+
+        self.voxel_hashset = o3d.core.HashSet(10000,
+                key_dtype=o3d.core.int64,
+                key_element_shape=(3,),
+                device=o3d.core.Device('CUDA:0'),
+        )
 
     @classmethod
     def from_file(cls, tsdf_file):
@@ -168,12 +176,17 @@ class TSDF:
         return mesh
 
     def to_mesh_pytorch3d(self, scale_to_world=True):
-        tsdf_vals = self.tsdf_values.clone()
 
-        tsdf_vals[tsdf_vals == -1] = 1
+        active_buf_indices = self.voxel_hashset.active_buf_indices().to(o3d.core.int64)
+        active_keys = self.voxel_hashset.key_tensor()[active_buf_indices]
+        active_keys = torch.utils.dlpack.from_dlpack(active_keys.to_dlpack()).to(torch.int32).contiguous()
+
+        tsdf_vals = self.tsdf_values
+
         batched_verts, batched_faces = marching_cubes(
-            tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False
+            tsdf_vals[None].float().cuda(), active_keys, isolevel=0.0, return_local_coords=False
         )
+
         verts = batched_verts[0]
         faces = batched_faces[0]
 
@@ -289,7 +302,7 @@ class TSDFFuser:
         self.use_gpu = use_gpu
         self.truncation_size = 3.0
         self.maxW = 100.0
-        self.vox_indices = torch.stack(torch.meshgrid([torch.arange(vd) for vd in self.shape]))
+        self.vox_indices = torch.stack(torch.meshgrid([torch.arange(vd) for vd in self.shape])).long()
 
         # Create homogeneous coords once only
         self.hom_voxel_coords_14hwd = torch.cat(
@@ -299,6 +312,10 @@ class TSDFFuser:
     @property
     def voxel_coords_3hwd(self):
         return self.tsdf.voxel_coords_3hwd
+    
+    @property
+    def voxel_hashset(self):
+        return self.tsdf.voxel_hashset
 
     @property
     def tsdf_values(self):
@@ -460,6 +477,12 @@ class TSDFFuser:
             valid_indices = self.vox_indices.flatten(1)[:, valid_voxel_mask_N][:, valid_points_1N[0]]
             old_tsdf_vals = self.tsdf_values[valid_indices[0], valid_indices[1], valid_indices[2]]
             old_weights = self.tsdf_weights[valid_indices[0], valid_indices[1], valid_indices[2]]
+
+            # add active voxels to the hashset
+            active_mask = torch.logical_and(valid_points_1N, dist_b1N < self.truncation)
+            active_indices_N3 = self.vox_indices.flatten(1)[:, valid_voxel_mask_N][:, active_mask[0, 0]].T.contiguous()
+            active_indices_N3 = o3d.core.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(active_indices_N3))
+            self.voxel_hashset.insert(active_indices_N3)
 
             # Fetch the new tsdf values and the confidence
             new_tsdf_vals = tsdf_val_1N[valid_points_1N]

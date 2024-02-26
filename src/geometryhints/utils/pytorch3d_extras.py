@@ -6,6 +6,14 @@ from pytorch3d.ops.marching_cubes_data import EDGE_TO_VERTICES, FACE_TABLE, INDE
 from pytorch3d.transforms import Translate
 from torch.autograd import Function
 
+from torch.utils.cpp_extension import load
+
+marching_cubes_impl = load(name='ext',
+                           sources=['src/geometryhints/tools/marching_cubes/ext.cpp', 
+                                    'src/geometryhints/tools/marching_cubes/marching_cubes_cpu.cpp', 
+                                    'src/geometryhints/tools/marching_cubes/marching_cubes.cu'], 
+                            verbose=True)
+
 
 class _marching_cubes(Function):
     """
@@ -15,17 +23,19 @@ class _marching_cubes(Function):
     """
 
     @staticmethod
-    def forward(ctx, vol, isolevel):
-        verts, faces, ids = _C.marching_cubes(vol, isolevel)
+    def forward(ctx, vol, isolevel, active_voxels):
+        # verts, faces, ids = _C.marching_cubes(vol, isolevel)
+        verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels)
         return verts, faces, ids
-
+    
     @staticmethod
     def backward(ctx, grad_verts, grad_faces):
         raise ValueError("marching_cubes backward is not supported")
-
+    
 
 def marching_cubes(
     vol_batch: torch.Tensor,
+    active_voxels: torch.Tensor,
     isolevel: Optional[float] = None,
     return_local_coords: bool = True,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
@@ -55,7 +65,7 @@ def marching_cubes(
     for i in range(len(vol_batch)):
         vol = vol_batch[i]
         thresh = ((vol.max() + vol.min()) / 2).item() if isolevel is None else isolevel
-        verts, faces, ids = _marching_cubes.apply(vol, thresh)
+        verts, faces, ids = _marching_cubes.apply(vol, thresh, active_voxels)
         if len(faces) > 0 and len(verts) > 0:
             # Convert from world coordinates ([0, D-1], [0, H-1], [0, W-1]) to
             # local coordinates in the range [-1, 1]
