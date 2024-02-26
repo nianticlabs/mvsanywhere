@@ -7,6 +7,8 @@ import torch.nn.functional as TF
 import trimesh
 from pytorch3d.structures import Meshes
 from skimage import measure
+import open3d as o3d
+import time
 
 from geometryhints.utils.pytorch3d_extras import marching_cubes
 
@@ -36,6 +38,12 @@ class TSDF:
         self.tsdf_weights = tsdf_weights.half()
         self.voxel_size = voxel_size
         self.origin = origin.half()
+
+        self.voxel_hashset = o3d.core.HashSet(10000,
+                key_dtype=o3d.core.int64,
+                key_element_shape=(3,),
+                device=o3d.core.Device('CUDA:0'),
+        )
 
     @classmethod
     def from_file(cls, tsdf_file):
@@ -168,12 +176,17 @@ class TSDF:
         return mesh
 
     def to_mesh_pytorch3d(self, scale_to_world=True):
-        tsdf_vals = self.tsdf_values.clone()
 
-        tsdf_vals[tsdf_vals == -1] = 1
+        active_buf_indices = self.voxel_hashset.active_buf_indices().to(o3d.core.int64)
+        active_keys = self.voxel_hashset.key_tensor()[active_buf_indices]
+        active_keys = torch.utils.dlpack.from_dlpack(active_keys.to_dlpack()).to(torch.int32).contiguous()
+
+        tsdf_vals = self.tsdf_values
+
         batched_verts, batched_faces = marching_cubes(
-            tsdf_vals[None].float().cuda(), isolevel=0.0, return_local_coords=False
+            tsdf_vals[None].float().cuda(), active_keys, isolevel=0.0, return_local_coords=False
         )
+
         verts = batched_verts[0]
         faces = batched_faces[0]
 
@@ -289,6 +302,7 @@ class TSDFFuser:
         self.use_gpu = use_gpu
         self.truncation_size = 3.0
         self.maxW = 100.0
+        self.vox_indices = torch.stack(torch.meshgrid([torch.arange(vd) for vd in self.shape])).long()
 
         # Create homogeneous coords once only
         self.hom_voxel_coords_14hwd = torch.cat(
@@ -298,6 +312,10 @@ class TSDFFuser:
     @property
     def voxel_coords_3hwd(self):
         return self.tsdf.voxel_coords_3hwd
+    
+    @property
+    def voxel_hashset(self):
+        return self.tsdf.voxel_hashset
 
     @property
     def tsdf_values(self):
@@ -319,22 +337,18 @@ class TSDFFuser:
     def truncation(self):
         return self.truncation_size * self.voxel_size
 
-    def project_to_camera(self, cam_T_world_T_b44, K_b44):
+    def project_to_camera(self, cam_T_world_T_144, K_144, valid_voxels_14N):
         if self.use_gpu:
-            cam_T_world_T_b44 = cam_T_world_T_b44.cuda()
-            K_b44 = K_b44.cuda()
-            self.hom_voxel_coords_14hwd = self.hom_voxel_coords_14hwd.cuda()
+            cam_T_world_T_144 = cam_T_world_T_144.cuda()
+            K_144 = K_144.cuda()
+            valid_voxels_14N = valid_voxels_14N.cuda()
 
-        world_to_pix_P_b34 = torch.matmul(K_b44, cam_T_world_T_b44)[:, :3]
-        batch_size = cam_T_world_T_b44.shape[0]
+        world_to_pix_P_134 = torch.matmul(K_144, cam_T_world_T_144)[:, :3]
 
-        world_points_b4N = self.hom_voxel_coords_14hwd.expand(batch_size, 4, *self.shape).flatten(
-            start_dim=2
-        )
-        cam_points_b3N = torch.matmul(world_to_pix_P_b34, world_points_b4N)
-        cam_points_b3N[:, :2] = cam_points_b3N[:, :2] / cam_points_b3N[:, 2, None]
+        cam_points_13N = torch.matmul(world_to_pix_P_134, valid_voxels_14N)
+        cam_points_13N[:, :2] = cam_points_13N[:, :2] / cam_points_13N[:, 2, None]
 
-        return cam_points_b3N
+        return cam_points_13N
 
     def integrate_depth(
         self,
@@ -358,64 +372,116 @@ class TSDFFuser:
             depth_b1hw = depth_b1hw.cuda()
             img_size = img_size.cuda()
             self.tsdf.cuda()
-
-        # Project voxel coordinates into images
-        cam_points_b3N = self.project_to_camera(cam_T_world_T_b44, K_b44)
-        vox_depth_b1N = cam_points_b3N[:, 2:3]
-        pixel_coords_b2N = cam_points_b3N[:, :2]
-
-        # Reshape the projected voxel coords to a 2D view of shape Hx(WxD)
-        pixel_coords_bhw2 = pixel_coords_b2N.view(
-            -1, 2, self.shape[0], self.shape[1] * self.shape[2]
-        ).permute(0, 2, 3, 1)
-        pixel_coords_bhw2 = 2 * pixel_coords_bhw2 / img_size - 1
+            self.hom_voxel_coords_14hwd = self.hom_voxel_coords_14hwd.cuda()
+            self.vox_indices = self.vox_indices.cuda()
 
         if depth_mask_b1hw is not None:
             depth_b1hw = depth_b1hw.clone()
             depth_b1hw[~depth_mask_b1hw] = -1
 
-        # Sample the depth using grid sample
-        sampled_depth_b1hw = TF.grid_sample(
-            input=depth_b1hw,
-            grid=pixel_coords_bhw2,
-            mode="nearest",
-            padding_mode="zeros",
-            align_corners=False,
-        )
-        sampled_depth_b1N = sampled_depth_b1hw.flatten(start_dim=2)
+        for batch_idx in range(len(depth_b1hw)):
 
-        # Confidence from InfiniTAM
-        confidence_b1N = (
-            torch.clamp(
-                1.0 - (sampled_depth_b1N - self.min_depth) / (self.max_depth - self.min_depth),
-                min=0.25,  # changed from 0
-                max=1.0,
+            cam_T_world_T_144 = cam_T_world_T_b44[batch_idx:batch_idx + 1] 
+            K_144 = K_b44[batch_idx:batch_idx + 1]
+            depth_11hw = depth_b1hw[batch_idx:batch_idx + 1]
+
+            # get voxels which are visible in the camera
+            depth_min = depth_11hw.min()
+            depth_max = self.max_depth + 0.1
+
+            corner_uv_144 = torch.tensor(
+                [
+                [0, 0, 1, 1],
+                [img_w, 0, 1, 1],
+                [0, img_h, 1, 1],
+                [img_w, img_h, 1, 1],
+            ],
+            dtype=torch.float16,
+            device=depth_b1hw.device,
+            ).T.unsqueeze(0)
+
+            corner_points_144 = torch.matmul(torch.inverse(K_144.float()).half(), corner_uv_144)
+            min_corner_points_144 = corner_points_144.clone()
+            min_corner_points_144[:, :3] *= depth_min
+            max_corner_points_144 = corner_points_144.clone()
+            max_corner_points_144[:, :3] *= depth_max
+
+            corner_points_148 = torch.cat(
+                (
+                    min_corner_points_144,
+                    max_corner_points_144,
+                ), dim=2
             )
-            ** 2
-        )
+            corner_points_148 = torch.matmul(torch.inverse(cam_T_world_T_144.float()).half(), corner_points_148)
+            minbounds_3 = corner_points_148[0].amin(dim=1)[:3]
+            maxbounds_3 = corner_points_148[0].amax(dim=1)[:3]
 
-        # Calculate TSDF values from depth difference by normalizing to [-1, 1]
-        dist_b1N = sampled_depth_b1N - vox_depth_b1N
-        tsdf_vals_b1N = torch.clamp(dist_b1N / self.truncation, min=-1.0, max=1.0)
+            valid_voxel_mask_N = torch.logical_and(
+                self.hom_voxel_coords_14hwd[0, :3] > minbounds_3.view(1, -1, 1, 1, 1),
+                self.hom_voxel_coords_14hwd[0, :3] < maxbounds_3.view(1, -1, 1, 1, 1),
+            ).all(1).view(-1)
 
-        # Get the valid points mask
-        valid_points_b1N = (
-            (vox_depth_b1N > 0)
-            & (dist_b1N > -self.truncation)
-            & (sampled_depth_b1N > 0)
-            & (vox_depth_b1N > 0)
-            & (vox_depth_b1N < self.max_depth)
-            & (confidence_b1N > 0)
-        )
+            valid_voxels_14N = self.hom_voxel_coords_14hwd.flatten(2)[..., valid_voxel_mask_N]
 
-        # Updating the TSDF has to be sequential so we break out the batch here
-        for tsdf_val_1N, valid_points_1N, confidence_1N in zip(
-            tsdf_vals_b1N, valid_points_b1N, confidence_b1N
-        ):
+            # Project voxel coordinates into images
+            cam_points_b3N = self.project_to_camera(cam_T_world_T_144, K_144, valid_voxels_14N)
+            vox_depth_b1N = cam_points_b3N[:, 2:3]
+            pixel_coords_b2N = cam_points_b3N[:, :2]
+
+            # Reshape the projected voxel coords to a 2D view of shape Hx(WxD)
+            pixel_coords_bhw2 = pixel_coords_b2N.reshape(
+                1, 2, 1, -1
+            ).permute(0, 2, 3, 1)
+            pixel_coords_bhw2 = 2 * pixel_coords_bhw2 / img_size - 1
+
+            # Sample the depth using grid sample
+            sampled_depth_b1hw = TF.grid_sample(
+                input=depth_11hw,
+                grid=pixel_coords_bhw2,
+                mode="nearest",
+                padding_mode="zeros",
+                align_corners=False,
+            )
+            sampled_depth_b1N = sampled_depth_b1hw.flatten(start_dim=2)
+
+            # Confidence from InfiniTAM
+            confidence_b1N = (
+                torch.clamp(
+                    1.0 - (sampled_depth_b1N - self.min_depth) / (self.max_depth - self.min_depth),
+                    min=0.25,
+                    max=1.0,
+                )
+                ** 2
+            )
+
+            # Calculate TSDF values from depth difference by normalizing to [-1, 1]
+            dist_b1N = sampled_depth_b1N - vox_depth_b1N
+            tsdf_vals_b1N = torch.clamp(dist_b1N / self.truncation, min=-1.0, max=1.0)
+
+            # Get the valid points mask
+            valid_points_b1N = (
+                (vox_depth_b1N > 0)
+                & (dist_b1N > -self.truncation)
+                & (sampled_depth_b1N > 0)
+                & (vox_depth_b1N > 0)
+                & (vox_depth_b1N < self.max_depth)
+                & (confidence_b1N > 0)
+            )
+
+            valid_points_1N = valid_points_b1N[0]
+            tsdf_val_1N = tsdf_vals_b1N[0]
+            confidence_1N = confidence_b1N[0]
+
             # Reshape the valid mask to the TSDF's shape and read the old values
-            valid_points_hwd = valid_points_1N.view(self.shape)
-            old_tsdf_vals = self.tsdf_values[valid_points_hwd]
-            old_weights = self.tsdf_weights[valid_points_hwd]
+            valid_indices = self.vox_indices.flatten(1)[:, valid_voxel_mask_N][:, valid_points_1N[0]]
+            old_tsdf_vals = self.tsdf_values[valid_indices[0], valid_indices[1], valid_indices[2]]
+            old_weights = self.tsdf_weights[valid_indices[0], valid_indices[1], valid_indices[2]]
+
+            # add active voxels to the hashset
+            active_mask = torch.logical_and(valid_points_1N, dist_b1N < self.truncation)
+            active_indices_N3 = self.vox_indices.flatten(1)[:, valid_voxel_mask_N][:, active_mask[0, 0]].T.contiguous()
+            active_indices_N3 = o3d.core.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(active_indices_N3))
+            self.voxel_hashset.insert(active_indices_N3)
 
             # Fetch the new tsdf values and the confidence
             new_tsdf_vals = tsdf_val_1N[valid_points_1N]
@@ -430,7 +496,7 @@ class TSDFFuser:
             total_weights = old_weights + new_weights
 
             # Update the tsdf and the weights
-            self.tsdf_values[valid_points_hwd] = (
+            self.tsdf_values[valid_indices[0], valid_indices[1], valid_indices[2]] = (
                 old_tsdf_vals * old_weights + new_tsdf_vals * new_weights
             ) / total_weights
-            self.tsdf_weights[valid_points_hwd] = torch.clamp(total_weights, max=1.0)
+            self.tsdf_weights[valid_indices[0], valid_indices[1], valid_indices[2]] = torch.clamp(total_weights, max=1.0)

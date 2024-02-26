@@ -12,6 +12,7 @@ dependencies:
   - pytorch=2.0.1
   - torchvision
   - pytorch-cuda=11.7
+  - cudatoolkit-dev=11.7  # nvcc
   - lightning=2.0.0
   - pytorch3d=0.7.4 # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op
@@ -42,3 +43,4 @@ dependencies:
     - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes
     - ray[default,data,train,tune]==2.9.1
     - opencv-python==4.9.0.80
+    - ninja==1.11.1.1
