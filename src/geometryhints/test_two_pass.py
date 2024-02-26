@@ -456,7 +456,7 @@ def main(opts):
                 # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
                 # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                 # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                
+
                 sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                 cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
 

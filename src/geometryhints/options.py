@@ -213,8 +213,8 @@ class Options:
     # for backfacing meshes, this allows them to be rendered and composited with
     # an alpha to a culled-back-faces render.
     back_face_alpha: float = 0.5
-    
-    # for quick_viz_export, whether or not to use a fixed min and max at 0 and 5m 
+
+    # for quick_viz_export, whether or not to use a fixed min and max at 0 and 5m
     # for visualization
     viz_fixed_min_max: bool = False
 
