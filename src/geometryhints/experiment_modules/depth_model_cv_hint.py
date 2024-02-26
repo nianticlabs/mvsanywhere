@@ -380,50 +380,26 @@ class DepthModelCVHint(pl.LightningModule):
         # prior.
         cur_feats = self.encoder(cur_image)
 
-        # this gets a mask for those batches that have a hint
-        available_hint_b = torch.any(cur_data["depth_hint_mask_b_b1hw"].flatten(1), 1)
-        # get the chance of ablating plane sweep
-        plane_sweep_ablation_ratio = getattr(self.run_opts, "plane_sweep_ablation_ratio", 0.0)
-        # randomly ablate plane sweep for batches that have a hint. This mask is true when plane sweep should be ignored.
-        plane_sweep_ablate_b = (torch.rand(available_hint_b.shape) < plane_sweep_ablation_ratio).to(
-            available_hint_b.device
-        )
-        # Get the final mask for plane sweep.
-        # True when we have a hint and we flipped a coin and it came out to ignore.
-        plane_sweep_ignore_b = torch.logical_and(available_hint_b, plane_sweep_ablate_b)
+        # # this gets a mask for those batches that have a hint
+        # available_hint_b = torch.any(cur_data["depth_hint_mask_b_b1hw"].flatten(1), 1)
+        # # get the chance of ablating plane sweep
+        # plane_sweep_ablation_ratio = getattr(self.run_opts, "plane_sweep_ablation_ratio", 0.0)
+        # # randomly ablate plane sweep for batches that have a hint. This mask is true when plane sweep should be ignored.
+        # plane_sweep_ablate_b = (torch.rand(available_hint_b.shape) < plane_sweep_ablation_ratio).to(
+        #     available_hint_b.device
+        # )
+        # # Get the final mask for plane sweep.
+        # # True when we have a hint and we flipped a coin and it came out to ignore.
+        # plane_sweep_ignore_b = torch.logical_and(available_hint_b, plane_sweep_ablate_b)
 
         if null_plane_sweep:
-            plane_sweep_ignore_b = torch.ones_like(plane_sweep_ignore_b).bool()
+            assert phase != "train"
+            plane_sweep_ignore_b = torch.ones(cur_image.shape[0]).bool().to(cur_image.device)
+        else:
+            plane_sweep_ignore_b = torch.zeros(cur_image.shape[0]).bool().to(cur_image.device)
 
         cur_data["plane_sweep_ignore_b"] = plane_sweep_ignore_b
 
-        # if plane_sweep_ignore_b.any():
-        #     batch_size = cur_image.shape[0]
-        #     matching_height = cur_feats[self.run_opts.matching_scale].shape[-2]
-        #     matching_width = cur_feats[self.run_opts.matching_scale].shape[-1]
-
-        #     matching_cur_feats = torch.zeros(
-        #         batch_size, self.run_opts.matching_feature_dims, matching_height, matching_width
-        #     ).type_as(cur_feats[0])
-        #     matching_src_feats = torch.zeros(
-        #         batch_size,
-        #         src_image.shape[1],
-        #         self.run_opts.matching_feature_dims,
-        #         matching_height,
-        #         matching_width,
-        #     ).type_as(cur_feats[0])
-
-        #     (
-        #         matching_cur_feats[~plane_sweep_ignore_b],
-        #         matching_src_feats[~plane_sweep_ignore_b],
-        #     ) = self.compute_matching_feats(
-        #         cur_image[~plane_sweep_ignore_b],
-        #         src_image[~plane_sweep_ignore_b],
-        #         unbatched_matching_encoder_forward,
-        #     )
-        # else:
-        # instead of the above, opting to pass all images for better batchnorm
-        # Compute matching features
         matching_cur_feats, matching_src_feats = self.compute_matching_feats(
             cur_image, src_image, unbatched_matching_encoder_forward
         )
@@ -635,9 +611,9 @@ class DepthModelCVHint(pl.LightningModule):
             )
 
             if is_train:
-                prefix = "train_"
+                prefix = "train"
             else:
-                prefix = f"val_{dataloader_idx}_"
+                prefix = f"val_{dataloader_idx}"
 
             if log_images:
                 for i in range(4):
@@ -668,28 +644,28 @@ class DepthModelCVHint(pl.LightningModule):
 
                     self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
                     self.logger.experiment.add_image(
-                        f"{prefix}depth_gt/{i}", depth_gt_viz_i, self.global_step
+                        f"{prefix}_depth_gt/{i}", depth_gt_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}depth_pred/{i}", depth_pred_viz_i, self.global_step
+                        f"{prefix}_depth_pred/{i}", depth_pred_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}depth_hint/{i}", depth_hint_viz_i, self.global_step
+                        f"{prefix}_depth_hint/{i}", depth_hint_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}sampled_weights/{i}", sampled_weights_viz_i, self.global_step
+                        f"{prefix}_sampled_weights/{i}", sampled_weights_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+                        f"{prefix}_depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
+                        f"{prefix}_normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                        f"{prefix}_normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
                     )
                     self.logger.experiment.add_image(
-                        f"{prefix}cv_min/{i}", cv_min_viz_i, self.global_step
+                        f"{prefix}_cv_min/{i}", cv_min_viz_i, self.global_step
                     )
 
                 self.logger.experiment.flush()
@@ -704,6 +680,16 @@ class DepthModelCVHint(pl.LightningModule):
                     on_epoch=not is_train,
                     add_dataloader_idx=False,
                 )
+
+            # log plane sweep ignore mask
+            self.log(
+                f"{prefix}/plane_sweep_ignore_mask",
+                torch.mean(cur_data["plane_sweep_ignore_b"].float()),
+                sync_dist=True,
+                on_step=is_train,
+                on_epoch=not is_train,
+                add_dataloader_idx=False,
+            )
 
             # high_res_validation: it isn't always wise to load in high
             # resolution depth maps so this is an optional flag.
