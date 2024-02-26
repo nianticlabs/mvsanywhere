@@ -386,18 +386,18 @@ class TSDFFuser:
             depth_11hw = depth_b1hw[batch_idx:batch_idx + 1]
 
             # get voxels which are visible in the camera
-            depth_min = depth_11hw.min()
-            depth_max = self.max_depth + 0.1
+            depth_min = 0.01
+            depth_max = self.max_depth + self.truncation + 0.1
 
             corner_uv_144 = torch.tensor(
                 [
-                [0, 0, 1, 1],
-                [img_w, 0, 1, 1],
-                [0, img_h, 1, 1],
-                [img_w, img_h, 1, 1],
-            ],
-            dtype=torch.float16,
-            device=depth_b1hw.device,
+                    [0, 0, 1, 1],
+                    [img_w, 0, 1, 1],
+                    [0, img_h, 1, 1],
+                    [img_w, img_h, 1, 1],
+                ],
+                dtype=torch.float16,
+                device=depth_b1hw.device,
             ).T.unsqueeze(0)
 
             corner_points_144 = torch.matmul(torch.inverse(K_144.float()).half(), corner_uv_144)
