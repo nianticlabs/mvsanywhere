@@ -33,6 +33,7 @@ from geometryhints.utils.generic_utils import (
 from geometryhints.utils.geometry_utils import NormalGenerator
 from geometryhints.utils.metrics_utils import compute_depth_metrics
 from geometryhints.utils.visualization_utils import colormap_image
+from src.geometryhints.modules.confidence import compute_volume_entropy
 
 logger = logging.getLogger(__name__)
 

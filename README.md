@@ -6,7 +6,7 @@
 ### Incremental rendering
 
 ```
-CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt';
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_full_sr_no_ablate/epoch=7-step=89499.ckpt';
 CONFIG='configs/models/hero_model_mesh_hint.yaml';
 SCANNET_DIR='/mnt/scannet/';
 OUTPUT_DIR='/mnt/nas3/personal/mohameds/geometry_hints/outputs/';
@@ -34,7 +34,7 @@ CUDA_VISIBLE_DEVICES=1 python -m geometryhints.test_incremental_render  \
 ### Two pass
 
 ```
-CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_partial_lessablate/version_0/checkpoints/epoch=7-step=85498.ckpt';
+CHECKPOINT='/mnt/nas/personal/mohameds/geometry_hints/weights/sampled_weights_dual_mlp_full_sr_no_ablate/epoch=7-step=89499.ckpt';
 CONFIG='configs/models/hero_model_mesh_hint.yaml';
 SCANNET_DIR='/mnt/scannet/';
 OUTPUT_DIR='/mnt/nas3/personal/mohameds/geometry_hints/outputs/';
@@ -97,7 +97,7 @@ CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
 --dataset_path /mnt/scannet \
 --batch_size 4 \
 --data_to_render both \
---partial;
+--partial 1;
 ```
 
 ```
@@ -108,7 +108,7 @@ CUDA_VISIBLE_DEVICES=1 python ./scripts/render_scripts/render_meshes.py \
 --dataset_path /mnt/scannet \
 --batch_size 4 \
 --data_to_render both \
---partial;
+--partial 1;
 ```
 
 
@@ -127,7 +127,7 @@ python -m geometryhints.ray.train \
     --log_dir /mnt/nas3/personal/faleotti/geometryhints_debug \
     --batch_size 16 \
     --depth_hint_dir /mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/renders \
-    --val_interval 200 \
+    --val_interval 2000 \
     --val_batches 80 \
     --val_batch_size 6 \
     --num_workers 12 \

@@ -207,7 +207,7 @@ def save_viz_video_frames(frame_list, path, fps=30):
     return
 
 
-def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, batch_size):
+def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, batch_size, viz_fixed_min_max=False):
     """Helper function for quickly exporting depth maps during inference."""
 
     if valid_mask_b.sum() == 0:
@@ -218,6 +218,10 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
         batch_vmax = cur_data["full_res_depth_b1hw"][valid_mask_b].max()
 
     if batch_vmax == batch_vmin:
+        batch_vmin = 0.0
+        batch_vmax = 5.0
+        
+    if viz_fixed_min_max:
         batch_vmin = 0.0
         batch_vmax = 5.0
 
@@ -299,6 +303,19 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
                 np.uint8(rendered_depth_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
             )
             pil_image.save(os.path.join(output_path, f"{frame_id}_rendered_depth.png"))
+
+        if "cv_confidence_b1hw" in outputs:
+            cv_confidence_3hw = colormap_image(
+                outputs["cv_confidence_b1hw"][elem_ind],
+                vmin=0,
+                vmax=1,
+                colormap="viridis",
+                flip=False,
+            )
+            pil_image = Image.fromarray(
+                np.uint8(cv_confidence_3hw.permute(1, 2, 0).cpu().detach().numpy() * 255)
+            )
+            pil_image.save(os.path.join(output_path, f"{frame_id}_cv_confidence.png"))
 
 
 def load_and_merge_images(frame_ids, quick_viz_directory, fps=30):

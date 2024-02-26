@@ -6,10 +6,11 @@ import warnings
 import numpy as np
 from skimage import io
 from joblib import Parallel, delayed
+import tqdm
 
 # name of the folder where we download the original 7scenes dataset to
 # we restructure the dataset by creating symbolic links to that folder
-src_folder = "/mnt/res_nas/shared/datasets/7scenes"
+src_folder = "/mnt/nas/personal/mohameds/7scenes/7scenes"
 focal_length = 525.0
 
 # focal length of the depth sensor (source: https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/)
@@ -87,7 +88,7 @@ def process_scene(ds):
         # map sequences to folder names
         split = ["seq-" + s.strip()[8:].zfill(2) for s in split]
 
-        for seq in split:
+        for seq in tqdm.tqdm(split):
             files = os.listdir(ds + "/" + seq)
 
             # adjust depth files by mapping to RGB sensor

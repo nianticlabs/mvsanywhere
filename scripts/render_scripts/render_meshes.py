@@ -396,7 +396,7 @@ if __name__ == "__main__":
     option_handler.parser.add_argument(
         "--depth_noise",
         type=float,
-        required=True,
+        required=False,
         help="Noise to add to depth maps before fusing.",
         default=0.0,
     )

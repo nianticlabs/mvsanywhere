@@ -12,6 +12,7 @@ from geometryhints.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
+from geometryhints.modules.confidence import compute_volume_entropy
 from geometryhints.modules.cost_volume import CostVolumeManager
 from geometryhints.modules.feature_volume import FeatureVolumeManager
 from geometryhints.modules.layers import TensorFormatter

@@ -8,6 +8,8 @@ from torch.autograd import Function
 
 from torch.utils.cpp_extension import load
 
+
+# JIT compile the marching cubes implementation
 marching_cubes_impl = load(name='ext',
                            sources=['src/geometryhints/tools/marching_cubes/ext.cpp', 
                                     'src/geometryhints/tools/marching_cubes/marching_cubes_cpu.cpp', 
@@ -24,7 +26,6 @@ class _marching_cubes(Function):
 
     @staticmethod
     def forward(ctx, vol, isolevel, active_voxels):
-        # verts, faces, ids = _C.marching_cubes(vol, isolevel)
         verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels)
         return verts, faces, ids
     

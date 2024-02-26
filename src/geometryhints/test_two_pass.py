@@ -267,7 +267,7 @@ def main(opts):
             hint_fuser = fusers_helper.OurFuser(
                 gt_path=gt_path,
                 fusion_resolution=0.04,
-                max_fusion_depth=opts.fusion_max_depth,
+                max_fusion_depth=3,  # opts.fusion_max_depth,
                 fuse_color=False,
             )
             for batch_ind, batch in enumerate(tqdm(dataloader, desc="First pass")):
@@ -453,6 +453,10 @@ def main(opts):
                     cur_data["image_b3hw"].shape[0], 1, render_height, render_width
                 )
 
+                # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
+                # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+                
                 sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                 cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
 

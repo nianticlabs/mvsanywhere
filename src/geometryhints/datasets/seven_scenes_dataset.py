@@ -73,6 +73,10 @@ class SevenScenesDataset(GenericMVSDataset):
         verbose_init=True,
         min_valid_depth=1e-3,
         max_valid_depth=10,
+        fill_depth_hints=False,
+        depth_hint_aug=0.0,
+        depth_hint_dir=None,
+        load_empty_hints=True,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -95,6 +99,10 @@ class SevenScenesDataset(GenericMVSDataset):
             skip_frames=skip_frames,
             skip_to_frame=skip_to_frame,
             verbose_init=verbose_init,
+            fill_depth_hints=False,
+            depth_hint_aug=0.0,
+            depth_hint_dir=None,
+            load_empty_hints=True,
         )
         """
         Args:

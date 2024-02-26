@@ -113,6 +113,7 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+import torchvision
 from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
@@ -390,6 +391,7 @@ def main(opts):
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
+                        opts.viz_fixed_min_max
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:
