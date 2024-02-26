@@ -9,6 +9,8 @@ mamba env create -f environment.yaml
 This may fail due to `g++` not being found when trying to build our custom skimage fork. If this happens check if you have any version of g++ installed `ls /usr/bin/g++-` and tab complete. 
 If you do, then set `g++` to point to an installed `g++-XX` version - e.g. `sudo ln -s /usr/bin/g++-12 /usr/bin/g++`.
 
+Next run `pip install -e .` to install `geometryhints` as a module.
+
 We also have some custom cuda extensions (for marching cubes) which are built using pytorch JIT. This will fail if your default `gcc` and `g++` use different versions. Try running
 ```
 g++ --version
