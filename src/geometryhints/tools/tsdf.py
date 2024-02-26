@@ -482,8 +482,9 @@ class TSDFFuser:
             active_mask = torch.logical_and(valid_points_1N, dist_b1N < self.truncation)
             active_indices_N3 = self.vox_indices.flatten(1)[:, valid_voxel_mask_N][:, active_mask[0, 0]].T.contiguous()
             active_indices_N3 = o3d.core.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(active_indices_N3))
-            self.voxel_hashset.insert(active_indices_N3)
-
+            if active_indices_N3.shape[0] > 0:
+                self.voxel_hashset.insert(active_indices_N3)
+                
             # Fetch the new tsdf values and the confidence
             new_tsdf_vals = tsdf_val_1N[valid_points_1N]
             confidence = confidence_1N[valid_points_1N]
