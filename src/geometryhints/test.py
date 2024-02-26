@@ -391,7 +391,7 @@ def main(opts):
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
-                        opts.viz_fixed_min_max,
+                        opts.viz_fixed_min_max
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:

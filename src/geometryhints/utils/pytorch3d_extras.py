@@ -5,18 +5,16 @@ from pytorch3d import _C
 from pytorch3d.ops.marching_cubes_data import EDGE_TO_VERTICES, FACE_TABLE, INDEX
 from pytorch3d.transforms import Translate
 from torch.autograd import Function
+
 from torch.utils.cpp_extension import load
 
+
 # JIT compile the marching cubes implementation
-marching_cubes_impl = load(
-    name="ext",
-    sources=[
-        "src/geometryhints/tools/marching_cubes/ext.cpp",
-        "src/geometryhints/tools/marching_cubes/marching_cubes_cpu.cpp",
-        "src/geometryhints/tools/marching_cubes/marching_cubes.cu",
-    ],
-    verbose=True,
-)
+marching_cubes_impl = load(name='ext',
+                           sources=['src/geometryhints/tools/marching_cubes/ext.cpp', 
+                                    'src/geometryhints/tools/marching_cubes/marching_cubes_cpu.cpp', 
+                                    'src/geometryhints/tools/marching_cubes/marching_cubes.cu'], 
+                            verbose=True)
 
 
 class _marching_cubes(Function):
@@ -30,11 +28,11 @@ class _marching_cubes(Function):
     def forward(ctx, vol, isolevel, active_voxels):
         verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels)
         return verts, faces, ids
-
+    
     @staticmethod
     def backward(ctx, grad_verts, grad_faces):
         raise ValueError("marching_cubes backward is not supported")
-
+    
 
 def marching_cubes(
     vol_batch: torch.Tensor,
