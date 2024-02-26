@@ -389,12 +389,13 @@ class TSDFFuser:
             depth_min = 0.01
             depth_max = self.max_depth + self.truncation + 0.1
 
+            coord_pad = 5
             corner_uv_144 = torch.tensor(
                 [
-                    [0, 0, 1, 1],
-                    [img_w, 0, 1, 1],
-                    [0, img_h, 1, 1],
-                    [img_w, img_h, 1, 1],
+                    [-coord_pad, -coord_pad, 1, 1],
+                    [img_w+coord_pad, -coord_pad, 1, 1],
+                    [-coord_pad, img_h+coord_pad, 1, 1],
+                    [img_w+coord_pad, img_h+coord_pad, 1, 1],
                 ],
                 dtype=torch.float16,
                 device=depth_b1hw.device,
