@@ -207,7 +207,9 @@ def save_viz_video_frames(frame_list, path, fps=30):
     return
 
 
-def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, batch_size, viz_fixed_min_max=False):
+def quick_viz_export(
+    output_path, outputs, cur_data, batch_ind, valid_mask_b, batch_size, viz_fixed_min_max=False
+):
     """Helper function for quickly exporting depth maps during inference."""
 
     if valid_mask_b.sum() == 0:
@@ -220,7 +222,7 @@ def quick_viz_export(output_path, outputs, cur_data, batch_ind, valid_mask_b, ba
     if batch_vmax == batch_vmin:
         batch_vmin = 0.0
         batch_vmax = 5.0
-        
+
     if viz_fixed_min_max:
         batch_vmin = 0.0
         batch_vmax = 5.0

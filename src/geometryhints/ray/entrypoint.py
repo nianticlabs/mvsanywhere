@@ -29,7 +29,9 @@ def _get_ray_trainer(opts: options.Options, is_resume: bool = False) -> pl.Train
     callbacks = prepare_callbacks(opts=opts, enable_version_counter=False, is_resume=is_resume)
     callbacks.append(ray.train.lightning.RayTrainReportCallback())
 
-    ddp_strategy = ray.train.lightning.RayDDPStrategy(find_unused_parameters=opts.matching_encoder_type == "unet_encoder")
+    ddp_strategy = ray.train.lightning.RayDDPStrategy(
+        find_unused_parameters=opts.matching_encoder_type == "unet_encoder"
+    )
 
     # NOTE: check if we have to resume a checkpoint from the log dir.
     # For instance, the training might have be killed (spot instances..),

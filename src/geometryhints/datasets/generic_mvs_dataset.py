@@ -13,7 +13,7 @@ from geometryhints.utils.generic_utils import (
     read_image_file,
     readlines,
 )
-from geometryhints.utils.geometry_utils import pose_distance
+from geometryhints.utils.geometry_utils import pose_distance, rotz
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,8 @@ class GenericMVSDataset(Dataset):
         depth_hint_aug=0.0,
         depth_hint_dir=None,
         disable_flip=False,
+        rotate_images=False,
+        target_fov=None,
     ):
         """
         Args:
@@ -142,7 +144,7 @@ class GenericMVSDataset(Dataset):
 
             # check if this file exists
             assert os.path.exists(tuple_information_filepath), (
-                "Tuple file "
+                f"Tuple file {tuple_information_filepath}"
                 "doesn't exist! Pass none for mv_tuple_file_suffix if you don't"
                 " actually need a tuple file, otherwise check your paths."
             )
@@ -218,6 +220,8 @@ class GenericMVSDataset(Dataset):
         self.depth_hint_aug = depth_hint_aug
 
         self.disable_flip = disable_flip
+
+        self.rotate_images = rotate_images
 
     def __len__(self):
         return len(self.frame_tuples)
@@ -544,6 +548,12 @@ class GenericMVSDataset(Dataset):
         # load pose
         world_T_cam, cam_T_world = self.load_pose(scan_id, frame_id)
 
+        if self.rotate_images:
+            T = np.eye(4)
+            T[:3, :3] = rotz(-np.pi / 2)
+            world_T_cam = world_T_cam @ T
+            cam_T_world = np.linalg.inv(world_T_cam)
+
         if flip:
             T = np.eye(4).astype(world_T_cam.dtype)
             T[0, 0] = -1.0
@@ -556,6 +566,9 @@ class GenericMVSDataset(Dataset):
         # # Augment images
         # if self.split == "train":
         #     image = self.color_transform(image)
+
+        if self.rotate_images:
+            image = torch.rot90(image, 3, [1, 2])
 
         if flip:
             image = torch.flip(image, (-1,))
@@ -580,6 +593,11 @@ class GenericMVSDataset(Dataset):
             # get depth
             depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id)
 
+            if self.rotate_images:
+                depth = torch.rot90(depth, 3, [1, 2])
+                mask = torch.rot90(mask, 3, [1, 2])
+                mask_b = torch.rot90(mask_b, 3, [1, 2])
+
             if flip:
                 depth = torch.flip(depth, (-1,))
                 mask = torch.flip(mask, (-1,))
@@ -598,6 +616,9 @@ class GenericMVSDataset(Dataset):
             high_res_color = self.load_high_res_color(scan_id, frame_id)
             high_res_color = imagenet_normalize(high_res_color)
 
+            if self.rotate_images:
+                high_res_color = torch.rot90(high_res_color, 3, [1, 2])
+
             if flip:
                 high_res_color = torch.flip(high_res_color, (-1,))
 
@@ -612,6 +633,11 @@ class GenericMVSDataset(Dataset):
             full_res_depth, full_res_mask, full_res_mask_b = self.load_full_res_depth_and_mask(
                 scan_id, frame_id
             )
+
+            if self.rotate_images:
+                full_res_depth = torch.rot90(full_res_depth, 3, [1, 2])
+                full_res_mask = torch.rot90(full_res_mask, 3, [1, 2])
+                full_res_mask_b = torch.rot90(full_res_mask_b, 3, [1, 2])
 
             if flip:
                 full_res_depth = torch.flip(full_res_depth, (-1,))

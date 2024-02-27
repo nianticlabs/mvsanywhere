@@ -75,6 +75,10 @@ class Options:
     # number of keyframes to keep around in the buffer for DVMVS tuples.
     test_keyframe_buffer_size: int = 30
 
+    # whether to rotate images 90 degress clockwise (used for 3RScan data and VDR)
+    rotate_images: bool = False
+    modify_to_fov: bool = False
+
     ############################## hyperparameters #############################
     # learning rate
     lr: float = 1e-4

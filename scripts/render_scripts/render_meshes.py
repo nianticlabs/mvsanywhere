@@ -406,7 +406,6 @@ if __name__ == "__main__":
         default=0,
     )
 
-
     option_handler.parse_and_merge_options(ignore_cl_args=False)
     option_handler.pretty_print_options()
     opts = option_handler.options
