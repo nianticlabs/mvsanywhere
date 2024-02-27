@@ -61,7 +61,7 @@ class CostVolumeManager(nn.Module):
 
         self.initialise_for_projection()
 
-    def initialise_for_projection(self):
+    def initialise_for_projection(self, device=None):
         """
         Set up for backwarping and projection of feature maps
 
@@ -77,6 +77,11 @@ class CostVolumeManager(nn.Module):
             height=self.matching_height, width=self.matching_width
         )
         self.projector = Project3D()
+
+        if device is not None:
+            self.projector = self.projector.to(device)
+            self.backprojector = self.backprojector.to(device)
+            self.linear_ramp_1d11 = self.linear_ramp_1d11.to(device)
 
     def get_mask(self, pix_coords_bk2hw):
         """
@@ -341,6 +346,13 @@ class CostVolumeManager(nn.Module):
         return_mask=False,
     ):
         """Runs the cost volume and gets the lowest cost result"""
+        self.matching_width = cur_feats.shape[-1]
+        self.matching_height = cur_feats.shape[-2]
+
+        # change to portrait if we need to.
+        if self.matching_height > self.matching_width:
+            self.initialise_for_projection(device=cur_feats.device)
+
         cost_volume, depth_planes_bdhw, overall_mask_bhw = self.build_cost_volume(
             cur_feats=cur_feats,
             src_feats=src_feats,

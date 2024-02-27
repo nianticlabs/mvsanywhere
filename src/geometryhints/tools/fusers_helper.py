@@ -4,6 +4,7 @@ import torch
 import trimesh
 
 from geometryhints.datasets.scannet_dataset import ScannetDataset
+from geometryhints.datasets.threer_scan_dataset import ThreeRScanDataset
 from geometryhints.tools.tsdf import TSDF, TSDFFuser
 from geometryhints.utils.generic_utils import reverse_imagenet_normalize
 
@@ -208,6 +209,8 @@ def get_fuser(opts, scan):
 
     if opts.dataset == "scannet":
         gt_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
+    elif opts.dataset == "3rscan":
+        gt_path = ThreeRScanDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
     else:
         gt_path = None
 

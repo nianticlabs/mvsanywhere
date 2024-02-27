@@ -58,6 +58,8 @@ class VDRDataset(GenericMVSDataset):
         depth_hint_aug=0.0,
         depth_hint_dir=None,
         disable_flip=False,
+        rotate_images=False,
+        modify_to_fov=False,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -87,6 +89,7 @@ class VDRDataset(GenericMVSDataset):
             depth_hint_dir=depth_hint_dir,
             depth_hint_aug=depth_hint_aug,
             disable_flip=disable_flip,
+            rotate_images=rotate_images,
         )
 
         self.capture_metadata = {}
@@ -262,11 +265,23 @@ class VDRDataset(GenericMVSDataset):
             full_K[1] *= self.native_depth_height / image_height
 
             output_dict[f"K_full_depth_b44"] = full_K.clone()
+            if self.rotate_images:
+                temp = output_dict[f"K_full_depth_b44"].clone()
+                output_dict[f"K_full_depth_b44"][0, 0] = temp[1, 1]
+                output_dict[f"K_full_depth_b44"][1, 1] = temp[0, 0]
+                output_dict[f"K_full_depth_b44"][1, 2] = temp[0, 2]
+                output_dict[f"K_full_depth_b44"][0, 2] = self.native_depth_height - temp[1, 2]
             output_dict[f"invK_full_depth_b44"] = torch.linalg.inv(full_K)
 
         # scale intrinsics to the dataset's configured depth resolution.
         K[0] *= self.depth_width / image_width
         K[1] *= self.depth_height / image_height
+        if self.rotate_images:
+            temp = K.clone()
+            K[0, 0] = temp[1, 1]
+            K[1, 1] = temp[0, 0]
+            K[1, 2] = temp[0, 2]
+            K[0, 2] = self.depth_height - temp[1, 2]
 
         # Get the intrinsics of all the scales
         for i in range(5):

@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 import kornia
+import numpy as np
 import torch
+import torch.nn as nn
 import torchvision.transforms.functional as TF
 from PIL import Image
-from torch import nn
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,60 @@ def reverse_imagenet_normalize(image):
         std=(4.36681223, 4.46428571, 4.44444444),
     )
     return image
+
+
+def fov_to_image_dimension(fov_degrees: float, focal_length: float) -> float:
+    """Assuming the principal point is in the centre, then given an fov and a focal length
+    we can work out what size the image should be
+    """
+    return 2.0 * focal_length * np.tan(np.deg2rad(fov_degrees / 2.0))
+
+
+def crop_or_pad(image_bchw, new_height, new_width, pad_mode="constant"):
+    """Crops or pads an image to a new size.
+        NOTE: This function assumes that the input image is in BCHW format. and
+        will round down the output size to the nearest integer.
+    args:
+        image_bchw: the input image in BCHW format
+        new_height: the new height
+        new_width: the new width
+    returns:
+        the cropped and/or padded image
+    """
+
+    assert image_bchw.ndim == 4, f"expected image_bchw.ndim == 4, got {image_bchw.ndim} instead."
+
+    old_height, old_width = image_bchw.shape[2:]
+
+    # Calculate the starting points for the crop
+    top = (old_height - new_height) // 2
+    left = (old_width - new_width) // 2
+
+    # print(f"old_height: {old_height}, old_width: {old_width}")
+    # print(f"new_height: {new_height}, new_width: {new_width}")
+    # print(f"top: {top}, left: {left}")
+
+    # Crop or pad the width
+    if new_width <= old_width:
+        # Crop the width
+        image_bchw = image_bchw[:, :, :, left : left + new_width]
+    else:
+        # Pad the width
+        pad_left = np.abs((new_width - old_width) // 2)
+        image_bchw = np.pad(
+            image_bchw, ((0, 0), (0, 0), (0, 0), (pad_left, pad_left)), mode=pad_mode
+        )
+
+    # Crop or pad the height
+    if new_height <= old_height:
+        # Crop the height
+        image_bchw = image_bchw[:, :, top : top + new_height, :]
+    else:
+        # Pad the height
+        pad_top = abs((new_height - old_height) // 2)
+        image_bchw = np.pad(image_bchw, ((0, 0), (0, 0), (pad_top, pad_top), (0, 0)), mode=pad_mode)
+
+    return image_bchw
 
 
 def read_image_file(

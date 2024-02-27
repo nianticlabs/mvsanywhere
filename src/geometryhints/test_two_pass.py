@@ -120,6 +120,7 @@ from tqdm import tqdm
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
 from geometryhints.datasets.scannet_dataset import ScannetDataset
+from geometryhints.datasets.threer_scan_dataset import ThreeRScanDataset
 from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
@@ -247,6 +248,8 @@ def main(opts):
                 depth_hint_dir=None,
                 load_empty_hints=True,
                 disable_flip=True,
+                rotate_images=opts.rotate_images,
+                modify_to_fov=opts.modify_to_fov,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -261,6 +264,8 @@ def main(opts):
 
             if opts.dataset == "scannet":
                 gt_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
+            elif opts.dataset == "3rscan":
+                gt_path = ThreeRScanDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
             else:
                 gt_path = None
 
@@ -389,6 +394,8 @@ def main(opts):
                 depth_hint_dir=None,
                 load_empty_hints=True,
                 disable_flip=True,
+                rotate_images=opts.rotate_images,
+                modify_to_fov=opts.modify_to_fov,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -406,8 +413,15 @@ def main(opts):
 
             hint_start_time = torch.cuda.Event(enable_timing=True)
             hint_end_time = torch.cuda.Event(enable_timing=True)
-            render_height = 192
-            render_width = 256
+
+            render_height = dataset.image_height // 2
+            render_width = dataset.image_width // 2
+
+            if opts.rotate_images:
+                temp = render_height
+                render_height = render_width
+                render_width = temp
+
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
 
@@ -456,7 +470,7 @@ def main(opts):
                 # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
                 # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
                 # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-                
+
                 sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                 cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
 

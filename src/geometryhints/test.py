@@ -246,6 +246,8 @@ def main(opts):
                 depth_hint_dir=opts.depth_hint_dir,
                 load_empty_hints=opts.load_empty_hint,
                 disable_flip=True,
+                rotate_images=opts.rotate_images,
+                modify_to_fov=opts.modify_to_fov,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -391,7 +393,7 @@ def main(opts):
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
-                        opts.viz_fixed_min_max
+                        opts.viz_fixed_min_max,
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:
