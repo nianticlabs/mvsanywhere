@@ -277,11 +277,29 @@ def main(opts):
             elapsed_hint_time = 0.0
             frame_ids = []
             weights_list = []
+            initial_t = None
             for batch_ind, batch in enumerate(tqdm(dataloader)):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
                 src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
+
+                if opts.shift_world_origin:
+                    if initial_t is None:
+                        initial_t = cur_data["world_T_cam_b44"][0, :3, 3].clone()
+
+                    cur_data["world_T_cam_b44"][:, :3, 3] = (
+                        cur_data["world_T_cam_b44"][:, :3, 3] - initial_t
+                    )
+                    cur_data["cam_T_world_b44"] = torch.linalg.inv(cur_data["world_T_cam_b44"])
+
+                    for src_ind in range(src_data["world_T_cam_b44"].shape[1]):
+                        src_data["world_T_cam_b44"][:, src_ind, :3, 3] = (
+                            src_data["world_T_cam_b44"][:, src_ind, :3, 3] - initial_t
+                        )
+                        src_data["cam_T_world_b44"][:, src_ind] = torch.linalg.inv(
+                            src_data["world_T_cam_b44"][:, src_ind]
+                        )
 
                 for i in range(len(cur_data["frame_id_string"])):
                     frame_ids.append(cur_data["frame_id_string"][i])
@@ -492,7 +510,7 @@ def main(opts):
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
-                        opts.viz_fixed_min_max
+                        opts.viz_fixed_min_max,
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:
