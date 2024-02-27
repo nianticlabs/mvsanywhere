@@ -534,7 +534,7 @@ def main(opts):
                     # go over batch and get metrics frame by frame to update
                     # the averagers
                     for element_index in range(depth_gt.shape[0]):
-                        if (~valid_mask_b[element_index]).all():
+                        if not torch.logical_and(~torch.isnan(upsampled_depth_pred_b1hw[element_index]), valid_mask_b[element_index]).any():
                             # ignore if no valid gt exists
                             continue
 
