@@ -191,6 +191,9 @@ class Options:
     # fast cost volume for inference.
     fast_cost_volume: bool = False
 
+    # if true, will shift the world origin to 'in front' of the first frame in the sequence
+    shift_world_origin: bool = False
+
     ############################### Visualization ##############################
     # standard fps to dump video files out.
     standard_fps: int = 30
@@ -213,8 +216,8 @@ class Options:
     # for backfacing meshes, this allows them to be rendered and composited with
     # an alpha to a culled-back-faces render.
     back_face_alpha: float = 0.5
-    
-    # for quick_viz_export, whether or not to use a fixed min and max at 0 and 5m 
+
+    # for quick_viz_export, whether or not to use a fixed min and max at 0 and 5m
     # for visualization
     viz_fixed_min_max: bool = False
 

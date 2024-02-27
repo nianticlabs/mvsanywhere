@@ -522,7 +522,7 @@ def load_camera_pose(cam_pose_dir, use_homogenous=True, data_source="TagBA"):
         with open(cam_pose_dir, "r") as f:
             reader = csv.reader(f, delimiter=" ", quotechar="|")
             for line_data_list in reader:
-                if len(line_data_list) is not 8:
+                if len(line_data_list) != 8:
                     continue
                 process(line_data_list)
 
