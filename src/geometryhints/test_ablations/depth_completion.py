@@ -1,4 +1,5 @@
 import functools
+
 import numpy as np
 import scipy
 import torch
@@ -6,11 +7,10 @@ import torch
 
 @functools.lru_cache(maxsize=None)
 def get_mesh_grid(width, height):
-    xx, yy = np.meshgrid(
-        np.arange(width), np.arange(height)
-    )
-    
+    xx, yy = np.meshgrid(np.arange(width), np.arange(height))
+
     return xx, yy
+
 
 def fill_missing_values(
     rendered_depth_1hw: torch.Tensor,

@@ -490,7 +490,6 @@ def main(opts):
                 filled_depth_maps = []
                 # fill holes if the mesh is empty
                 for rendered_depth_ind in range(cur_data["depth_hint_b1hw"].shape[0]):
-                    
                     rendered_depth_1hw = cur_data["depth_hint_b1hw"][rendered_depth_ind]
 
                     if cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].sum() < 4:
@@ -534,7 +533,10 @@ def main(opts):
                     # go over batch and get metrics frame by frame to update
                     # the averagers
                     for element_index in range(depth_gt.shape[0]):
-                        if not torch.logical_and(~torch.isnan(upsampled_depth_pred_b1hw[element_index]), valid_mask_b[element_index]).any():
+                        if not torch.logical_and(
+                            ~torch.isnan(upsampled_depth_pred_b1hw[element_index]),
+                            valid_mask_b[element_index],
+                        ).any():
                             # ignore if no valid gt exists
                             continue
 
