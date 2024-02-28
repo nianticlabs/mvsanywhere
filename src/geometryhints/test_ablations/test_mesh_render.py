@@ -14,6 +14,7 @@ import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
+from geometryhints.test_ablations.depth_completion import fill_missing_values
 from geometryhints.tools import fusers_helper
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import cache_model_outputs, to_gpu
@@ -22,30 +23,6 @@ from geometryhints.utils.metrics_utils import (
     compute_depth_metrics_batched,
 )
 from geometryhints.utils.visualization_utils import quick_viz_export
-
-
-def fillMissingValues(
-    data,
-):
-    # from https://stackoverflow.com/questions/20753288/filling-gaps-on-an-image-using-numpy-and-scipy with modifications
-
-    # a boolean array of (width, height) which False where there are missing values and True where there are valid (non-missing) values
-    mask = ~np.isnan(data)
-
-    # array of (number of points, 2) containing the x,y coordinates of the valid values only
-    xx, yy = np.meshgrid(np.arange(data.shape[1]), np.arange(data.shape[0]))
-    xym = np.vstack((np.ravel(xx[mask]), np.ravel(yy[mask]))).T
-
-    # the valid values in the first, second, as 1D arrays (in the same order as their coordinates in xym)
-    data0 = np.ravel(data[:, :][mask])
-
-    # interpolate
-    interp0 = scipy.interpolate.LinearNDInterpolator(xym, data0)
-
-    # reshape
-    result0 = interp0(np.ravel(xx), np.ravel(yy)).reshape(xx.shape)
-
-    return result0
 
 
 def main(opts):
@@ -147,12 +124,8 @@ def main(opts):
                 ):
                     # fill holes if the mesh is empty
                     if not cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].all():
-                        rendered_depth_hw = fillMissingValues(
-                            rendered_depth_1hw.squeeze().cpu().numpy()
-                        )
-                        filled_depth_maps.append(
-                            torch.tensor(rendered_depth_hw).unsqueeze(0).unsqueeze(0).cuda()
-                        )
+                        rendered_depth_1hw = fill_missing_values(rendered_depth_1hw)
+                        filled_depth_maps.append(rendered_depth_1hw.unsqueeze(0))
                     else:
                         filled_depth_maps.append(rendered_depth_1hw.unsqueeze(0))
 
