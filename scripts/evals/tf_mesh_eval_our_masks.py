@@ -310,7 +310,7 @@ def main():
         }
         # Update scene stats.
         scene_scores[scene_id] = scores_dict
-        scores_save_path = mesh_pred_path.split(".ply")[0] + "_scores.json"
+        scores_save_path = mesh_pred_path.split(".ply")[0] + "_scores_our_masks.json"
         # save json file
 
         if not args.dont_save_scores:
@@ -378,7 +378,7 @@ def main():
     scene_scores["overall"] = metrics
 
     # save json file
-    scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores.json")
+    scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores_our_masks.json")
     if not args.dont_save_scores:
         with open(scores_save_path, "w") as f:
             json.dump(scene_scores, f, indent=4)
