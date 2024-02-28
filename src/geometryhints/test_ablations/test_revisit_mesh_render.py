@@ -493,7 +493,7 @@ def main(opts):
                     
                     rendered_depth_1hw = cur_data["depth_hint_b1hw"][rendered_depth_ind]
 
-                    if cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].sum() == 0:
+                    if cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].sum() < 4:
                         rendered_depth_1hw = torch.ones_like(rendered_depth_1hw)
                     elif not cur_data["depth_hint_mask_b_b1hw"][rendered_depth_ind].all():
                         rendered_depth_1hw = fill_missing_values(rendered_depth_1hw)
