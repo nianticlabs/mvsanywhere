@@ -146,7 +146,7 @@ def create_all_occlusion_masks(
     scan_names = readlines(scan_list_path)
     scan_names.sort()
 
-    for scan_name in tqdm.tqdm(scan_names):
+    for ind, scan_name in tqdm.tqdm(enumerate(scan_names)):
         dataset = SimpleScanNetDataset(
             scan_name=scan_name,
             scan_data_root=scan_data_root,

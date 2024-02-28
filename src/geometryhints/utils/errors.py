@@ -5,6 +5,8 @@ import open3d as o3d
 import torch
 import trimesh
 
+from geometryhints.utils.volume_utils import SimpleVolume
+
 T_ = Union[trimesh.Trimesh, torch.Tensor]
 
 
@@ -98,56 +100,16 @@ class MeshErrorVisualiser(ErrorVisualiser):
         return distances_prediction_to_target * 100
 
     def filter_mesh_by_visibility(
-        self, mesh: trimesh.Trimesh, occlusion_mask: torch.Tensor, world2grid: torch.Tensor
+        self, mesh: trimesh.Trimesh, visibility_volume: SimpleVolume
     ):
-        """Filter the mesh using a visibility mask.
-        Code adapted from TransformerFusion, released with MIT License.
-
-        https://github.com/AljazBozic/TransformerFusion/blob/fe64be2e57a064403d6e0bf170ce42afcab1ab9f/src/evaluation/eval.py#L45
-
-        """
-
-        dim_x = occlusion_mask.shape[0]
-        dim_y = occlusion_mask.shape[1]
-        dim_z = occlusion_mask.shape[2]
-        vertices = torch.tensor(mesh.vertices).float()
-        num_points_pred = mesh.vertices.shape[0]
-
-        # Transform points to bbox space.
-        R_world2grid = world2grid[:3, :3].view(1, 3, 3).expand(num_points_pred, -1, -1)
-        t_world2grid = world2grid[:3, 3].view(1, 3, 1).expand(num_points_pred, -1, -1)
-
-        points_pred_coords = (
-            torch.matmul(R_world2grid, vertices.view(num_points_pred, 3, 1)) + t_world2grid
-        ).view(num_points_pred, 3)
-
-        # Normalize to [-1, 1]^3 space.
-        # The world2grid transforms world positions to voxel centers, so we need to
-        # use "align_corners=True".
-        points_pred_coords[:, 0] /= dim_x - 1
-        points_pred_coords[:, 1] /= dim_y - 1
-        points_pred_coords[:, 2] /= dim_z - 1
-        points_pred_coords = points_pred_coords * 2 - 1
-
-        # Trilinearly interpolate occlusion mask.
-        # Occlusion mask is given as (x, y, z) storage, but the grid_sample method
-        # expects (c, z, y, x) storage.
-        visibility_mask = 1 - occlusion_mask.view(dim_x, dim_y, dim_z)
-        visibility_mask = visibility_mask.permute(2, 1, 0).contiguous()
-        visibility_mask = visibility_mask.view(1, 1, dim_z, dim_y, dim_x)
-
-        points_pred_coords = points_pred_coords.view(1, 1, 1, num_points_pred, 3)
-
-        points_pred_visibility = torch.nn.functional.grid_sample(
-            visibility_mask,
-            points_pred_coords.cpu(),
-            mode="bilinear",
-            padding_mode="zeros",
-            align_corners=True,
-        )
-
+        points_pred = torch.tensor(mesh.vertices)
+        
+        visibility_volume.cuda()
+        vis_samples_N = visibility_volume.sample_volume(points_pred)
+        valid_mask_N = vis_samples_N > 0.5
+        
         # prepare the indices
-        indices_N = points_pred_visibility.squeeze().bool().numpy()
+        indices_N = valid_mask_N.cpu().squeeze().bool().numpy()
 
         # remove vertices and faces with index = 0, ie is not visible
         mesh.update_faces(indices_N[mesh.faces].all(axis=1))
@@ -158,8 +120,7 @@ class MeshErrorVisualiser(ErrorVisualiser):
         self,
         prediction: trimesh.Trimesh,
         target: trimesh.Trimesh,
-        mask: Optional[torch.Tensor] = None,
-        transform: Optional[torch.Tensor] = None,
+        visibility_volume: SimpleVolume,
     ) -> trimesh.Trimesh:
         """Given the vertices of the predicted and the target meshes, return a new mesh where the
         colour of each vertex represents the accuracy (in cm).
@@ -172,14 +133,14 @@ class MeshErrorVisualiser(ErrorVisualiser):
         Returns:
             a mesh where the colour of each vertex represents the accuracy (blue means good, red means bad)
         """
-        assert (mask is None and transform is None) or (mask is not None and transform is not None)
+        # assert (mask is None and transform is None) or (mask is not None and transform is not None)
 
         chamfer_distance = self.compute_error(prediction=prediction, target=target)
         error_mesh = trimesh.Trimesh(vertices=prediction.vertices, faces=prediction.faces)
         error_map = self.mapper.to_rgba(chamfer_distance)[:, :3]
         error_mesh.visual.vertex_colors = error_map
-        if mask is not None:
-            error_mesh = self.filter_mesh_by_visibility(
-                mesh=error_mesh, occlusion_mask=mask, world2grid=transform
-            )
+        # if mask is not None:
+        error_mesh = self.filter_mesh_by_visibility(
+            mesh=error_mesh, visibility_volume=visibility_volume,
+        )
         return error_mesh

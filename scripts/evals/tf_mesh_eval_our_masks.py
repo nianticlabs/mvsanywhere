@@ -156,7 +156,12 @@ def main():
         help="Provide path to the visibility volume.",
         default="/mnt/nas/personal/mohameds/scannet_test_occlusion_masks/",
     )
-
+    parser.add_argument(
+        "--dont_save_scores",
+        action="store_true",
+        help="Don't save scores as jsons",
+    )
+    
     args = parser.parse_args()
 
     groundtruth_dir = args.groundtruth_dir
@@ -182,7 +187,7 @@ def main():
     if args.single_scene is not None:
         scene_ids = [args.single_scene]
 
-    for scene_id in tqdm(scene_ids[:10]):
+    for scene_id in tqdm(scene_ids):
         # Load predicted mesh.
         missing_scene = False
 
@@ -308,8 +313,9 @@ def main():
         scores_save_path = mesh_pred_path.split(".ply")[0] + "_scores.json"
         # save json file
 
-        # with open(scores_save_path, "w") as f:
-        #     json.dump(scores_dict, f, indent=4)
+        if not args.dont_save_scores:
+            with open(scores_save_path, "w") as f:
+                json.dump(scores_dict, f, indent=4)
 
         # Just for debugging: Visualize occluded points.
         # occluded_pcd = o3d.geometry.PointCloud()
@@ -373,8 +379,9 @@ def main():
 
     # save json file
     scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores.json")
-    # with open(scores_save_path, "w") as f:
-    #     json.dump(scene_scores, f, indent=4)
+    if not args.dont_save_scores:
+        with open(scores_save_path, "w") as f:
+            json.dump(scene_scores, f, indent=4)
 
     print()
     print("#" * 50)
