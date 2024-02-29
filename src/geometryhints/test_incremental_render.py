@@ -140,6 +140,9 @@ from geometryhints.utils.visualization_utils import (
 
 
 def main(opts):
+
+    assert opts.batch_size == 1, "Batch size should be one for incremental mode"
+
     # get dataset
     dataset_class, scans = get_dataset(
         opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id
