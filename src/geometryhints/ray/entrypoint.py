@@ -113,8 +113,8 @@ def main() -> None:
         train_loop_config=opts,
         scaling_config=scaling_config,
         run_config=ray.train.RunConfig(
-            name="ray",
-            storage_path=str((Path(opts.log_dir) / opts.name).resolve()),
+            # name="ray",
+            storage_path=str((Path(opts.log_dir) / opts.name / "ray").resolve()),
             failure_config=ray.train.FailureConfig(max_failures=10),
         ),
     )
