@@ -373,11 +373,7 @@ def main():
 
     scene_scores["overall"] = metrics
 
-    # save json file
-    scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores.json")
-    if not args.dont_save_scores:
-        with open(scores_save_path, "w") as f:
-            json.dump(scene_scores, f, indent=4)
+
             
     print()
     print("#" * 50)
@@ -400,6 +396,11 @@ def main():
         f"{(metrics['f1_score']):.4f}",
     )
 
+    # save json file
+    scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores.json")
+    if not args.dont_save_scores:
+        with open(scores_save_path, "w") as f:
+            json.dump(scene_scores, f, indent=4)
 
 if __name__ == "__main__":
     main()
