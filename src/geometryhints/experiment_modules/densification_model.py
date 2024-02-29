@@ -521,7 +521,7 @@ class DensificationModel(pl.LightningModule):
             # log losses
             for loss_name, loss_val in losses.items():
                 self.log(
-                    f"{phase}/{loss_name}",
+                    f"{prefix}/{loss_name}",
                     loss_val,
                     sync_dist=True,
                     on_step=is_train,
