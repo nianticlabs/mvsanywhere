@@ -211,6 +211,8 @@ __global__ void ClassifyVoxelKernel(
     // const int gz = tid / (W * H);
     // compute global location of the voxel
 
+    if (gx < W && gy < H && gz < D){
+
     int cubeindex = 0;
     int invalid = 0;
     for (int i = 0; i < 8; i++) {
@@ -240,6 +242,7 @@ __global__ void ClassifyVoxelKernel(
     }
   }
     }
+        }
 
 // extract compact voxel array for acceleration
 //
