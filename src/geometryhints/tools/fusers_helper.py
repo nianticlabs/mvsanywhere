@@ -34,6 +34,7 @@ class OurFuser(DepthFuser):
         fusion_resolution=0.04,
         max_fusion_depth=3,
         fuse_color=False,
+        extended_neg_truncation=False,
     ):
         super().__init__(
             gt_path,
@@ -58,7 +59,7 @@ class OurFuser(DepthFuser):
             bounds["zmax"] = 10.0
 
             tsdf_pred = TSDF.from_bounds(bounds, voxel_size=fusion_resolution)
-
+        self.extended_neg_truncation = extended_neg_truncation
         self.tsdf_fuser_pred = TSDFFuser(tsdf_pred, max_depth=max_fusion_depth)
 
     def fuse_frames(self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw):
@@ -66,6 +67,7 @@ class OurFuser(DepthFuser):
             depth_b1hw=depths_b1hw.half(),
             cam_T_world_T_b44=cam_T_world_b44.half(),
             K_b44=K_b44.half(),
+            extended_neg_truncation=self.extended_neg_truncation,
         )
 
     def export_mesh(self, path, export_single_mesh=True):
@@ -226,6 +228,7 @@ def get_fuser(opts, scan):
             fusion_resolution=opts.fusion_resolution,
             max_fusion_depth=opts.fusion_max_depth,
             fuse_color=False,
+            extended_neg_truncation=opts.extended_neg_truncation,
         )
         fuser.tsdf_fuser_pred.tsdf.cuda()
         return fuser

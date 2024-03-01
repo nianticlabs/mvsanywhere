@@ -360,6 +360,7 @@ class TSDFFuser:
         cam_T_world_T_b44,
         K_b44,
         depth_mask_b1hw=None,
+        extended_neg_truncation=False,
     ):
         """
         Integrates depth maps into the volume. Supports batching.
@@ -467,10 +468,15 @@ class TSDFFuser:
             dist_b1N = sampled_depth_b1N - vox_depth_b1N
             tsdf_vals_b1N = torch.clamp(dist_b1N / self.truncation, min=-1.0, max=1.0)
 
+            if extended_neg_truncation:
+                trunc_check = -self.truncation * 1.5
+            else:
+                trunc_check = -self.truncation
+                
             # Get the valid points mask
             valid_points_b1N = (
                 (vox_depth_b1N > 0)
-                & (dist_b1N > -self.truncation)
+                & (dist_b1N > trunc_check)
                 & (sampled_depth_b1N > 0)
                 & (vox_depth_b1N > 0)
                 & (vox_depth_b1N < self.max_depth)
