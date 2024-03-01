@@ -32,8 +32,8 @@ scores = [
    ["VoRTX~\cite{stier2021vortx} & Yes",4.3794, 7.2266, 5.8030, 0.7257, 0.6508, 0.6851],
    ["SimpleRecon~\cite{sayed2022simplerecon} (4cm)  & No",5.0456, 5.9082, 5.4769, 0.6736, 0.6681, 0.6692],
    ["FineRecon~\cite{Stier_2023_ICCV} (1cm) & Yes",4.9243, 5.0599, 4.9921, 0.6869, 0.7373, 0.7098],
-   ["\\textbf{Ours} (online) (4cm)& No",3.8893, 5.1732, 4.5313, 0.7574, 0.7233, 0.7390],
-   ["\\textbf{Ours} (two-pass) (2cm)& No",4.50 ,4.68,4.59,0.761,0.740,0.755],
+   ["\\textbf{Ours} (online) (4cm)& No",4.6769, 5.8353, 5.2561, 0.7006, 0.6721, 0.6849],
+   ["\\textbf{Ours} (two-pass) (2cm)& No",3.8893, 5.1732, 4.5313, 0.7574, 0.7233, 0.7390],
 ]
 
 sort_direction = [False, False, False, False, True, True, True]
