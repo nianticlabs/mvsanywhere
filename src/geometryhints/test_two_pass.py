@@ -397,6 +397,8 @@ def main(opts):
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
+            
+            assert len(dataset) > 0, f"Dataset {scan} is empty."
 
             dataloader = torch.utils.data.DataLoader(
                 dataset,
