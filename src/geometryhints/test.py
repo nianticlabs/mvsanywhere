@@ -155,6 +155,8 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_color"
         if opts.fusion_use_raw_lowest_cost:
             mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
+        if opts.extended_neg_truncation:
+            mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
 
         mesh_output_dir = os.path.join(results_path, "meshes", mesh_output_folder_name)
 
@@ -249,9 +251,9 @@ def main(opts):
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
-            
+
             assert len(dataset) > 0, f"Dataset {scan} is empty."
-            
+
             dataloader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=opts.batch_size,
@@ -375,6 +377,7 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
+                        extended_neg_truncation=opts.extended_neg_truncation,
                     )
 
                 ########################### Quick Viz ##########################

@@ -472,7 +472,7 @@ class TSDFFuser:
                 trunc_check = -self.truncation * 1.5
             else:
                 trunc_check = -self.truncation
-                
+
             # Get the valid points mask
             valid_points_b1N = (
                 (vox_depth_b1N > 0)

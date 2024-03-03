@@ -161,7 +161,7 @@ def main():
         action="store_true",
         help="Don't save scores as jsons",
     )
-    
+
     args = parser.parse_args()
 
     groundtruth_dir = args.groundtruth_dir
@@ -377,7 +377,6 @@ def main():
 
     scene_scores["overall"] = metrics
 
-
     print()
     print("#" * 50)
     print("EVALUATION SUMMARY")
@@ -404,6 +403,7 @@ def main():
     if not args.dont_save_scores:
         with open(scores_save_path, "w") as f:
             json.dump(scene_scores, f, indent=4)
+
 
 if __name__ == "__main__":
     main()

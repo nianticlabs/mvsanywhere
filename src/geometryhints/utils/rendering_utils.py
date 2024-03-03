@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import torch
+import trimesh
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings
 from pytorch3d.utils import cameras_from_opencv_projection
 
@@ -42,3 +45,25 @@ class PyTorch3DMeshDepthRenderer:
         depth_b1hw = depth_bhw1.permute(0, 3, 1, 2)
 
         return depth_b1hw
+
+
+def load_and_preprocess_mesh_for_rendering(
+    mesh_load_path: Path,
+    scan: str,
+    color_with: str,
+) -> trimesh.Trimesh:
+    """Load a mesh and preprocess it for rendering, e.g. removing ceiling and recolouring"""
+
+    scene_trimesh_mesh = trimesh.load(mesh_load_path, force="mesh")
+
+    if color_with == "raw":
+        scene_trimesh_mesh.visual.face_colors = None
+        scene_trimesh_mesh.visual.vertex_colors = None
+    elif color_with == "normals":
+        normals = scene_trimesh_mesh.vertex_normals.copy()
+        normals = (normals + 1) / 2
+        scene_trimesh_mesh.visual.vertex_colors = normals
+    else:
+        raise ValueError(f"Unknown color_with option {color_with}")
+
+    return scene_trimesh_mesh

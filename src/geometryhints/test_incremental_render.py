@@ -140,7 +140,6 @@ from geometryhints.utils.visualization_utils import (
 
 
 def main(opts):
-
     assert opts.batch_size == 1, "Batch size should be one for incremental mode"
 
     # get dataset
@@ -165,6 +164,8 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_color"
         if opts.fusion_use_raw_lowest_cost:
             mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
+        if opts.extended_neg_truncation:
+            mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
 
         mesh_output_dir = os.path.join(results_path, "meshes", mesh_output_folder_name)
 
@@ -262,7 +263,7 @@ def main(opts):
             )
 
             assert len(dataset) > 0, f"Dataset {scan} is empty."
-            
+
             dataloader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=opts.batch_size,

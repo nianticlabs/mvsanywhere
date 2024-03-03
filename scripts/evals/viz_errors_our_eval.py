@@ -16,8 +16,12 @@ visibility_volume_path = Path(
     "/mnt/nas/personal/mohameds/scannet_test_occlusion_masks/"
 )
 
-pred_mesh_path_first_path = Path(f"/mnt/nas3/personal/faleotti/geometryhints/finerecon/official/4cm/{scene_id}.ply")
-pred_mesh_path_second_path = Path(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/no_ablate_two_pass_3_5m/scannet/default/meshes/0.02_3.5_ours/{scene_id}.ply")
+pred_mesh_path_first_path = Path(
+    f"/mnt/nas3/personal/faleotti/geometryhints/finerecon/official/4cm/{scene_id}.ply"
+)
+pred_mesh_path_second_path = Path(
+    f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/no_ablate_two_pass_3_5m/scannet/default/meshes/0.02_3.5_ours/{scene_id}.ply"
+)
 
 assert gt_mesh_path.exists()
 assert pred_mesh_path_first_path.exists()
@@ -26,9 +30,7 @@ assert pred_mesh_path_first_path.exists()
 assert visibility_volume_path.exists()
 
 gt_mesh = trimesh.load(gt_mesh_path)
-visibility_volume_path = (
-    Path(visibility_volume_path) / scene_id / f"{scene_id}_volume.npz"
-)
+visibility_volume_path = Path(visibility_volume_path) / scene_id / f"{scene_id}_volume.npz"
 visibility_volume = SimpleVolume.load(visibility_volume_path)
 
 # long range
@@ -41,7 +43,7 @@ mesh_error = mesh_error_vis.forward(
 trimesh.exchange.export.export_mesh(mesh_error, f"debug_dump/first_{scene_id}.ply")
 print("Saved long range mesh")
 
-# second 
+# second
 pred_mesh_second = trimesh.load(pred_mesh_path_second_path)
 mesh_error_vis = MeshErrorVisualiser(max_val=15)
 mesh_error = mesh_error_vis.forward(

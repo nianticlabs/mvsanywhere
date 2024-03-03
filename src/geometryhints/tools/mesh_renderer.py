@@ -23,6 +23,9 @@ DEFAULT_CAM_FRUSTUM_MATERIAL = pyrender.MetallicRoughnessMaterial(
     alphaMode="OPAQUE",
     baseColorFactor=(1.0, 110 / 255, 0.0, 1.0),
 )
+import copy
+
+from geometryhints.utils.geometry_utils import rotx
 
 
 class Renderer:
@@ -31,12 +34,14 @@ class Renderer:
     Used to render depthmaps from a mesh for visualization.
     """
 
-    def __init__(self, height=480, width=640, flat_render=False):
+    def __init__(self, height=480, width=640, flat_render=False, ambient_light=0.4):
         self.renderer = pyrender.OffscreenRenderer(width, height)
-        self.scene = pyrender.Scene(ambient_light=0.4)
+        self.scene = pyrender.Scene(ambient_light=ambient_light)
         self.flat_render = flat_render
 
-    def render(self, height, width, intrinsics, pose, meshes, lights=None, render_flags=None):
+    def render(
+        self, height, width, intrinsics, pose, meshes, lights=None, render_flags=None, znear=0.05
+    ):
         self.renderer.viewport_height = height
         self.renderer.viewport_width = width
         self.scene.clear()
@@ -48,6 +53,7 @@ class Renderer:
             cy=intrinsics[1, 2],
             fx=intrinsics[0, 0],
             fy=intrinsics[1, 1],
+            znear=znear,
         )
         pose = self.fix_pose(pose)
         self.scene.add(cam, pose=pose)
@@ -100,6 +106,7 @@ class Renderer:
         mesh_materials=None,
         lights=None,
         render_flags=None,
+        znear=0.05,
     ):
         if isinstance(meshes, list):
             meshes = meshes.copy()
@@ -119,6 +126,7 @@ class Renderer:
                 meshes,
                 lights=lights,
                 render_flags=render_flags,
+                znear=znear,
             )
 
             if get_colour:
@@ -126,8 +134,8 @@ class Renderer:
             else:
                 return rendered_depth
 
-        except pyrender.renderer.GLError:
-            print("opengl error")
+        except pyrender.renderer.GLError as e:
+            print("opengl error", e)
             return None
 
     def render_mesh_cull_composite(self, alpha, **kwargs):
@@ -239,26 +247,36 @@ class SmoothBirdsEyeCamera:
         self.current_look_at = self.current_mean_loc - self.current_cam_loc
         self.current_look_at = self.current_look_at / np.linalg.norm(self.current_look_at)
 
-        # now get a rotation matrix from the lookat vector, construct R and t.
-        cam_R = np.zeros((3, 3))
-        cam_t = np.zeros((3,))
-        cam_mat = np.identity(4)
-
-        temp_vec = np.zeros((3,))
-        temp_vec[2] = 1
-
-        right_vec = np.cross(self.current_look_at, temp_vec)
-        up_vec = np.cross(self.current_look_at, right_vec)
-
-        cam_t = self.current_cam_loc
-        cam_R[:, 0] = right_vec
-        cam_R[:, 1] = up_vec
-        cam_R[:, 2] = self.current_look_at
-
-        cam_mat[:3, :3] = cam_R
-        cam_mat[:3, 3] = cam_t
+        cam_mat = get_cam_pose_from_lookat_and_loc(self.current_cam_loc, self.current_look_at)
 
         return cam_mat
+
+
+def get_cam_pose_from_lookat_and_loc(
+    cam_location: np.ndarray, look_at_vec: np.ndarray
+) -> np.ndarray:
+    """Get a camera's pose matrix from a location and lookat vector."""
+
+    # get a rotation matrix from the lookat vector, construct R and t.
+    cam_R = np.zeros((3, 3))
+    cam_t = np.zeros((3,))
+    cam_mat = np.identity(4)
+
+    temp_vec = np.zeros((3,))
+    temp_vec[2] = 1
+
+    right_vec = np.cross(look_at_vec, temp_vec)
+    up_vec = np.cross(look_at_vec, right_vec)
+
+    cam_t = cam_location
+    cam_R[:, 0] = right_vec
+    cam_R[:, 1] = up_vec
+    cam_R[:, 2] = look_at_vec
+
+    cam_mat[:3, :3] = cam_R
+    cam_mat[:3, 3] = cam_t
+
+    return cam_mat
 
 
 def camera_marker(
@@ -516,11 +534,25 @@ def get_image_box(
     return mesh
 
 
+def create_lights_above_mesh(mesh: trimesh.Trimesh, light_intensity: float = 1.0) -> list:
+    scene_middle = (mesh.vertices.max(0) + mesh.vertices.min(0)) / 2
+
+    # create lights somewhere near the mesh
+    light_pos = np.eye(4)
+    light_pos[:3, -3] = scene_middle + np.array([0, -4, 6])
+    return create_light_array(
+        pyrender.DirectionalLight(intensity=light_intensity),
+        light_pos,
+        x_length=20,
+        y_length=20,
+        num_x=2,
+        num_y=2,
+    )
+
+
 def create_light_array(light_type, center_loc, x_length=10.0, y_length=10.0, num_x=5, num_y=5):
     """ " Creates an array of lights."""
     lights = []
-
-    # lights.append([light_type, center_loc])
 
     x_offsets = np.linspace(-x_length, x_length, num_x).squeeze()
     y_offsets = np.linspace(-y_length, y_length, num_y).squeeze()
@@ -533,9 +565,10 @@ def create_light_array(light_type, center_loc, x_length=10.0, y_length=10.0, num
         x = coords[coord_ind, 0]
         y = coords[coord_ind, 1]
         corner_pos = center_loc.copy()
-        corner_pos[2, 0] += x
-        corner_pos[2, 1] += y
-        lights.append([light_type, corner_pos])
+        corner_pos[0, 3] += x
+        corner_pos[1, 3] += y
+
+        lights.append([copy.deepcopy(light_type), corner_pos])
 
     return lights
 

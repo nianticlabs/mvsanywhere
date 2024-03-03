@@ -62,7 +62,9 @@ class OurFuser(DepthFuser):
         self.extended_neg_truncation = extended_neg_truncation
         self.tsdf_fuser_pred = TSDFFuser(tsdf_pred, max_depth=max_fusion_depth)
 
-    def fuse_frames(self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw, extended_neg_truncation=False):
+    def fuse_frames(
+        self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw, extended_neg_truncation=False
+    ):
         self.tsdf_fuser_pred.integrate_depth(
             depth_b1hw=depths_b1hw.half(),
             cam_T_world_T_b44=cam_T_world_b44.half(),

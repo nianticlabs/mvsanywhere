@@ -1,17 +1,19 @@
-
 import json
 import pandas as pd
 import numpy as np
 
 
 def distance_formatter(val):
-    return f"{val:.4f}".lstrip('0')
+    return f"{val:.4f}".lstrip("0")
+
 
 def a_formatter(val):
     return f"{val:.2f}"
 
+
 def itentity_formatter(val):
     return val
+
 
 def order_formatter(elem, index):
     if index == 0:
@@ -22,7 +24,6 @@ def order_formatter(elem, index):
         return "\cellcolor{thirdcolor}" + elem
     else:
         return elem
-
 
 
 scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/sr_new_scores/7scenes/default/scores/all_frame_avg_metrics_test.json"
@@ -53,20 +54,40 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_ne
 with open(scores_path, "r") as f:
     ours_two_pass_7scenes = json.load(f)["scores"]
 
+show_bold = False
 
-    
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "a5", "a25"]
 
 scores = [
-    ["SimpleRecon \cite{sayed2022simplerecon}"] + [sr_scannet[metric_name] for metric_name in used_metrics] + [sr_7scenes[metric_name] for metric_name in used_metrics],
-    ["\\textbf{Ours} (no hint)"] + [ours_no_hint_scannet[metric_name] for metric_name in used_metrics] + [ours_no_hint_7scenes[metric_name] for metric_name in used_metrics],
-    ["\\textbf{Ours} (online)"] + [ours_online_scannet[metric_name] for metric_name in used_metrics] + [ours_online_7scenes[metric_name] for metric_name in used_metrics],
-    ["\\textbf{Ours} (Two Pass)"] + [ours_two_pass_scannet[metric_name] for metric_name in used_metrics] + [ours_two_pass_7scenes[metric_name] for metric_name in used_metrics],
+    ["SimpleRecon \cite{sayed2022simplerecon}"]
+    + [sr_scannet[metric_name] for metric_name in used_metrics]
+    + [sr_7scenes[metric_name] for metric_name in used_metrics],
+    ["\\textbf{Ours} (no hint)"]
+    + [ours_no_hint_scannet[metric_name] for metric_name in used_metrics]
+    + [ours_no_hint_7scenes[metric_name] for metric_name in used_metrics],
+    ["\\textbf{Ours} (online)"]
+    + [ours_online_scannet[metric_name] for metric_name in used_metrics]
+    + [ours_online_7scenes[metric_name] for metric_name in used_metrics],
+    ["\\textbf{Ours} (Two Pass)"]
+    + [ours_two_pass_scannet[metric_name] for metric_name in used_metrics]
+    + [ours_two_pass_7scenes[metric_name] for metric_name in used_metrics],
 ]
 
 
 sort_direction = [False, False, False, False, True, True, False, False, False, True, True]
-number_formatters = [itentity_formatter, distance_formatter, distance_formatter, distance_formatter, a_formatter, a_formatter, distance_formatter, distance_formatter, distance_formatter, a_formatter, a_formatter]
+number_formatters = [
+    itentity_formatter,
+    distance_formatter,
+    distance_formatter,
+    distance_formatter,
+    a_formatter,
+    a_formatter,
+    distance_formatter,
+    distance_formatter,
+    distance_formatter,
+    a_formatter,
+    a_formatter,
+]
 
 
 df = pd.DataFrame(scores)
@@ -75,14 +96,17 @@ for col_ind, col in enumerate(df.columns):
     if col_ind == 0:
         continue
     ordered = list(np.argsort(df[col_ind]))
-    
+
     # reverse ordered
     if sort_direction[col_ind]:
         ordered = ordered[::-1]
-        
+
     for order_ind, row_ind in enumerate(ordered):
         rounded_str_elem = number_formatters[col_ind](df[col_ind][row_ind])
-        df.loc[row_ind, col] = order_formatter(rounded_str_elem, order_ind)
+        if show_bold:
+            df.loc[row_ind, col] = order_formatter(rounded_str_elem, order_ind)
+        else:
+            df.loc[row_ind, col] = rounded_str_elem
 
 
 # df.style.highlight_max(axis=0, props="textbf:--rwrap;")

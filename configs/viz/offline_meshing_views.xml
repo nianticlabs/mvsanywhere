@@ -1,0 +1,221 @@
+<?xml version="1.0"?>
+<data>
+
+
+
+    <scan name="scene0773_00">
+        <view name="kitchen">
+
+        <!-- <!DOCTYPE ViewState>
+        <project> -->
+        <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1160" RotationMatrix="0.932841 -0.358255 -0.0382228 0 0.17926 0.369485 0.911782 0 -0.312528 -0.8574 0.408892 0 0 0 0 1 " TranslationVector="-1.12416 -1.79131 -1.81858 1" FocalMm="33.274879" CenterPx="792 580" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+        <ViewSettings TrackScale="1.0720739" FarPlane="48.28709" NearPlane="0.27196375"/>
+        <!-- </project> -->
+
+
+        <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="2" light_vertical_shift="1.5"/>
+        </view>
+    </scan>
+
+
+    <scan name="scene0776_00">
+        <view name="lounge_area">
+
+        <!-- <!DOCTYPE ViewState>
+        <project> -->
+        <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1144" RotationMatrix="0.193668 0.981034 0.00802028 0 -0.444756 0.0805076 0.892026 0 0.874463 -0.176324 0.451912 0 0 0 0 1 " TranslationVector="-9.13645 -7.045 -1.91738 1" FocalMm="36.573975" CenterPx="792 572" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+        <ViewSettings TrackScale="1.8357309" FarPlane="61.237694" NearPlane="0.80770642"/>
+        <!-- </project> -->
+
+
+        <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="3" light_vertical_shift="1" light_grid_spread="1.0"  light_grid_count="2" light_intensity="30.0"/>
+        </view>
+    </scan>
+
+    <scan name="scene0780_00">
+        <view name="laundry">
+
+        <!-- <!DOCTYPE ViewState>
+        <project> -->
+        <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1144" RotationMatrix="-0.986366 -0.163457 0.0190474 0 0.0832841 -0.396009 0.914462 0 -0.141932 0.903581 0.404224 0 0 0 0 1 " TranslationVector="-3.08895 -3.82531 -1.89439 1" FocalMm="36.573975" CenterPx="792 572" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+        <ViewSettings TrackScale="11.545639" FarPlane="210.66527" NearPlane="0.30310887"/>
+        <!-- </project> -->
+
+
+        <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="1.0"/>
+        </view>
+    </scan>
+
+
+    <scan name="scene0785_00">
+        <view name="living_room">
+
+        <!-- <!DOCTYPE ViewState>
+        <project> -->
+        <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1144" RotationMatrix="-0.609354 -0.792671 0.0190127 0 0.490397 -0.357926 0.794607 0 -0.623056 0.49352 0.606827 0 0 0 0 1 " TranslationVector="-2.76479 -5.39011 -2.18777 1" FocalMm="36.573952" CenterPx="792 572" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+        <ViewSettings TrackScale="3.1029756" FarPlane="64.552086" NearPlane="0.30310887"/>
+        <!-- </project> -->
+
+        <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="2"/>
+        </view>
+    </scan>
+
+    <scan name="scene0787_00">
+        <view name="storage">
+
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1144" RotationMatrix="0.454798 -0.890563 -0.00752213 0 0.198567 0.0931643 0.975649 0 -0.868176 -0.445217 0.219207 0 0 0 0 1 " TranslationVector="-3.13765 -2.06032 -1.81722 1" FocalMm="36.810989" CenterPx="792 572" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="1.5344442" FarPlane="46.271038" NearPlane="1.3819046"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="2"/>
+        </view>
+    </scan>
+    <scan name="scene0788_00">
+        <view name="treadmill">
+
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1144" RotationMatrix="-0.996192 0.0848187 0.020198 0 -0.00780162 -0.317437 0.948247 0 0.0868407 0.944479 0.31689 0 0 0 0 1 " TranslationVector="-6.17338 -5.46878 -1.79005 1" FocalMm="38.907017" CenterPx="792 572" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="0.93238932" FarPlane="13.94375" NearPlane="0.32244411"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="2"/>
+        </view>
+    </scan>
+
+    <scan name="scene0793_00">
+        <view name="computer_lab">
+
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1160" RotationMatrix="-0.941931 0.333839 -0.0363115 0 -0.161465 -0.355436 0.920649 0 0.294442 0.87305 0.388699 0 0 0 0 1 " TranslationVector="-6.02637 -7.45478 -1.78625 1" FocalMm="38.770554" CenterPx="792 580" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="1.4554902" FarPlane="43.338531" NearPlane="0.23959507"/>
+            <!-- </project> -->
+
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="6" light_vertical_shift="1.5" light_grid_spread="1.2"  light_grid_count="2" light_intensity="30.0"/>
+        </view>
+    </scan>
+
+    <scan name="scene0796_00">
+        <view name="board_table">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1356 1160" RotationMatrix="0.952491 -0.302688 0.0337767 0 0.0643789 0.30849 0.949047 0 -0.297684 -0.901784 0.31332 0 0 0 0 1 " TranslationVector="-4.36319 -0.815193 -1.43285 1" FocalMm="37.085499" CenterPx="678 580" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="0.96129292" FarPlane="26.808764" NearPlane="1.5351898"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="1"/>
+        </view>
+    </scan>
+
+
+    <scan name="scene0800_00">
+        <view name="bookshelves">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1160" RotationMatrix="-0.885866 -0.463941 -0.000360161 0 0.209749 -0.401194 0.891655 0 -0.41382 0.789811 0.452714 0 0 0 0 1 " TranslationVector="-3.54935 -4.99219 -1.73801 1" FocalMm="36.995968" CenterPx="792 580" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="1.3701423" FarPlane="25.60605" NearPlane="0.30237707"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="1" light_vertical_shift="0.4" light_grid_spread="1.0"/>
+        </view>
+    </scan>
+
+    <scan name="scene0802_00">
+        <view name="lounge_chairs">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera PixelSizeMm="0.0369161 0.0369161" ViewportPx="1585 1160" RotationMatrix="0.929127 0.368997 0.0237415 0 -0.271532 0.637311 0.721183 0 0.250984 -0.676518 0.692337 0 0 0 0 1 " TranslationVector="-3.83136 -5.51746 -2.6396 1" FocalMm="37.085499" CenterPx="792 580" LensDistortion="0 0" CameraType="0" BinaryData="0"/>
+            <ViewSettings TrackScale="0.76775068" FarPlane="8.0343542" NearPlane="0.60072592"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_cam_x_y_shift="1" light_vertical_shift="0.1"/>
+        </view>
+    </scan>
+
+    <scan name="scene0804_00">
+        <view name="pigeon_holes">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera FocalMm="37.085499" BinaryData="0" ViewportPx="1585 1160" CenterPx="792 580" RotationMatrix="-0.383159 -0.923523 0.0171707 0 0.243122 -0.0828996 0.966447 0 -0.891112 0.374477 0.256293 0 0 0 0 1 " LensDistortion="0 0" TranslationVector="-1.66829 -2.7302 -1.68137 1" CameraType="0" PixelSizeMm="0.0369161 0.0369161"/>
+            <ViewSettings FarPlane="16.131514" TrackScale="0.79280233" NearPlane="0.30310887"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true" light_grid_spread="0.5" light_cam_x_y_shift="1" light_vertical_shift="1.5"/>
+        </view>
+    </scan>
+
+    <scan name="scene0783_00">
+        <view name="couch">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera FocalMm="36.906788" BinaryData="0" ViewportPx="1585 1160" CenterPx="792 580" RotationMatrix="0.431604 -0.901984 -0.0119683 0 0.336929 0.148886 0.929684 0 -0.836778 -0.405288 0.368164 0 0 0 0 1 " LensDistortion="0 0" TranslationVector="-1.00452 -3.41702 -1.48392 1" CameraType="0" PixelSizeMm="0.0369161 0.0369161"/>
+            <ViewSettings FarPlane="35.318546" TrackScale="1.2587652" NearPlane="0.3016482"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true"/>
+        </view>
+    </scan>
+
+    <scan name="scene0715_00">
+        <view name="couch">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera FocalMm="37.085499" BinaryData="0" ViewportPx="1585 1160" CenterPx="792 580" RotationMatrix="0.992197 -0.124668 -0.00170997 0 0.0522898 0.403633 0.913426 0 -0.113184 -0.906388 0.407002 0 0 0 0 1 " LensDistortion="0 0" TranslationVector="-2.9703 -3.66679 -1.59366 1" CameraType="0" PixelSizeMm="0.0369161 0.0369161"/>
+            <ViewSettings FarPlane="21.65608" TrackScale="1.6233048" NearPlane="0.30310887"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="true"/>
+        </view>
+    </scan>
+
+
+    <scan name="scene0748_00">
+        <view name="living_room">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera FocalMm="37.085499" BinaryData="0" ViewportPx="1585 1160" CenterPx="792 580" RotationMatrix="-0.75657 0.653621 -0.0195141 0 -0.458278 -0.5087 0.728839 0 0.466458 0.560361 0.684407 0 0 0 0 1 " LensDistortion="0 0" TranslationVector="-3.84436 -3.13983 -1.98513 1" CameraType="0" PixelSizeMm="0.0369161 0.0369161"/>
+            <ViewSettings FarPlane="17.17927" TrackScale="1.2469352" NearPlane="1.1115229"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="false" use_original_res="false"/>
+        </view>
+    </scan>
+
+
+    <scan name="scene0792_00">
+        <view name="main_staircase">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera FocalMm="27.526392" BinaryData="0" ViewportPx="1585 861" CenterPx="792 430" RotationMatrix="0.199296 -0.979925 0.00524733 0 0.42321 0.090899 0.90146 0 -0.883841 -0.177436 0.43283 0 0 0 0 1 " LensDistortion="0 0" TranslationVector="2.3869 -2.35919 -4.45619 1" CameraType="0" PixelSizeMm="0.0369161 0.0369161"/>
+            <ViewSettings FarPlane="10.626035" TrackScale="0.48773149" NearPlane="0.30310887"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="true" use_original_res="true" light_cam_x_y_shift="3" light_vertical_shift="1"/>
+        </view>
+    </scan>
+    <scan name="scene0711_00">
+        <view name="desk">
+            <!-- your meshlab cam data goes here: -->
+            <VCGCamera CameraType="0" LensDistortion="0 0" BinaryData="0" ViewportPx="1585 1099" CenterPx="792 549" TranslationVector="-3.25087 -2.48397 -1.64679 1" FocalMm="35.135296" PixelSizeMm="0.0369161 0.0369161" RotationMatrix="-0.959945 0.280115 0.00635567 0 -0.1541 -0.546768 0.822981 0 0.234005 0.789038 0.568032 0 0 0 0 1 "/>
+            <ViewSettings FarPlane="40.799702" NearPlane="0.30310887" TrackScale="1.8665501"/>
+            <RenderAttrib normals="true"/>
+        </view>
+    </scan>
+    <scan name="scene0723_00">
+        <view name="bed_and_ladder">
+            <!-- <!DOCTYPE ViewState>
+            <project> -->
+            <VCGCamera CameraType="0" LensDistortion="0 0" BinaryData="0" ViewportPx="1585 1099" CenterPx="792 549" TranslationVector="-3.55405 -1.40074 -1.81766 1" FocalMm="37.532692" PixelSizeMm="0.0369161 0.0369161" RotationMatrix="0.997839 -0.0561987 -0.0340513 0 0.0534939 0.393811 0.917633 0 -0.0381601 -0.917472 0.395966 0 0 0 0 1 "/>
+            <ViewSettings FarPlane="14.427801" NearPlane="0.67130303" TrackScale="1.4617195"/>
+            <!-- </project> -->
+
+            <RenderAttrib cull_faces="true" use_original_res="false"/>
+        </view>
+    </scan>
+
+
+</data>
