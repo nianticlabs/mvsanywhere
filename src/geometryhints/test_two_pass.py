@@ -400,7 +400,7 @@ def main(opts):
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
-            
+
             assert len(dataset) > 0, f"Dataset {scan} is empty."
 
             dataloader = torch.utils.data.DataLoader(
@@ -591,7 +591,7 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
-                        extended_neg_truncation=opts.extended_neg_truncation
+                        extended_neg_truncation=opts.extended_neg_truncation,
                     )
 
                 ########################### Quick Viz ##########################
@@ -612,7 +612,7 @@ def main(opts):
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
-                        opts.viz_fixed_min_max
+                        opts.viz_fixed_min_max,
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:

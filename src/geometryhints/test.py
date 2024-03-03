@@ -157,7 +157,7 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
         if opts.extended_neg_truncation:
             mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
-            
+
         mesh_output_dir = os.path.join(results_path, "meshes", mesh_output_folder_name)
 
         Path(mesh_output_dir).mkdir(parents=True, exist_ok=True)
@@ -251,9 +251,9 @@ def main(opts):
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
-            
+
             assert len(dataset) > 0, f"Dataset {scan} is empty."
-            
+
             dataloader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=opts.batch_size,

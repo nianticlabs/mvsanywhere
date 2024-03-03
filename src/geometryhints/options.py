@@ -159,7 +159,7 @@ class Options:
     # type of depth fuser to use. 'ours' allows batching and is used in the
     # paper for scores. 'open3d' allows color but not batching.
     depth_fuser: str = "ours"
-    
+
     extended_neg_truncation: bool = False
 
     # only run whatever it is this script is doing on a single frame.

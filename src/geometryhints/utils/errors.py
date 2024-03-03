@@ -99,15 +99,13 @@ class MeshErrorVisualiser(ErrorVisualiser):
         # convert m into cm
         return distances_prediction_to_target * 100
 
-    def filter_mesh_by_visibility(
-        self, mesh: trimesh.Trimesh, visibility_volume: SimpleVolume
-    ):
+    def filter_mesh_by_visibility(self, mesh: trimesh.Trimesh, visibility_volume: SimpleVolume):
         points_pred = torch.tensor(mesh.vertices)
-        
+
         visibility_volume.cuda()
         vis_samples_N = visibility_volume.sample_volume(points_pred)
         valid_mask_N = vis_samples_N > 0.5
-        
+
         # prepare the indices
         indices_N = valid_mask_N.cpu().squeeze().bool().numpy()
 
@@ -141,6 +139,7 @@ class MeshErrorVisualiser(ErrorVisualiser):
         error_mesh.visual.vertex_colors = error_map
         # if mask is not None:
         error_mesh = self.filter_mesh_by_visibility(
-            mesh=error_mesh, visibility_volume=visibility_volume,
+            mesh=error_mesh,
+            visibility_volume=visibility_volume,
         )
         return error_mesh

@@ -23,8 +23,10 @@ DEFAULT_CAM_FRUSTUM_MATERIAL = pyrender.MetallicRoughnessMaterial(
     alphaMode="OPAQUE",
     baseColorFactor=(1.0, 110 / 255, 0.0, 1.0),
 )
-from geometryhints.utils.geometry_utils import rotx
 import copy
+
+from geometryhints.utils.geometry_utils import rotx
+
 
 class Renderer:
     """OpenGL mesh renderer
@@ -37,7 +39,9 @@ class Renderer:
         self.scene = pyrender.Scene(ambient_light=ambient_light)
         self.flat_render = flat_render
 
-    def render(self, height, width, intrinsics, pose, meshes, lights=None, render_flags=None, znear=0.05):
+    def render(
+        self, height, width, intrinsics, pose, meshes, lights=None, render_flags=None, znear=0.05
+    ):
         self.renderer.viewport_height = height
         self.renderer.viewport_width = width
         self.scene.clear()
@@ -273,6 +277,7 @@ def get_cam_pose_from_lookat_and_loc(
     cam_mat[:3, 3] = cam_t
 
     return cam_mat
+
 
 def camera_marker(
     camera,
@@ -528,6 +533,7 @@ def get_image_box(
 
     return mesh
 
+
 def create_lights_above_mesh(mesh: trimesh.Trimesh, light_intensity: float = 1.0) -> list:
     scene_middle = (mesh.vertices.max(0) + mesh.vertices.min(0)) / 2
 
@@ -543,10 +549,10 @@ def create_lights_above_mesh(mesh: trimesh.Trimesh, light_intensity: float = 1.0
         num_y=2,
     )
 
+
 def create_light_array(light_type, center_loc, x_length=10.0, y_length=10.0, num_x=5, num_y=5):
     """ " Creates an array of lights."""
     lights = []
-
 
     x_offsets = np.linspace(-x_length, x_length, num_x).squeeze()
     y_offsets = np.linspace(-y_length, y_length, num_y).squeeze()
@@ -561,7 +567,7 @@ def create_light_array(light_type, center_loc, x_length=10.0, y_length=10.0, num
         corner_pos = center_loc.copy()
         corner_pos[0, 3] += x
         corner_pos[1, 3] += y
-        
+
         lights.append([copy.deepcopy(light_type), corner_pos])
 
     return lights

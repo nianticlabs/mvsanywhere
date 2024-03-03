@@ -1,4 +1,7 @@
+import copy
 import json
+import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional
 
@@ -6,11 +9,15 @@ import click
 import cv2
 import numpy as np
 import pyrender
-from tqdm import tqdm
 import trimesh
+from tqdm import tqdm
 
-import time
-from geometryhints.tools.mesh_renderer import Renderer, camera_marker, get_cam_pose_from_lookat_and_loc, create_light_array
+from geometryhints.tools.mesh_renderer import (
+    Renderer,
+    camera_marker,
+    create_light_array,
+    get_cam_pose_from_lookat_and_loc,
+)
 from geometryhints.utils.cropping_utils import (
     find_image_collection_bounding_box,
     tightly_crop_images,
@@ -19,24 +26,28 @@ from geometryhints.utils.generic_utils import readlines
 from geometryhints.utils.geometry_utils import rotx
 from geometryhints.utils.rendering_utils import load_and_preprocess_mesh_for_rendering
 from geometryhints.utils.visualization_utils import save_viz_video_frames, tile_images
-import xml.etree.ElementTree as ET
 
-import copy
 
 def get_cam_settings_from_meshlab_dict(meshlab_camera_info: dict, image_width_target: int = None):
     """Returns cam pose and K from meshlab camera info and scaled image size.
-    
-    If scale_image_size is None, then the meshlab reported viewport size is returned 
+
+    If scale_image_size is None, then the meshlab reported viewport size is returned
     and the K is not scaled. Otherwise, the K is scaled to the new image size.
-    
+
     """
-    translation_vector_3 = np.array(meshlab_camera_info["TranslationVector"].strip().split(" ")).astype(float)[:3]
-    rotation_matrix_33 = np.array(meshlab_camera_info["RotationMatrix"].strip().split(" ")).astype(float).reshape(4, 4)[:3,:3]
+    translation_vector_3 = np.array(
+        meshlab_camera_info["TranslationVector"].strip().split(" ")
+    ).astype(float)[:3]
+    rotation_matrix_33 = (
+        np.array(meshlab_camera_info["RotationMatrix"].strip().split(" "))
+        .astype(float)
+        .reshape(4, 4)[:3, :3]
+    )
     focal_mm = float(meshlab_camera_info["FocalMm"].strip())
     center_px = np.array(meshlab_camera_info["CenterPx"].strip().split(" ")).astype(int)
     viewport_px = np.array(meshlab_camera_info["ViewportPx"].strip().split(" ")).astype(int)
     pixel_size_mm = np.array(meshlab_camera_info["PixelSizeMm"].strip().split(" ")).astype(float)
-    
+
     # create K
     K_44 = np.eye(4)
     K_44[0, 2] = center_px[0] / viewport_px[0]
@@ -44,21 +55,20 @@ def get_cam_settings_from_meshlab_dict(meshlab_camera_info: dict, image_width_ta
     K_44[0, 0] = focal_mm / (pixel_size_mm[0] * viewport_px[0])
     K_44[1, 1] = focal_mm / (pixel_size_mm[0] * viewport_px[0])
 
-    
     if image_width_target is not None:
         image_width = image_width_target
         image_height = int(image_width_target * (viewport_px[1] / viewport_px[0]))
     else:
         image_width = viewport_px[0]
         image_height = viewport_px[1]
-        
+
     # scale K
     K_44[0] *= image_width
-    K_44[1,2] *= image_height
-    K_44[1,1] *= image_width
-        
+    K_44[1, 2] *= image_height
+    K_44[1, 1] *= image_width
+
     # create cam pose
-    # meshlab's trackball is fun! 
+    # meshlab's trackball is fun!
     cam_T_world_44 = np.identity(4)
     translate_44 = np.eye(4)
     translate_44[:3, 3] = translation_vector_3
@@ -67,16 +77,14 @@ def get_cam_settings_from_meshlab_dict(meshlab_camera_info: dict, image_width_ta
     rotation_matrix_44[:3, :3] = rotation_matrix_33
     cam_T_world_44 = rotation_matrix_44 @ cam_T_world_44
     world_T_cam_44 = np.linalg.inv(cam_T_world_44)
-    
+
     # rotate 180 degrees around x
     rot = np.eye(4)
     rot[:3, :3] = rotx(np.pi)
-    world_T_cam_44 =  world_T_cam_44 @ rot
-    
+    world_T_cam_44 = world_T_cam_44 @ rot
+
     if False:
-        fpv_camera = trimesh.scene.Camera(
-            resolution=(200, 300), focal=(200, 200)
-        )
+        fpv_camera = trimesh.scene.Camera(resolution=(200, 300), focal=(200, 200))
 
         cam_marker_size = 0.7
         cam_marker_mesh = camera_marker(fpv_camera, cam_marker_size=cam_marker_size)[1]
@@ -84,28 +92,25 @@ def get_cam_settings_from_meshlab_dict(meshlab_camera_info: dict, image_width_ta
         np_vertices = np.array(cam_marker_mesh.vertices)
 
         np_vertices = (
-            world_T_cam_44
-            @ np.concatenate([np_vertices, np.ones((np_vertices.shape[0], 1))], 1).T
+            world_T_cam_44 @ np.concatenate([np_vertices, np.ones((np_vertices.shape[0], 1))], 1).T
         ).T
 
         np_vertices = np_vertices / np_vertices[:, 3][:, None]
-        cam_marker_mesh = trimesh.Trimesh(
-            vertices=np_vertices[:, :3], faces=cam_marker_mesh.faces
-        )
+        cam_marker_mesh = trimesh.Trimesh(vertices=np_vertices[:, :3], faces=cam_marker_mesh.faces)
         cam_marker_mesh.export("cam_marker.ply")
 
         print(f"K_44: {K_44}")
         print(f"world_T_cam_44: {world_T_cam_44}")
-        
+
     return world_T_cam_44, K_44, image_width, image_height
-    
+
 
 def render_views(
     mesh_load_dirs: list[str],
     run_names: list[str],
     render_save_dir: Path,
     color_with: str,
-    all_views_dict: dict, 
+    all_views_dict: dict,
     render_width: int = 640 * 2,
     render_height: int = 480 * 2,
 ):
@@ -117,12 +122,11 @@ def render_views(
     if color_with == "normals":
         combined_dir_name += "_normals"
         individual_dir_name += "_normals"
-    
+
     (render_save_dir / "fixed_views" / combined_dir_name).mkdir(exist_ok=True, parents=True)
     (render_save_dir / "fixed_views" / individual_dir_name).mkdir(exist_ok=True, parents=True)
 
-    
-    for scan, scan_views in tqdm(all_views_dict.items(), desc="Looping over scans: "):        
+    for scan, scan_views in tqdm(all_views_dict.items(), desc="Looping over scans: "):
         # load a mesh for each method we care about
         try:
             meshes = [
@@ -140,14 +144,15 @@ def render_views(
 
         for view_name, view_info in scan_views.items():
             cam_mat_44, K_44, image_width, image_height = get_cam_settings_from_meshlab_dict(
-                view_info["meshlab_camera_info"], 
-                image_width_target=None if view_info.get("use_original_res", "false") == "true" else render_width,
+                view_info["meshlab_camera_info"],
+                image_width_target=None
+                if view_info.get("use_original_res", "false") == "true"
+                else render_width,
             )
-        
 
-            light_position = cam_mat_44[:3,3].copy()
+            light_position = cam_mat_44[:3, 3].copy()
             light_position[2] += float(view_info.get("light_vertical_shift", "1"))
-            
+
             # shift lights in x and y direction of the camera
             # get the lookat of the fpv camera
             fpv_cam_transform = np.linalg.inv(cam_mat_44[:3, :3])
@@ -156,15 +161,17 @@ def render_views(
             z_vec[1] = -1
             current_fpv_look_at = fpv_cam_transform @ z_vec
             # shift lights by the lookat in x and y
-            light_position[:2] += current_fpv_look_at[:2] * float(view_info.get("light_cam_x_y_shift", 0))
-            
+            light_position[:2] += current_fpv_look_at[:2] * float(
+                view_info.get("light_cam_x_y_shift", 0)
+            )
+
             light_world_T_cam_44 = np.eye(4)
             light_world_T_cam_44[:3, 3] = light_position
             # light_world_T_cam_44 = light_world_T_cam_44 @ shift
             lights = create_light_array(
                 pyrender.SpotLight(
                     intensity=float(view_info.get("light_intensity", 20.0)),
-                    outerConeAngle=np.pi/2
+                    outerConeAngle=np.pi / 2,
                 ),
                 light_world_T_cam_44,
                 x_length=float(view_info.get("light_grid_spread", 1.0)),
@@ -199,28 +206,27 @@ def render_views(
             # cam_marker_mesh = trimesh.Trimesh(
             #     vertices=np_vertices[:, :3], faces=cam_marker_mesh.faces
             # )
-            
+
             renders = []
             names = []
             # Render the meshes for each method in turn
             for mesh, run_name in zip(meshes, run_names):
                 renderer = Renderer(height=image_height, width=image_width, ambient_light=0.1)
 
-                
                 render_flags = (
                     pyrender.RenderFlags.NONE
                     # | pyrender.RenderFlags.SKIP_CULL_FACES
                     # | pyrender.RenderFlags.ALL_WIREFRAME
                 )
-                
+
                 if view_info.get("cull_faces", "false") == "false":
                     render_flags = render_flags | pyrender.RenderFlags.SKIP_CULL_FACES
-                
+
                 if color_with == "normals":
                     render_flags = render_flags | pyrender.RenderFlags.FLAT
                 else:
                     render_flags = render_flags | pyrender.RenderFlags.SHADOWS_ALL
-                    
+
                 render_color = renderer.render_mesh(
                     [mesh],
                     image_height,
@@ -241,7 +247,7 @@ def render_views(
                 names.append(run_name)
 
                 # if True:#export_meshes:
-                    # mesh.export(render_save_dir / "individual_meshes" / f"{scan}_{run_name}.ply")
+                # mesh.export(render_save_dir / "individual_meshes" / f"{scan}_{run_name}.ply")
 
             # crop and save images
             # renders = tightly_crop_images(renders)
@@ -249,24 +255,31 @@ def render_views(
             if len(renders) > 0:
                 # also save a combined image
                 combined = np.hstack(renders)
-                im_save_path = render_save_dir / "fixed_views" / combined_dir_name / f"{scan}_{view_name}.png"
+                im_save_path = (
+                    render_save_dir / "fixed_views" / combined_dir_name / f"{scan}_{view_name}.png"
+                )
                 cv2.imwrite(str(im_save_path), combined[:, :, ::-1])
 
             for run_name, render in zip(names, renders):
-                im_save_path = render_save_dir / "fixed_views" / individual_dir_name / f"{scan}_{view_name}_{run_name}.png"
+                im_save_path = (
+                    render_save_dir
+                    / "fixed_views"
+                    / individual_dir_name
+                    / f"{scan}_{view_name}_{run_name}.png"
+                )
                 cv2.imwrite(str(im_save_path), render[:, :, ::-1])
 
 
 def parse_view_xml(view_xml_file_path: Path):
     xml_tree = ET.parse(view_xml_file_path)
     all_views_dict = {}
-    
+
     for scene_xml in xml_tree.getroot():
         scene_dict = {}
         for view_xml in scene_xml:
             view_dict = {}
             view_dict["meshlab_camera_info"] = {}
-            
+
             for view_child in view_xml:
                 if view_child.tag == "VCGCamera":
                     view_dict["meshlab_camera_info"].update(view_child.attrib)
@@ -274,13 +287,13 @@ def parse_view_xml(view_xml_file_path: Path):
                     view_dict["meshlab_camera_info"].update(view_child.attrib)
                 else:
                     view_dict.update(view_child.attrib)
-            
+
             scene_dict[view_xml.attrib["name"]] = view_dict
-            
+
         all_views_dict[scene_xml.attrib["name"]] = scene_dict
-    
-    
+
     return all_views_dict
+
 
 @click.command()
 @click.option(
@@ -333,9 +346,14 @@ def parse_view_xml(view_xml_file_path: Path):
     help="Number of intervals in a 360 spin video.",
 )
 def cli(
-    load_dir: list[Path], save_dir: str, run_name: list[str], color_with: str, view_xml_path: Path, turntable: bool, turntable_interval: int
+    load_dir: list[Path],
+    save_dir: str,
+    run_name: list[str],
+    color_with: str,
+    view_xml_path: Path,
+    turntable: bool,
+    turntable_interval: int,
 ):  # click Paths are strings
-    
     # copy past meshlab camera settings via Window -> "Copy camera settings to clipboard"
     # use copilot to help you parse the string
     # <?xml version="1.0"?>

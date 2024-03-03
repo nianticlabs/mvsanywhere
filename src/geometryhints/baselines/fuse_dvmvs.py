@@ -1,9 +1,12 @@
 import os
-import torch
-
 from pathlib import Path
 
+import numpy as np
+import open3d as o3d
+import torch
+import tqdm
 import trimesh
+from PIL import Image
 
 from geometryhints.datasets.scannet_dataset import ScannetDataset
 from geometryhints.options import OptionsHandler
@@ -11,17 +14,12 @@ from geometryhints.tools.fusers_helper import OurFuser
 from geometryhints.tools.partial_fuser import PartialFuser
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import readlines, to_gpu
-
-import numpy as np
-import open3d as o3d
-import torch
-import tqdm
-from PIL import Image
 from geometryhints.utils.geometry_utils import BackprojectDepth
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
-
-
-from geometryhints.utils.visualization_utils import colormap_image, save_viz_video_frames
+from geometryhints.utils.visualization_utils import (
+    colormap_image,
+    save_viz_video_frames,
+)
 
 
 class SimpleScanNetDataset(torch.utils.data.Dataset):
@@ -104,6 +102,7 @@ class SimpleScanNetDataset(torch.utils.data.Dataset):
 
         return item_dict
 
+
 def fuse_depth_maps(
     scan_id: str,
     dataset_root: Path,
@@ -112,8 +111,6 @@ def fuse_depth_maps(
     tuple_filepath: Path,
     batch_size: int = 4,
 ):
-
-
     dataset = SimpleScanNetDataset(
         scan_name=scan_id,
         scan_data_root=dataset_root,
@@ -123,8 +120,8 @@ def fuse_depth_maps(
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, drop_last=False, shuffle=False
     )
-    
-    cached_depths_list = np.load(cached_depth_path, allow_pickle=True)['arr_0']
+
+    cached_depths_list = np.load(cached_depth_path, allow_pickle=True)["arr_0"]
     cached_depths_N1hw = torch.tensor(np.stack(cached_depths_list)).float().cuda().unsqueeze(1)
 
     assert len(cached_depths_N1hw) == len(dataset), f"{len(cached_depths_N1hw)} != {len(dataset)}"
@@ -135,16 +132,16 @@ def fuse_depth_maps(
     with torch.no_grad():
         for batch_ind, batch in tqdm.tqdm(enumerate(dataloader)):
             depths_b1hw = cached_depths_N1hw[batch_ind * batch_size : (batch_ind + 1) * batch_size]
-            
+
             # upsample nearest to 640x480
             depths_b1hw = torch.nn.functional.interpolate(
                 depths_b1hw, size=(480, 640), mode="nearest"
             )
-            
+
             K_b44 = batch["K_b44"]
-            K_b44[:,0] *= 640
-            K_b44[:,1] *= 480
-            
+            K_b44[:, 0] *= 640
+            K_b44[:, 1] *= 480
+
             batch = to_gpu(batch, key_ignores=["frame_id_str"])
             fuser.fuse_frames(
                 depths_b1hw=depths_b1hw,
@@ -152,9 +149,8 @@ def fuse_depth_maps(
                 cam_T_world_b44=batch["cam_T_world_b44"].cuda(),
                 color_b3hw=None,
             )
-    
-    fuser.export_mesh(output_path / f"{scan_id}.ply")
 
+    fuser.export_mesh(output_path / f"{scan_id}.ply")
 
 
 def fuse_cached_depths_for_scans(
@@ -168,12 +164,12 @@ def fuse_cached_depths_for_scans(
     output_path.mkdir(exist_ok=True, parents=True)
     for scan_id in tqdm.tqdm(scan_list):
         fuse_depth_maps(
-            scan_id = scan_id,
-            dataset_root = dataset_root,
-            cached_depth_path = cached_depth_wild_card_path.replace("SCAN_NAME", scan_id),
-            output_path = output_path,
-            tuple_filepath = tuple_filepath,
-            batch_size = batch_size,
+            scan_id=scan_id,
+            dataset_root=dataset_root,
+            cached_depth_path=cached_depth_wild_card_path.replace("SCAN_NAME", scan_id),
+            output_path=output_path,
+            tuple_filepath=tuple_filepath,
+            batch_size=batch_size,
         )
 
 

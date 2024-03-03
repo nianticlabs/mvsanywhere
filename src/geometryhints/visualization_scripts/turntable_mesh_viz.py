@@ -7,7 +7,11 @@ import numpy as np
 import pyrender
 from tqdm import tqdm
 
-from geometryhints.tools.mesh_renderer import Renderer, get_cam_pose_from_lookat_and_loc, create_lights_above_mesh
+from geometryhints.tools.mesh_renderer import (
+    Renderer,
+    create_lights_above_mesh,
+    get_cam_pose_from_lookat_and_loc,
+)
 from geometryhints.utils.cropping_utils import (
     find_image_collection_bounding_box,
     tightly_crop_images,
@@ -40,12 +44,14 @@ def create_birdseye_camera_viewpoint(
     # cam_angle=0 gives us x_dist at 0 and y_dist at pullback_dist
     x_dist = pullback_dist * np.sin(cam_angle)
     y_dist = pullback_dist * np.cos(cam_angle)
-    
+
     camera_position = scene_middle + np.array([x_dist, y_dist, height_above_mesh])
     look_at_vec = scene_middle - camera_position
     look_at_vec /= np.linalg.norm(look_at_vec)
 
-    camera_viewpoint = get_cam_pose_from_lookat_and_loc(cam_location=camera_position, look_at_vec=look_at_vec)
+    camera_viewpoint = get_cam_pose_from_lookat_and_loc(
+        cam_location=camera_position, look_at_vec=look_at_vec
+    )
 
     return camera_viewpoint
 
@@ -55,7 +61,7 @@ def render_top_down(
     run_names: list[str],
     render_save_dir: Path,
     color_with: str,
-    scans: list[str], 
+    scans: list[str],
     render_width: int = 640 * 2,
     render_height: int = 480 * 2,
 ):
@@ -75,9 +81,9 @@ def render_top_down(
     K[0, :] *= render_width
     K[1, :] *= render_height
     # after fixing the function that computes cam pose this is necessary.
-    K[0,0] *= 0.5
-    K[1,1] *= 0.5
-    
+    K[0, 0] *= 0.5
+    K[1, 1] *= 0.5
+
     for scan in tqdm(scans):
         # load a mesh for each method we care about
         try:
@@ -123,7 +129,7 @@ def render_top_down(
             renders.append(render_color)
             names.append(run_name)
 
-            if True:#export_meshes:
+            if True:  # export_meshes:
                 mesh.export(render_save_dir / "individual_meshes" / f"{scan}_{run_name}.ply")
 
         # crop and save images
@@ -145,7 +151,7 @@ def render_top_down_turntable(
     run_names: list[str],
     render_save_dir: Path,
     color_with: str,
-    scans: list[str], 
+    scans: list[str],
     render_width: int = 640 * 2,
     render_height: int = 480 * 2,
     turntable_interval: int = 200,
@@ -153,14 +159,13 @@ def render_top_down_turntable(
     """Renders top down views of each mesh and saves to render_save_dir as a video."""
     assert len(mesh_load_dirs) == len(run_names)
 
-
     (render_save_dir / "combined_turntable").mkdir(exist_ok=True, parents=True)
     (render_save_dir / "individual_turntable").mkdir(exist_ok=True, parents=True)
 
     renderer = Renderer(height=render_height, width=render_width, ambient_light=0.2)
 
     print(mesh_load_dirs)
-    
+
     for scan in tqdm(scans, desc="Looping over scans: "):
         # load a mesh for each method we care about
         try:
@@ -181,29 +186,28 @@ def render_top_down_turntable(
         lights = create_lights_above_mesh(meshes[0])
 
         scene_middle = meshes[0].vertices.mean(0)
-        
+
         # find the optimal K for this scan. Get min and max bounds
         min_extent = 0
         max_extent = 0
         for mesh in meshes:
             min_extent = np.minimum(min_extent, mesh.vertices.min(0))
             max_extent = np.maximum(max_extent, mesh.vertices.max(0))
-        
-        diff = (max_extent-min_extent).max()
-        
+
+        diff = (max_extent - min_extent).max()
+
         focal_length_scale = 0.5
         if diff < 4:
             focal_length_scale *= 2.0
-        
+
         # create intrinsics for all the renders based on diff
         K = np.eye(4)
         K[0, 2] = 0.5
         K[1, 2] = 0.5
         K[0] *= render_width
         K[1] *= render_height
-        K[0,0] *= focal_length_scale
-        K[1,1] *= focal_length_scale
-        
+        K[0, 0] *= focal_length_scale
+        K[1, 1] *= focal_length_scale
 
         renders = {}
         names = []
@@ -211,11 +215,15 @@ def render_top_down_turntable(
         for mesh, run_name in tqdm(zip(meshes, run_names), desc="Looping over methods: "):
             renders[run_name] = []
             names.append(run_name)
-            
-            cam_angles = np.linspace(start=0, stop=2*np.pi, num=turntable_interval, endpoint=False)
+
+            cam_angles = np.linspace(
+                start=0, stop=2 * np.pi, num=turntable_interval, endpoint=False
+            )
             for cam_angle in cam_angles:
-                camera_viewpoint = create_birdseye_camera_viewpoint(scene_middle, cam_angle=cam_angle, height_above_mesh=6.0, pullback_dist=6.0)
-                
+                camera_viewpoint = create_birdseye_camera_viewpoint(
+                    scene_middle, cam_angle=cam_angle, height_above_mesh=6.0, pullback_dist=6.0
+                )
+
                 render_color = renderer.render_mesh(
                     [mesh],
                     render_height,
@@ -231,7 +239,7 @@ def render_top_down_turntable(
                 if render_color is None:
                     print(f"Failed to render scene {scan} for method {run_name}")
                     continue
-                
+
                 renders[run_name].append(render_color)
 
         # crop all images
@@ -242,13 +250,13 @@ def render_top_down_turntable(
         # get bounds
         left, top, bottom, right = find_image_collection_bounding_box(all_renders)
         padding_ratio = 0.05
-        
+
         bottom = min(render_height, round(bottom + render_height * padding_ratio))
         top = max(0, round(top - render_height * padding_ratio))
-        
+
         right = min(render_width, round(right + render_width * padding_ratio))
         left = max(0, round(left - render_width * padding_ratio))
-        
+
         for name in names:
             # crop
             renders[name] = [im[top:bottom, left:right] for im in renders[name]]
@@ -257,7 +265,7 @@ def render_top_down_turntable(
             video_save_path = render_save_dir / "individual_turntable" / f"{scan}_{run_name}.mp4"
             # cv2.imwrite(str(im_save_path), render[:, :, ::-1])
             save_viz_video_frames(renders[run_name], str(video_save_path), fps=20)
-            
+
         # tile images and save a combined video
         video_frames = []
         for frame_num in range(turntable_interval):
@@ -323,13 +331,19 @@ def render_top_down_turntable(
     help="Number of intervals in a 360 spin video.",
 )
 def cli(
-    load_dir: list[Path], save_dir: str, run_name: list[str], color_with: str, scan: list[str], turntable: bool, turntable_interval: int
+    load_dir: list[Path],
+    save_dir: str,
+    run_name: list[str],
+    color_with: str,
+    scan: list[str],
+    turntable: bool,
+    turntable_interval: int,
 ):  # click Paths are strings
-    
     if len(scan) == 0:
-        scan = readlines("/home/mohameds/code/geometryhints/data_splits/ScanNetv2/standard_split/scannetv2_test.txt")
-    
-    
+        scan = readlines(
+            "/home/mohameds/code/geometryhints/data_splits/ScanNetv2/standard_split/scannetv2_test.txt"
+        )
+
     if turntable:
         render_top_down_turntable(
             mesh_load_dirs=load_dir,

@@ -43,6 +43,7 @@ def find_image_bounding_box(image: np.ndarray) -> tuple[int, int, int, int]:
 
     return left, top, bottom, right
 
+
 def find_image_collection_bounding_box(images: list[np.ndarray]) -> tuple[int, int, int, int]:
     """Finds the tightest single bounding box for a set of images."""
 
@@ -62,6 +63,7 @@ def find_image_collection_bounding_box(images: list[np.ndarray]) -> tuple[int, i
     assert right > left
 
     return left, top, bottom, right
+
 
 def tightly_crop_images(images: list[np.ndarray]):
     """Finds the tightest single bounding box for a set of images and crops them all to that size."""

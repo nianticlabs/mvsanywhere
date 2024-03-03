@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 
@@ -25,7 +24,7 @@ from geometryhints.utils.visualization_utils import quick_viz_export
 
 def main(opts):
     opts.name = "fused_gt"
-    
+
     # get dataset
     dataset_class, scans = get_dataset(
         opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id
@@ -35,7 +34,6 @@ def main(opts):
     results_path = os.path.join(
         opts.output_base_path, opts.name, opts.dataset, opts.frame_tuple_type
     )
-    
 
     # set up directories for fusion
     if opts.run_fusion:
@@ -106,9 +104,9 @@ def main(opts):
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
-            
+
             assert len(dataset) > 0, f"Dataset {scan} is empty."
-            
+
             dataloader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=opts.batch_size,
@@ -133,14 +131,12 @@ def main(opts):
                 # use unbatched (looping) matching encoder image forward passes
                 # for numerically stable testing. If opts.fast_cost_volume, then
                 # batch.
-                
+
                 depth_b1hw = cur_data["full_res_depth_b1hw"].clone()
                 depth_b1hw[~cur_data["full_res_mask_b_b1hw"].bool()] = -1
 
-            
                 ######################### DEPTH FUSION #########################
                 if opts.run_fusion:
-
                     color_frame = (
                         cur_data["high_res_color_b3hw"]
                         if "high_res_color_b3hw" in cur_data
@@ -162,6 +158,7 @@ def main(opts):
                 fuser.save_tsdf(
                     os.path.join(mesh_output_dir, f"{scan.replace('/', '_')}_tsdf.npz"),
                 )
+
 
 if __name__ == "__main__":
     # don't need grad for test.
