@@ -207,6 +207,10 @@ python -m geometryhints.train \
 --val_interval 2000;
 ```
 
+## Fusing GT 
+```
+CUDA_VISIBLE_DEVICES=0 python -m geometryhints.fuse_gt  --config_file $CONFIG --data_config configs/data/scannet_dense_test.yaml  --dataset_path $SCANNET_DIR --num_workers 12  --batch_size 1  --output_base_path $OUTPUT_DIR  --depth_hint_aug 0.0  --load_empty_hint --run_fusion --plane_sweep_ablation_ratio 0.0 --fusion_max_depth 8 --fusion_resolution 0.01
+```
 ## Rendering data
 
 
