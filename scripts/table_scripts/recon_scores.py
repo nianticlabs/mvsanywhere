@@ -27,7 +27,7 @@ def order_formatter(elem, index):
         return elem
 
 
-def print_table(mask_type="tf", scores_table="online"):
+def print_table(mask_type="tf", scores_table="online", format_ordering=True):
     assert mask_type in ["tf", "ours"]
     assert scores_table in ["online", "offline"]
 
@@ -44,7 +44,6 @@ def print_table(mask_type="tf", scores_table="online"):
         perc_formatter,
         perc_formatter,
     ]
-    show_bold = True
 
     if mask_type == "tf":
         scores_json_name = "scores.json"
@@ -173,18 +172,24 @@ def print_table(mask_type="tf", scores_table="online"):
                     metrics, [11.95 / 100, 7.46 / 100, 9.71 / 100, 0.478, 0.533, 0.501]
                 )
             }
-            all_scores_dict["DeepVideoMVS~\cite{duzceker2021deepvideomvs} & No"] = {
-                metric: value
-                for metric, value in zip(
-                    metrics, [10.68 / 100, 6.90 / 100, 8.79 / 100, 0.541, 0.592, 0.563]
-                )
-            }
+            # all_scores_dict["DeepVideoMVS~\cite{duzceker2021deepvideomvs} & No"] = {
+            #     metric: value
+            #     for metric, value in zip(
+            #         metrics, [10.68 / 100, 6.90 / 100, 8.79 / 100, 0.541, 0.592, 0.563]
+            #     )
+            # }
             all_scores_dict["NeuralRecon~\cite{sun2021neuralrecon} & Yes"] = {
                 metric: value
                 for metric, value in zip(
                     metrics, [5.09 / 100, 9.13 / 100, 7.11 / 100, 0.630, 0.612, 0.619]
                 )
             }
+
+        all_scores_dict["DeepVideoMVS~\cite{duzceker2021deepvideomvs} & No"] = json.load(
+        open(
+            f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/dvmvs_4cm/{scores_json_name}"
+        )
+        )["overall"]
 
         all_scores_dict["SimpleRecon~\cite{sayed2022simplerecon} (online) (4cm)  & No"] = json.load(
             open(
@@ -217,7 +222,7 @@ def print_table(mask_type="tf", scores_table="online"):
 
         for order_ind, row_ind in enumerate(ordered):
             rounded_str_elem = number_formatters[col_ind](df[col_ind][row_ind])
-            if show_bold:
+            if format_ordering:
                 df.loc[row_ind, col] = order_formatter(rounded_str_elem, order_ind)
             else:
                 df.loc[row_ind, col] = rounded_str_elem
@@ -233,10 +238,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mask_type", type=str, default="tf")
     parser.add_argument("--scores_table", type=str, default="online")
+    parser.add_argument("--format_ordering", action="store_true")
     # parse
     args = parser.parse_args()
 
-    print_table(mask_type=args.mask_type, scores_table=args.scores_table)
+    print_table(mask_type=args.mask_type, scores_table=args.scores_table, format_ordering=args.format_ordering)
 
 
 # legacy table
