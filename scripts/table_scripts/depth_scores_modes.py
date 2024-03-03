@@ -53,8 +53,8 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_ne
 with open(scores_path, "r") as f:
     ours_two_pass_7scenes = json.load(f)["scores"]
 
+show_bold = False
 
-    
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "a5", "a25"]
 
 scores = [
@@ -82,7 +82,11 @@ for col_ind, col in enumerate(df.columns):
         
     for order_ind, row_ind in enumerate(ordered):
         rounded_str_elem = number_formatters[col_ind](df[col_ind][row_ind])
-        df.loc[row_ind, col] = order_formatter(rounded_str_elem, order_ind)
+        if show_bold:
+            df.loc[row_ind, col] = order_formatter(rounded_str_elem, order_ind)
+        else:
+            df.loc[row_ind, col] = rounded_str_elem
+        
 
 
 # df.style.highlight_max(axis=0, props="textbf:--rwrap;")

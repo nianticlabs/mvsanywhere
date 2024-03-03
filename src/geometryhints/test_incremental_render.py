@@ -165,7 +165,9 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_color"
         if opts.fusion_use_raw_lowest_cost:
             mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
-
+        if opts.extended_neg_truncation:
+            mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
+            
         mesh_output_dir = os.path.join(results_path, "meshes", mesh_output_folder_name)
 
         Path(mesh_output_dir).mkdir(parents=True, exist_ok=True)
