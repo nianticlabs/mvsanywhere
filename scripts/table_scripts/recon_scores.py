@@ -199,7 +199,7 @@ def print_table(mask_type="tf", scores_table="online", format_ordering=True):
                 f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_incremental/scannet/default/meshes/0.04_3.0_ours/{scores_json_name}"
             )
         )["overall"]
-        # all_scores_dict["\\textbf{Ours} (online) (2cm)& No"] = json.load(open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_incremental_2cm/scannet/default/meshes/0.02_3.0_ours/{scores_json_name}"))["overall"]
+        # all_scores_dict["\\textbf{Ours} (online) (2cm)& No"] = json.load(open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_incremental_2cm/scannet/default/meshes/0.02_3.0_ours_neg_trunc/{scores_json_name}"))["overall"]
 
     # Define the scores dictionary
     scores = [
