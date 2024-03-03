@@ -186,9 +186,7 @@ def print_table(mask_type="tf", scores_table="online", format_ordering=True):
             }
 
         all_scores_dict["DeepVideoMVS~\cite{duzceker2021deepvideomvs} & No"] = json.load(
-        open(
-            f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/dvmvs_4cm/{scores_json_name}"
-        )
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/dvmvs_4cm/{scores_json_name}")
         )["overall"]
 
         all_scores_dict["SimpleRecon~\cite{sayed2022simplerecon} (online) (4cm)  & No"] = json.load(
@@ -242,7 +240,11 @@ if __name__ == "__main__":
     # parse
     args = parser.parse_args()
 
-    print_table(mask_type=args.mask_type, scores_table=args.scores_table, format_ordering=args.format_ordering)
+    print_table(
+        mask_type=args.mask_type,
+        scores_table=args.scores_table,
+        format_ordering=args.format_ordering,
+    )
 
 
 # legacy table
