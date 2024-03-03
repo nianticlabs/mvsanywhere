@@ -276,7 +276,6 @@ def main(opts):
                 fusion_resolution=0.04,
                 max_fusion_depth=3.0,
                 fuse_color=False,
-                extended_neg_truncation=True,
             )
             for batch_ind, batch in enumerate(tqdm(dataloader, desc="First pass")):
                 # get data, move to GPU
@@ -591,7 +590,6 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
-                        extended_neg_truncation=opts.extended_neg_truncation,
                     )
 
                 ########################### Quick Viz ##########################

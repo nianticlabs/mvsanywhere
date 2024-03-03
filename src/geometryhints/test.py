@@ -377,7 +377,6 @@ def main(opts):
                         cur_data["K_full_depth_b44"],
                         cur_data["cam_T_world_b44"],
                         color_frame,
-                        extended_neg_truncation=opts.extended_neg_truncation,
                     )
 
                 ########################### Quick Viz ##########################

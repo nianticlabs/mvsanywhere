@@ -144,7 +144,6 @@ class Open3DFuser(DepthFuser):
         K_b44,
         cam_T_world_b44,
         color_b3hw,
-        extended_neg_truncation=False,
     ):
         width = depths_b1hw.shape[-1]
         height = depths_b1hw.shape[-2]
