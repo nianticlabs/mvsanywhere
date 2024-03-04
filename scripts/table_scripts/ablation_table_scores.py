@@ -116,29 +116,29 @@ show_bold = False
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "a5", "a25"]
 
 scores = [
-    ["\\textbf{A -- Ours} without hint MLP (as in~\cite{sayed2022simplerecon})"]
+    ["\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without hint MLP (as in~\cite{sayed2022simplerecon})"]
     + [sr_scannet[metric_name] for metric_name in used_metrics],
-    ["\\textbf{B -- Ours} w/ online hint, without confidence"]
+    ["\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
-    ["\\textbf{C -- Ours} w/ hint on input to cost volume encoder"]
+    ["\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint on input to cost volume encoder"]
     + [null_elements[metric_name] for metric_name in used_metrics],
-    ["\\textbf{D -- Ours} w/ single MLP"] 
+    ["\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP"]
     + [null_elements[metric_name] for metric_name in used_metrics],
-    ["\\textbf{E -- Ours} w/ warped depth as hint"]
+    ["\\row{row:ours_warped_depth} & \\textbf{Ours} w/ warped depth as hint"]
     + [warped_depth_ablation[metric_name] for metric_name in used_metrics],
-    ["\\textbf{F -- Ours} w/ sampled SDF confidences \& hint MLP"]
+    ["\\row{row:ours_sdf_conf} & \\textbf{Ours} w/ sampled SDF confidences \& hint MLP"]
     + [null_elements[metric_name] for metric_name in used_metrics],
-    ["\\textbf{G -- Ours} w/ guided cost volume \cite{poggi2022multi}"]
+    ["\\row{row:ours_guided_cv} & \\textbf{Ours} w/ guided cost volume \cite{poggi2022multi}"]
     + [guided_mvs_scannet[metric_name] for metric_name in used_metrics],
-    ["\\textbf{H -- Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
+    ["\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
     + [simple_mapping_scannet[metric_name] for metric_name in used_metrics],
-    ["\\textbf{I -- Ours} w/ current predicted depth run twice"]
+    ["\\row{row:ours_pred_depth_twice} & \\textbf{Ours} w/ current predicted depth run twice"]
     + [null_elements[metric_name] for metric_name in used_metrics],
-    ["J -- SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD"]
+    ["\\row{row:tocd} & SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD \cite{khan2023temporally}"]
     + [tocd_sr[metric_name] for metric_name in used_metrics],
-    ["\\textbf{K -- Ours} (no hint)"]
+    ["\\row{row:ours_no_hint} & \\textbf{Ours} (no hint)"]
     + [ours_no_hint_scannet[metric_name] for metric_name in used_metrics],
-    ["\\textbf{L -- Ours} (with Online hint)"]
+    ["\\row{row:ours} & \\textbf{Ours} (with Online hint)"]
     + [ours_online_scannet[metric_name] for metric_name in used_metrics],
 ]
 
