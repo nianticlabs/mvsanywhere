@@ -111,6 +111,11 @@ scores_path = "scripts/table_scripts/guidedMVS.json"
 with open(scores_path, "r") as f:
     guided_mvs_scannet = json.load(f)["scores"]
 
+
+scores_path = "scripts/table_scripts/cost_vol_encoder_hint.json"
+with open(scores_path, "r") as f:
+    cost_vol_encoder_hint = json.load(f)["scores"]
+
 show_bold = False
 
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "a5", "a25"]
@@ -120,8 +125,8 @@ scores = [
     + [sr_scannet[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint on input to cost volume encoder"]
-    + [null_elements[metric_name] for metric_name in used_metrics],
+    ["\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint \& confidence to cost volume encoder"]
+    + [cost_vol_encoder_hint[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP"]
     + [null_elements[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_warped_depth} & \\textbf{Ours} w/ warped depth as hint"]
@@ -132,8 +137,8 @@ scores = [
     + [guided_mvs_scannet[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
     + [simple_mapping_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_pred_depth_twice} & \\textbf{Ours} w/ current predicted depth run twice"]
-    + [null_elements[metric_name] for metric_name in used_metrics],
+    # ["\\row{row:ours_pred_depth_twice} & \\textbf{Ours} w/ current predicted depth run twice"]
+    # + [null_elements[metric_name] for metric_name in used_metrics],
     ["\\row{row:tocd} & SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD \cite{khan2023temporally}"]
     + [tocd_sr[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_no_hint} & \\textbf{Ours} (no hint)"]
