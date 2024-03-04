@@ -178,17 +178,25 @@ def print_table(mask_type="tf", scores_table="online", format_ordering=True):
             #         metrics, [10.68 / 100, 6.90 / 100, 8.79 / 100, 0.541, 0.592, 0.563]
             #     )
             # }
-            all_scores_dict["NeuralRecon~\cite{sun2021neuralrecon} & Yes"] = {
-                metric: value
-                for metric, value in zip(
-                    metrics, [5.09 / 100, 9.13 / 100, 7.11 / 100, 0.630, 0.612, 0.619]
-                )
-            }
+            # all_scores_dict["NeuralRecon~\cite{sun2021neuralrecon} & Yes"] = {
+            #     metric: value
+            #     for metric, value in zip(
+            #         metrics, [5.09 / 100, 9.13 / 100, 7.11 / 100, 0.630, 0.612, 0.619]
+            #     )
+            # }
 
         all_scores_dict["DeepVideoMVS~\cite{duzceker2021deepvideomvs} & No"] = json.load(
             open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/dvmvs_4cm/{scores_json_name}")
         )["overall"]
 
+
+        all_scores_dict["NeuralRecon~\cite{sun2021neuralrecon} & Yes"] = json.load(
+            open(
+                f"/mnt/nas3/personal/faleotti/geometryhints/neuralrecon/{scores_json_name}"
+            )
+        )["overall"]
+        
+        
         all_scores_dict["SimpleRecon~\cite{sayed2022simplerecon} (online) (4cm)  & No"] = json.load(
             open(
                 f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/sr_new_scores/scannet/default/meshes/0.04_3.0_ours/{scores_json_name}"
