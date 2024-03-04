@@ -234,6 +234,9 @@ class TSDF:
         verts = batched_verts[0]
         faces = batched_faces[0]
 
+        if len(verts) == 0:
+            verts = torch.zeros(1, 3).cuda()
+            faces = torch.zeros(1, 3).cuda()
         if scale_to_world:
             verts = self.origin.view(1, 3).cuda() + verts * self.voxel_size
 
