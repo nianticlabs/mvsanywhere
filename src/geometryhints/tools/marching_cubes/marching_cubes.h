@@ -39,13 +39,18 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubesCpu(
 std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubesCuda(
     const at::Tensor& vol,
     const float isolevel,
-    const at::Tensor& active_voxels);
+    const at::Tensor& active_voxels,
+    const at::Tensor& min_bounds,
+    const at::Tensor& max_bounds);
 
 // Implementation which is exposed
 inline std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubes(
     const at::Tensor& vol,
     const float isolevel,
-    const at::Tensor& active_voxels) {
+    const at::Tensor& active_voxels,
+    const at::Tensor& min_bounds,
+    const at::Tensor& max_bounds
+    ) {
   if (vol.is_cuda()) {
 // #ifdef WITH_CUDA
     CHECK_CUDA(vol);
@@ -55,7 +60,7 @@ inline std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubes(
     if (D > 1024 || H > 1024 || W > 1024) {
       AT_ERROR("Maximum volume size allowed 1K x 1K x 1K");
     }
-    return MarchingCubesCuda(vol.contiguous(), isolevel, active_voxels.contiguous());
+    return MarchingCubesCuda(vol.contiguous(), isolevel, active_voxels.contiguous(), min_bounds.contiguous(), max_bounds.contiguous());
 // #else
 //     AT_ERROR("Not compiled with GPU support.");
 // #endif

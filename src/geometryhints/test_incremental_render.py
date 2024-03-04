@@ -124,6 +124,7 @@ import geometryhints.options as options
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 from geometryhints.tools import fusers_helper
+from geometryhints.tools.tsdf import get_frustum_bounds
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import cache_model_outputs, to_gpu
 from geometryhints.utils.geometry_utils import BackprojectDepth, rotx, roty, rotz
@@ -322,7 +323,18 @@ def main(opts):
                 if batch_ind * opts.batch_size > 0:
                     hint_start_time.record()
 
-                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True)
+                    min_bounds_3, max_bounds_3 = get_frustum_bounds(
+                        cur_data["invK_s0_b44"],
+                        cur_data["world_T_cam_b44"],
+                        0.1,
+                        10.0,
+                        render_height,
+                        render_width ,
+                    )
+
+                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True, 
+                                                          min_bounds_3=min_bounds_3, 
+                                                          max_bounds_3=max_bounds_3)
 
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s0_b44"].clone()

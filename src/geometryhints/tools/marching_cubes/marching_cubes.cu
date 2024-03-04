@@ -166,6 +166,8 @@ __global__ void ClassifyVoxelKernel(
     at::PackedTensorAccessor32<int, 1, at::RestrictPtrTraits> voxelOccupied,
     const at::PackedTensorAccessor32<float, 3, at::RestrictPtrTraits> vol,
     const at::PackedTensorAccessor32<int, 2, at::RestrictPtrTraits> activeIndices,
+    const at::PackedTensorAccessor32<int, 1, at::RestrictPtrTraits> min_bounds,
+    const at::PackedTensorAccessor32<int, 1, at::RestrictPtrTraits> max_bounds,
     // const at::PackedTensorAccessor<int, 1, at::RestrictPtrTraits>
     // numVertsTable,
     float isolevel) {
@@ -211,7 +213,10 @@ __global__ void ClassifyVoxelKernel(
     // const int gz = tid / (W * H);
     // compute global location of the voxel
 
-    if (gx < W && gy < H && gz < D){
+    if (gx < W && gy < H && gz < D 
+        && gx >= 0 && gy >= 0 && gz >= 0 
+        && gx < max_bounds[2] && gy < max_bounds[1] && gz < max_bounds[0] 
+        && gx >= min_bounds[2] && gy >= min_bounds[1] && gz >= min_bounds[0]){
 
     int cubeindex = 0;
     int invalid = 0;
@@ -450,7 +455,9 @@ __global__ void GenerateFacesKernel(
 std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubesCuda(
     const at::Tensor& vol,
     const float isolevel,
-    const at::Tensor& activeIndices
+    const at::Tensor& activeIndices,
+    const at::Tensor& min_bounds,
+    const at::Tensor& max_bounds
     ) {
   // Set the device for the kernel launch based on the device of vol
   at::cuda::CUDAGuard device_guard(vol.device());
@@ -499,6 +506,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> MarchingCubesCuda(
       d_voxelOccupied.packed_accessor32<int, 1, at::RestrictPtrTraits>(),
       vol.packed_accessor32<float, 3, at::RestrictPtrTraits>(),
       activeIndices.packed_accessor32<int, 2, at::RestrictPtrTraits>(),
+      min_bounds.packed_accessor32<int, 1, at::RestrictPtrTraits>(),
+      max_bounds.packed_accessor32<int, 1, at::RestrictPtrTraits>(),
       isolevel);
   AT_CUDA_CHECK(cudaGetLastError());
   cudaDeviceSynchronize();
