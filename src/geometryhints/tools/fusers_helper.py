@@ -215,6 +215,8 @@ def get_fuser(opts, scan):
         gt_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
     elif opts.dataset == "3rscan":
         gt_path = ThreeRScanDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
+    elif opts.dataset == "7scenes":
+        gt_path = "/mnt/nas/personal/mohameds/geometry_hints/outputs/fused_gt/7scenes/default/meshes/0.04_8.0_ours/SCAN_NAME.ply".replace("SCAN_NAME", scan.replace("/", "_"))
     else:
         gt_path = None
 
