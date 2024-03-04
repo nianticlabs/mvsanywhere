@@ -102,6 +102,10 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_ne
 with open(scores_path, "r") as f:
     ours_two_pass_scannet = json.load(f)["scores"]
 
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ablations_single_mlp_incremental/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    single_mlp_ablation = json.load(f)["scores"]
+
 
 scores_path = "scripts/table_scripts/simple_mapping.json"
 with open(scores_path, "r") as f:
@@ -127,12 +131,10 @@ scores = [
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint \& confidence to cost volume encoder"]
     + [cost_vol_encoder_hint[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP"]
-    + [null_elements[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_warped_depth} & \\textbf{Ours} w/ warped depth as hint"]
     + [warped_depth_ablation[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_sdf_conf} & \\textbf{Ours} w/ sampled SDF confidences \& hint MLP"]
-    + [null_elements[metric_name] for metric_name in used_metrics],
+    # ["\\row{row:ours_sdf_conf} & \\textbf{Ours} w/ sampled SDF confidences \& hint MLP"]
+    # + [null_elements[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_guided_cv} & \\textbf{Ours} w/ guided cost volume \cite{poggi2022multi}"]
     + [guided_mvs_scannet[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
@@ -141,6 +143,8 @@ scores = [
     # + [null_elements[metric_name] for metric_name in used_metrics],
     ["\\row{row:tocd} & SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD \cite{khan2023temporally}"]
     + [tocd_sr[metric_name] for metric_name in used_metrics],
+    ["\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP for matching and hints"]
+    + [single_mlp_ablation[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_no_hint} & \\textbf{Ours} (no hint)"]
     + [ours_no_hint_scannet[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours} & \\textbf{Ours} (with Online hint)"]
