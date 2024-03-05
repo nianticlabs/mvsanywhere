@@ -151,6 +151,7 @@ def fuse_depth_maps(
             )
 
     fuser.export_mesh(output_path / f"{scan_id}.ply")
+    fuser.save_tsdf(output_path / f"{scan_id}_tsdf.npz")
 
 
 def fuse_cached_depths_for_scans(
