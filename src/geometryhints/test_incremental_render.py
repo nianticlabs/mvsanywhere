@@ -545,6 +545,9 @@ def main(opts):
                 fuser.export_mesh(
                     os.path.join(mesh_output_dir, f"{scan.replace('/', '_')}.ply"),
                 )
+                fuser.save_tsdf(
+                    os.path.join(mesh_output_dir, f"{scan.replace('/', '_')}_tsdf.npz"),
+                )
 
             # compute a clean average
             scene_frame_metrics.compute_final_average()
