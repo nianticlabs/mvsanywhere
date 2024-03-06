@@ -107,11 +107,9 @@
                     --batch_size 4;
 """
 
-
 import os
 from pathlib import Path
 
-import pytorch3d
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -121,27 +119,27 @@ from tqdm import tqdm
 
 import geometryhints.modules.cost_volume as cost_volume
 import geometryhints.options as options
+from geometryhints.datasets.scannet_dataset import ScannetDataset
+from geometryhints.datasets.threer_scan_dataset import ThreeRScanDataset
+from geometryhints.experiment_modules.densification_model import DensificationModel
 from geometryhints.experiment_modules.depth_model import DepthModel
 from geometryhints.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 from geometryhints.tools import fusers_helper
-from geometryhints.tools.tsdf import get_frustum_bounds
+from geometryhints.tools.tsdf import TSDF
 from geometryhints.utils.dataset_utils import get_dataset
 from geometryhints.utils.generic_utils import cache_model_outputs, to_gpu
-from geometryhints.utils.geometry_utils import BackprojectDepth, rotx, roty, rotz
+from geometryhints.utils.geometry_utils import BackprojectDepth
 from geometryhints.utils.metrics_utils import (
     ResultsAverager,
     compute_depth_metrics_batched,
 )
 from geometryhints.utils.model_utils import get_model_class, load_model_inference
 from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
-from geometryhints.utils.visualization_utils import (
-    load_and_merge_images,
-    quick_viz_export,
-)
+from geometryhints.utils.visualization_utils import quick_viz_export
 
 
 def main(opts):
-    assert opts.batch_size == 1, "Batch size should be one for incremental mode"
+    assert opts.dataset == "3rscan", "This script is only for 3RScan dataset."
 
     # get dataset
     dataset_class, scans = get_dataset(
@@ -165,8 +163,6 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_color"
         if opts.fusion_use_raw_lowest_cost:
             mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
-        if opts.extended_neg_truncation:
-            mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
 
         mesh_output_dir = os.path.join(results_path, "meshes", mesh_output_folder_name)
 
@@ -189,11 +185,12 @@ def main(opts):
         print(f"".center(80, "#"))
         print("")
 
-    viz_output_folder_name = "quick_viz"
-    viz_output_dir = os.path.join(results_path, "viz", viz_output_folder_name)
-    Path(viz_output_dir).mkdir(parents=True, exist_ok=True)
     # set up directories for quick depth visualizations
     if opts.dump_depth_visualization:
+        viz_output_folder_name = "quick_viz"
+        viz_output_dir = os.path.join(results_path, "viz", viz_output_folder_name)
+
+        Path(viz_output_dir).mkdir(parents=True, exist_ok=True)
         print(f"".center(80, "#"))
         print(f" Saving quick viz.".center(80, "#"))
         print(f"Output directory:\n{viz_output_dir} ".center(80, "#"))
@@ -214,7 +211,14 @@ def main(opts):
     model = load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
-    model.run_opts.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
+    model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
+
+
+    opts.load_weights_from_checkpoint = "/mnt/nas/personal/mohameds/geometry_hints/logs/densification_mesh_hint/epoch=7-step=89499.ckpt"
+    densification_model = load_model_inference(opts, DensificationModel)
+    densification_model = densification_model.cuda().eval()
+
+    densification_model.plane_sweep_ablation_ratio = 0.0
 
     # setting up overall result averagers
     all_frame_metrics = None
@@ -223,20 +227,161 @@ def main(opts):
     all_frame_metrics = ResultsAverager(opts.name, f"frame metrics")
     all_scene_metrics = ResultsAverager(opts.name, f"scene metrics")
 
+    rescan_map = dataset_class.parse_rescan_transforms(opts.dataset_path, scans)
+
     with torch.inference_mode():
         start_time = torch.cuda.Event(enable_timing=True)
         end_time = torch.cuda.Event(enable_timing=True)
 
-        hint_start_time = torch.cuda.Event(enable_timing=True)
-        hint_end_time = torch.cuda.Event(enable_timing=True)
-
         # loop over scans
         for scan in tqdm(scans):
-            # initialize fuser if we need to fuse
-            if opts.run_fusion:
-                fuser = fusers_helper.get_fuser(opts, scan)
+            # set up dataset with a nighbor scan
+            first_scan_id = list(rescan_map[scan].keys())[0]
+            first_scan_T_second_scan_transform_144 = torch.inverse(
+                torch.tensor(rescan_map[scan][first_scan_id]).unsqueeze(0)
+            ).cuda()
 
-            # set up dataset with current scan
+            dataset = dataset_class(
+                opts.dataset_path,
+                split=opts.split,
+                mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
+                limit_to_scan_id=first_scan_id,  # note the scan id
+                include_full_res_depth=True,
+                tuple_info_file_location=opts.tuple_info_file_location,
+                num_images_in_tuple=None,
+                shuffle_tuple=opts.shuffle_tuple,
+                include_high_res_color=(
+                    (opts.fuse_color and opts.run_fusion) or opts.dump_depth_visualization
+                ),
+                include_full_depth_K=True,
+                skip_frames=opts.skip_frames,
+                skip_to_frame=opts.skip_to_frame,
+                image_width=opts.image_width,
+                image_height=opts.image_height,
+                pass_frame_id=True,
+                fill_depth_hints=opts.fill_depth_hints,
+                depth_hint_aug=opts.depth_hint_aug,
+                depth_hint_dir=None,
+                load_empty_hints=True,
+                disable_flip=True,
+                rotate_images=opts.rotate_images,
+                modify_to_fov=opts.modify_to_fov,
+            )
+
+            dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=opts.batch_size,
+                shuffle=False,
+                num_workers=opts.num_workers,
+                drop_last=False,
+            )
+
+            ######################### Compute mesh once #########################
+            if opts.dataset == "scannet":
+                gt_path = ScannetDataset.get_gt_mesh_path(
+                    opts.dataset_path, opts.split, first_scan_id
+                )
+            elif opts.dataset == "3rscan":
+                gt_path = ThreeRScanDataset.get_gt_mesh_path(
+                    opts.dataset_path, opts.split, first_scan_id
+                )
+            else:
+                gt_path = None
+
+            hint_fuser = fusers_helper.OurFuser(
+                gt_path=gt_path,
+                fusion_resolution=0.04,
+                max_fusion_depth=3,  # opts.fusion_max_depth,
+                fuse_color=False,
+            )
+            for batch_ind, batch in enumerate(tqdm(dataloader, desc="First pass")):
+                # get data, move to GPU
+                cur_data, src_data = batch
+                cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
+                src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
+
+                depth_gt = cur_data["full_res_depth_b1hw"]
+
+                # run to get output, also measure time
+                start_time.record()
+                # use unbatched (looping) matching encoder image forward passes
+                # for numerically stable testing. If opts.fast_cost_volume, then
+                # batch.
+                outputs = model(
+                    "test",
+                    cur_data,
+                    src_data,
+                    unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
+                    return_mask=True,
+                    null_plane_sweep=opts.null_plane_sweep,
+                )
+                end_time.record()
+                torch.cuda.synchronize()
+
+                elapsed_model_time = start_time.elapsed_time(end_time)
+
+                upsampled_depth_pred_b1hw = F.interpolate(
+                    outputs["depth_pred_s0_b1hw"],
+                    size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                    mode="nearest",
+                )
+
+                ######################### DEPTH FUSION #########################
+                # mask predicted depths when no vaiid MVS information
+                # exists, off by default
+                if opts.mask_pred_depth:
+                    overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
+
+                    overall_mask_b1hw = F.interpolate(
+                        overall_mask_b1hw,
+                        size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                        mode="nearest",
+                    ).bool()
+
+                    upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
+
+                # fuse the raw best guess depths from the cost volume, off
+                # by default
+                if opts.fusion_use_raw_lowest_cost:
+                    # upsampled_depth_pred_b1hw becomes the argmax from the
+                    # cost volume
+                    upsampled_depth_pred_b1hw = outputs["lowest_cost_bhw"].unsqueeze(1)
+
+                    upsampled_depth_pred_b1hw = F.interpolate(
+                        upsampled_depth_pred_b1hw,
+                        size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                        mode="nearest",
+                    )
+
+                    overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
+
+                    overall_mask_b1hw = F.interpolate(
+                        overall_mask_b1hw,
+                        size=(depth_gt.shape[-2], depth_gt.shape[-1]),
+                        mode="nearest",
+                    ).bool()
+
+                    upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
+
+                color_frame = (
+                    cur_data["high_res_color_b3hw"]
+                    if "high_res_color_b3hw" in cur_data
+                    else cur_data["image_b3hw"]
+                )
+
+                hint_fuser.fuse_frames(
+                    upsampled_depth_pred_b1hw,
+                    cur_data["K_full_depth_b44"],
+                    cur_data["cam_T_world_b44"],
+                    color_frame,
+                )
+
+            pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
+
+        
+            ######################### Run inference again with mesh hint. #########################
+            
+            # initialize scene averager
             dataset = dataset_class(
                 opts.dataset_path,
                 split=opts.split,
@@ -255,15 +400,14 @@ def main(opts):
                 image_width=opts.image_width,
                 image_height=opts.image_height,
                 pass_frame_id=True,
-                fill_depth_hints=False,
+                fill_depth_hints=opts.fill_depth_hints,
                 depth_hint_aug=opts.depth_hint_aug,
-                depth_hint_dir=opts.depth_hint_dir,
-                load_empty_hints=opts.load_empty_hint,
+                depth_hint_dir=None,
+                load_empty_hints=True,
+                disable_flip=True,
                 rotate_images=opts.rotate_images,
                 modify_to_fov=opts.modify_to_fov,
             )
-
-            assert len(dataset) > 0, f"Dataset {scan} is empty."
 
             dataloader = torch.utils.data.DataLoader(
                 dataset,
@@ -273,11 +417,14 @@ def main(opts):
                 drop_last=False,
             )
 
-            # initialize scene averager
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
 
-            # render_height = int(192/2)
-            # render_width = int(256/2)
+            if opts.run_fusion:
+                fuser = fusers_helper.get_fuser(opts, scan)
+
+            hint_start_time = torch.cuda.Event(enable_timing=True)
+            hint_end_time = torch.cuda.Event(enable_timing=True)
+
             render_height = dataset.image_height // 2
             render_width = dataset.image_width // 2
 
@@ -289,125 +436,71 @@ def main(opts):
             backprojector = BackprojectDepth(height=render_height, width=render_width).cuda()
             mesh_renderer = PyTorch3DMeshDepthRenderer(height=render_height, width=render_width)
 
-            elapsed_hint_time = 0.0
-            frame_ids = []
-            weights_list = []
-            initial_t = None
-            for batch_ind, batch in enumerate(tqdm(dataloader)):
+            for batch_ind, batch in enumerate(tqdm(dataloader, desc="Second pass")):
                 # get data, move to GPU
                 cur_data, src_data = batch
                 cur_data = to_gpu(cur_data, key_ignores=["frame_id_string"])
                 src_data = to_gpu(src_data, key_ignores=["frame_id_string"])
 
-                if opts.shift_world_origin:
-                    if initial_t is None:
-                        initial_t = cur_data["world_T_cam_b44"][0, :3, 3].clone()
-
-                    cur_data["world_T_cam_b44"][:, :3, 3] = (
-                        cur_data["world_T_cam_b44"][:, :3, 3] - initial_t
-                    )
-                    cur_data["cam_T_world_b44"] = torch.linalg.inv(cur_data["world_T_cam_b44"])
-
-                    for src_ind in range(src_data["world_T_cam_b44"].shape[1]):
-                        src_data["world_T_cam_b44"][:, src_ind, :3, 3] = (
-                            src_data["world_T_cam_b44"][:, src_ind, :3, 3] - initial_t
-                        )
-                        src_data["cam_T_world_b44"][:, src_ind] = torch.linalg.inv(
-                            src_data["world_T_cam_b44"][:, src_ind]
-                        )
-
-                for i in range(len(cur_data["frame_id_string"])):
-                    frame_ids.append(cur_data["frame_id_string"][i])
-
-                # get mesh render for hint, but after 12 keyframes have passed.
-                if batch_ind * opts.batch_size > 0:
-                    hint_start_time.record()
-
-                    min_bounds_3, max_bounds_3 = get_frustum_bounds(
-                        cur_data["invK_s0_b44"],
-                        cur_data["world_T_cam_b44"],
-                        0.1,
-                        10.0,
-                        render_height,
-                        render_width ,
-                    )
-
-                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True, 
-                                                          min_bounds_3=min_bounds_3, 
-                                                          max_bounds_3=max_bounds_3)
-
-                    # renderer expects normalized intrinsics.
-                    K_b44 = cur_data["K_s0_b44"].clone()
-                    K_b44[:, 0] /= render_width
-                    K_b44[:, 1] /= render_height
-                    rendered_depth_b1hw = mesh_renderer.render(
-                        mesh, cur_data["cam_T_world_b44"].clone(), K_b44
-                    )
-                    cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
-                    cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
-                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-
-                    cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
-                    # transform to world
-                    pose_to_use = cur_data["world_T_cam_b44"].clone()
-                    if opts.wiggle_render_pose:
-                        rand_t = (torch.randn(3) * 0.04).type_as(pose_to_use)
-                        rand_rot = torch.randn(3) * 0.03
-                        rot_mat = torch.tensor(
-                            rotx(rand_rot[0]) @ roty(rand_rot[1]) @ rotz(rand_rot[2])
-                        ).type_as(pose_to_use)
-                        rand_T = torch.eye(4).cuda().type_as(pose_to_use)
-                        rand_T[:3, :3] = rot_mat
-                        rand_T[:3, 3] = rand_t
-                        pose_to_use = rand_T.unsqueeze(0) @ pose_to_use
-
-                    world_points_b4N = pose_to_use @ cam_points_b4N
-
-                    # sample tsdf
-                    sampled_weights_N = fuser.sample_tsdf(
-                        world_points_b4N[:, :3, :].squeeze(0).transpose(0, 1),
-                        what_to_sample="weights",
-                    )
-
-                    # set weights
-                    sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
-
-                    cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
-                    cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                    cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
-
-                    weights_list.append(
-                        sampled_weights_b1hw[cur_data["depth_hint_mask_b_b1hw"]].mean().item()
-                    )
-                    sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
-                    cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
-
-                    hint_end_time.record()
-                    torch.cuda.synchronize()
-                    elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
-
-                    del mesh
-
-                else:
-                    # load empty hints
-                    cur_data["depth_hint_b1hw"] = torch.zeros_like(cur_data["depth_b1hw"])
-                    cur_data["depth_hint_b1hw"][:] = float("nan")
-                    cur_data["depth_hint_mask_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
-                    cur_data["depth_hint_mask_b_b1hw"] = cur_data["depth_hint_mask_b1hw"].bool()
-                    cur_data["sampled_weights_b1hw"] = torch.zeros_like(cur_data["depth_hint_b1hw"])
-
-                    sampled_weights_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
-                    rendered_depth_b1hw = torch.zeros_like(cur_data["depth_hint_b1hw"])
-
                 depth_gt = cur_data["full_res_depth_b1hw"]
+
+                # render hints and sample tsdf
+                hint_start_time.record()
+
+                # renderer expects normalized intrinsics.
+                K_b44 = cur_data["K_s0_b44"].clone()
+                K_b44[:, 0] /= render_width
+                K_b44[:, 1] /= render_height
+
+                first_scan_world_T_cam_b44 = (
+                    first_scan_T_second_scan_transform_144 @ cur_data["world_T_cam_b44"]
+                )
+                cam_T_first_scan_world_b44 = torch.inverse(first_scan_world_T_cam_b44)
+
+                rendered_depth_b1hw = mesh_renderer.render(
+                    pytorch_hint_mesh, cam_T_first_scan_world_b44.clone(), K_b44
+                )
+                cur_data["depth_hint_b1hw"] = rendered_depth_b1hw.clone()
+                cur_data["depth_hint_b1hw"][cur_data["depth_hint_b1hw"] == -1] = float("nan")
+                cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+
+                cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
+                # transform to world
+                world_points_b4N = first_scan_world_T_cam_b44 @ cam_points_b4N
+
+                # sample tsdf
+                sampled_weights_N_list = []
+                for world_points_4N in world_points_b4N:
+                    sampled_weights_N = hint_fuser.sample_tsdf(
+                        world_points_4N[:3, :].transpose(0, 1),
+                        what_to_sample="weights",
+                        # sampling_method="nearest",
+                    )
+                    sampled_weights_N_list.append(sampled_weights_N)
+
+                # sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
+                sampled_weights_b1hw = torch.stack(sampled_weights_N_list, 0).view(
+                    cur_data["image_b3hw"].shape[0], 1, render_height, render_width
+                )
+
+                # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
+                # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
+                # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
+
+                sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
+                cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
+
+                hint_end_time.record()
+                torch.cuda.synchronize()
+                elapsed_hint_time = hint_start_time.elapsed_time(hint_end_time)
 
                 # run to get output, also measure time
                 start_time.record()
-                # use unbatched (locur_data["depth_hint_b1hw"]oping) matching encoder image forward passes
+                # use unbatched (looping) matching encoder image forward passes
                 # for numerically stable testing. If opts.fast_cost_volume, then
                 # batch.
-                outputs = model(
+                outputs = densification_model(
                     "test",
                     cur_data,
                     src_data,
@@ -452,6 +545,9 @@ def main(opts):
 
                         # get per frame time in the batch
                         element_metrics["model_time"] = elapsed_model_time / depth_gt.shape[0]
+
+                        # get per frame time in the batch
+                        element_metrics["model_time"] = elapsed_model_time / depth_gt.shape[0]
                         element_metrics["hint_time"] = elapsed_hint_time / depth_gt.shape[0]
 
                         # both this scene and all frame averagers
@@ -463,22 +559,13 @@ def main(opts):
                     # mask predicted depths when no vaiid MVS information
                     # exists, off by default
                     if opts.mask_pred_depth:
-                        # overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
+                        overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
 
-                        # overall_mask_b1hw = F.interpolate(
-                        #     overall_mask_b1hw,
-                        #     size=(depth_gt.shape[-2], depth_gt.shape[-1]),
-                        #     mode="nearest",
-                        # ).bool()
-
-                        overall_mask_bkhw = outputs["overall_mask_bhw"].cuda().float()
-
-                        overall_mask_bkhw = F.interpolate(
-                            overall_mask_bkhw,
+                        overall_mask_b1hw = F.interpolate(
+                            overall_mask_b1hw,
                             size=(depth_gt.shape[-2], depth_gt.shape[-1]),
                             mode="nearest",
                         ).bool()
-                        overall_mask_b1hw = overall_mask_bkhw.sum(1, keepdim=True) > 2
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 
@@ -521,22 +608,21 @@ def main(opts):
                 ########################### Quick Viz ##########################
                 if opts.dump_depth_visualization:
                     # make a dir for this scan
-                    viz_output_path = os.path.join(viz_output_dir, scan)
-                    Path(viz_output_path).mkdir(parents=True, exist_ok=True)
+                    output_path = os.path.join(viz_output_dir, scan)
+                    Path(output_path).mkdir(parents=True, exist_ok=True)
 
-                    if "sampled_weights_b1hw" in locals():
-                        outputs["sampled_weights_b1hw"] = sampled_weights_b1hw
-                    if "rendered_depth_b1hw" in locals():
-                        outputs["rendered_depth_b1hw"] = rendered_depth_b1hw
+                    if "sampled_weights_b1hw" in cur_data:
+                        outputs["sampled_weights_b1hw"] = cur_data["sampled_weights_b1hw"]
+                    if "depth_hint_b1hw" in cur_data:
+                        outputs["rendered_depth_b1hw"] = cur_data["depth_hint_b1hw"]
 
                     quick_viz_export(
-                        viz_output_path,
+                        output_path,
                         outputs,
                         cur_data,
                         batch_ind,
                         valid_mask_b,
                         opts.batch_size,
-                        opts.viz_fixed_min_max,
                     )
                 ########################## Cache Depths ########################
                 if opts.cache_depths:
@@ -580,37 +666,6 @@ def main(opts):
                 print_running_metrics=True,
             )
 
-            # make a histogram of weights using matplotlib
-            if len(weights_list) > 0:
-                import matplotlib.pyplot as plt
-                import numpy as np
-
-                # clear the current figure
-                plt.clf()
-                # save weights list to disk
-                np.save(
-                    os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_avg.npy"),
-                    np.array(weights_list),
-                )
-                plt.hist(
-                    np.array(weights_list),
-                    bins=np.linspace(0, 0.7, 15),
-                    alpha=0.5,
-                    color="b",
-                    edgecolor="black",
-                )
-                # set xlim and ylim
-                plt.xlim(0, 0.7)
-                # set x and y axis labels
-                plt.xlabel("Weight")
-                plt.ylabel("Frame Mean Frequency")
-                plt.savefig(
-                    os.path.join(viz_output_dir, f"{scan.replace('/', '_')}_weights_histogram.png")
-                )
-
-            if opts.dump_depth_visualization:
-                load_and_merge_images(frame_ids, viz_output_path, fps=10)
-
         # compute and print final average
         print("\nFinal metrics:")
         all_scene_metrics.compute_final_average()
@@ -637,6 +692,7 @@ def main(opts):
 if __name__ == "__main__":
     # don't need grad for test.
     torch.set_grad_enabled(False)
+    pl.seed_everything(42)
 
     # get an instance of options and load it with config file(s) and cli args.
     option_handler = options.OptionsHandler()
