@@ -27,8 +27,8 @@ class _marching_cubes(Function):
     """
 
     @staticmethod
-    def forward(ctx, vol, isolevel, active_voxels):
-        verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels)
+    def forward(ctx, vol, isolevel, active_voxels, min_bounds, max_bounds):
+        verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels, min_bounds, max_bounds)
         return verts, faces, ids
 
     @staticmethod
@@ -41,6 +41,8 @@ def marching_cubes(
     active_voxels: torch.Tensor,
     isolevel: Optional[float] = None,
     return_local_coords: bool = True,
+    min_bounds: Optional[torch.Tensor] = None,
+    max_bounds: Optional[torch.Tensor] = None,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     """
     Run marching cubes over a volume scalar field with a designated isolevel.
@@ -63,12 +65,17 @@ def marching_cubes(
         verts: [{V_0}, {V_1}, ...] List of N sets of vertices of shape (|V_i|, 3) in FloatTensor
         faces: [{F_0}, {F_1}, ...] List of N sets of faces of shape (|F_i|, 3) in LongTensors
     """
+
+    if min_bounds is None:
+        min_bounds = torch.ones(3, device=vol_batch.device).int() * -10000
+        max_bounds = torch.ones(3, device=vol_batch.device).int() * 10000
+
     batched_verts, batched_faces = [], []
     D, H, W = vol_batch.shape[1:]
     for i in range(len(vol_batch)):
         vol = vol_batch[i]
         thresh = ((vol.max() + vol.min()) / 2).item() if isolevel is None else isolevel
-        verts, faces, ids = _marching_cubes.apply(vol, thresh, active_voxels)
+        verts, faces, ids = _marching_cubes.apply(vol, thresh, active_voxels, min_bounds, max_bounds)
         if len(faces) > 0 and len(verts) > 0:
             # Convert from world coordinates ([0, D-1], [0, H-1], [0, W-1]) to
             # local coordinates in the range [-1, 1]

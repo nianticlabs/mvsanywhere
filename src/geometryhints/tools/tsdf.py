@@ -13,6 +13,42 @@ from skimage import measure
 from geometryhints.utils.pytorch3d_extras import marching_cubes
 
 
+def get_frustum_bounds(invK_144, world_T_cam_144, min_depth=0.1, max_depth=10.0, img_h=480, img_w=640):
+    """
+    Gets the frustum bounds for a camera.
+    """
+
+    corner_uv_144 = torch.tensor(
+        [
+            [0, 0, 1, 1],
+            [img_w, 0, 1, 1],
+            [0, img_h, 1, 1],
+            [img_w, img_h, 1, 1],
+        ],
+        dtype=invK_144.dtype,
+        device=invK_144.device,
+    ).T.unsqueeze(0)
+
+    corner_points_144 = torch.matmul(invK_144, corner_uv_144)
+    min_corner_points_144 = corner_points_144.clone()
+    min_corner_points_144[:, :3] *= min_depth
+    max_corner_points_144 = corner_points_144.clone()
+    max_corner_points_144[:, :3] *= max_depth
+
+    corner_points_148 = torch.cat(
+        (
+            min_corner_points_144,
+            max_corner_points_144,
+        ),
+        dim=2,
+    )
+    corner_points_148 = torch.matmul(world_T_cam_144, corner_points_148)
+    minbounds_3 = corner_points_148[0].amin(dim=1)[:3]
+    maxbounds_3 = corner_points_148[0].amax(dim=1)[:3]
+
+    return minbounds_3, maxbounds_3
+
+
 class TSDF:
 
     """
@@ -176,7 +212,7 @@ class TSDF:
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=norms)
         return mesh
 
-    def to_mesh_pytorch3d(self, scale_to_world=True):
+    def to_mesh_pytorch3d(self, scale_to_world=True, min_bounds_3=None, max_bounds_3=None):
         active_buf_indices = self.voxel_hashset.active_buf_indices().to(o3d.core.int64)
         active_keys = self.voxel_hashset.key_tensor()[active_buf_indices]
         active_keys = (
@@ -185,13 +221,22 @@ class TSDF:
 
         tsdf_vals = self.tsdf_values
 
+
+        # convert bounds to indices
+        min_bounds_3 = torch.floor((min_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int() if min_bounds_3 is not None else None
+        max_bounds_3 = torch.ceil((max_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int() if max_bounds_3 is not None else None
+
         batched_verts, batched_faces = marching_cubes(
-            tsdf_vals[None].float().cuda(), active_keys, isolevel=0.0, return_local_coords=False
+            tsdf_vals[None].float().cuda(), active_keys, isolevel=0.0, return_local_coords=False,
+            min_bounds=min_bounds_3, max_bounds=max_bounds_3
         )
 
         verts = batched_verts[0]
         faces = batched_faces[0]
 
+        if len(verts) == 0:
+            verts = torch.zeros(1, 3).cuda()
+            faces = torch.zeros(1, 3).cuda()
         if scale_to_world:
             verts = self.origin.view(1, 3).cuda() + verts * self.voxel_size
 
@@ -392,37 +437,12 @@ class TSDFFuser:
             # get voxels which are visible in the camera
             depth_min = 0.01
             depth_max = self.max_depth + self.truncation + 0.1
+            invK_144 = torch.inverse(K_144.float()).half()
+            world_T_cam_T_144 = torch.inverse(cam_T_world_T_144.float()).half()
 
-            coord_pad = 5
-            corner_uv_144 = torch.tensor(
-                [
-                    [-coord_pad, -coord_pad, 1, 1],
-                    [img_w + coord_pad, -coord_pad, 1, 1],
-                    [-coord_pad, img_h + coord_pad, 1, 1],
-                    [img_w + coord_pad, img_h + coord_pad, 1, 1],
-                ],
-                dtype=torch.float16,
-                device=depth_b1hw.device,
-            ).T.unsqueeze(0)
-
-            corner_points_144 = torch.matmul(torch.inverse(K_144.float()).half(), corner_uv_144)
-            min_corner_points_144 = corner_points_144.clone()
-            min_corner_points_144[:, :3] *= depth_min
-            max_corner_points_144 = corner_points_144.clone()
-            max_corner_points_144[:, :3] *= depth_max
-
-            corner_points_148 = torch.cat(
-                (
-                    min_corner_points_144,
-                    max_corner_points_144,
-                ),
-                dim=2,
+            minbounds_3, maxbounds_3 = get_frustum_bounds(
+                invK_144[0], world_T_cam_T_144[0], depth_min, depth_max, img_h, img_w
             )
-            corner_points_148 = torch.matmul(
-                torch.inverse(cam_T_world_T_144.float()).half(), corner_points_148
-            )
-            minbounds_3 = corner_points_148[0].amin(dim=1)[:3]
-            maxbounds_3 = corner_points_148[0].amax(dim=1)[:3]
 
             valid_voxel_mask_N = (
                 torch.logical_and(
