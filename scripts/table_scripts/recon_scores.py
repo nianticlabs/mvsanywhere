@@ -29,7 +29,7 @@ def order_formatter(elem, index):
 
 def print_table(mask_type="tf", scores_table="online", format_ordering=True):
     assert mask_type in ["tf", "ours"]
-    assert scores_table in ["online", "offline"]
+    assert scores_table in ["online", "offline", "gt"]
 
     all_scores_dict = {}
 
@@ -209,6 +209,26 @@ def print_table(mask_type="tf", scores_table="online", format_ordering=True):
         )["overall"]
         # all_scores_dict["\\textbf{Ours} (online) (2cm)& No"] = json.load(open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_incremental_2cm/scannet/default/meshes/0.02_3.0_ours_neg_trunc/{scores_json_name}"))["overall"]
 
+    elif scores_table == "gt":
+
+        all_scores_dict["GT Depth Fused 3m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_3.0_ours/{scores_json_name}")
+        )["overall"]        
+
+        all_scores_dict["GT Depth Fused 5m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_5.0_ours/{scores_json_name}")
+        )["overall"]   
+
+        all_scores_dict["GT Depth Fused 8m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_8.0_ours/{scores_json_name}")
+        )["overall"]   
+
+        all_scores_dict["GT Depth Fused 8m 1cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_8.0_ours/{scores_json_name}")
+        )["overall"]
+        
+        
+        
     # Define the scores dictionary
     scores = [
         ["&" + key] + [all_scores_dict[key][metric] for metric in used_metrics]

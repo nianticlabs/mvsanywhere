@@ -126,7 +126,7 @@ with open(scores_path, "r") as f:
 
 show_bold = False
 
-used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "a5", "a25"]
+used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "rmse_log", "a5", "a25"]
 
 scores = [
     ["\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"]
@@ -158,9 +158,10 @@ scores = [
 ]
 
 
-sort_direction = [False, False, False, False, True, True, False, False, False, True, True]
+sort_direction = [False, False, False, False, True, True, False, False, False, False, True, True]
 number_formatters = [
     itentity_formatter,
+    distance_formatter,
     distance_formatter,
     distance_formatter,
     distance_formatter,
