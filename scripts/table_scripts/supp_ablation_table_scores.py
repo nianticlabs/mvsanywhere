@@ -89,6 +89,9 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_ne
 with open(scores_path, "r") as f:
     ours_online_scannet = json.load(f)["scores"]
 
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_two_pass_viz/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    ours_offline_scannet = json.load(f)["scores"]
 
 scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mesh_model_fast/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
@@ -97,14 +100,6 @@ with open(scores_path, "r") as f:
 scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_no_hint/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
     ours_no_hint_scannet = json.load(f)["scores"]
-
-scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
-with open(scores_path, "r") as f:
-    ours_two_pass_scannet = json.load(f)["scores"]
-
-scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/final_model_new_renders_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
-with open(scores_path, "r") as f:
-    ours_two_pass_scannet = json.load(f)["scores"]
 
 scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ablations_single_mlp_incremental/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
@@ -115,10 +110,13 @@ scores_path = "scripts/table_scripts/simple_mapping.json"
 with open(scores_path, "r") as f:
     simple_mapping_scannet = json.load(f)["scores"]
 
-scores_path = "scripts/table_scripts/guidedMVS.json"
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mvgmvs_clip_incremental/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
-    guided_mvs_scannet = json.load(f)["scores"]
+    guided_mvs_scannet_online = json.load(f)["scores"]
 
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mvgmvs_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    guided_mvs_scannet_offline = json.load(f)["scores"]
 
 scores_path = "scripts/table_scripts/cost_vol_encoder_hint.json"
 with open(scores_path, "r") as f:
@@ -129,32 +127,37 @@ show_bold = False
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "rmse_log", "a5", "a25"]
 
 scores = [
-    ["\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"]
+    ["&\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"]
     + [sr_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
+    ["&\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint \& confidence to cost volume encoder"]
+    ["&\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint \& confidence to cost volume encoder"]
     + [cost_vol_encoder_hint[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_warped_depth} & \\textbf{Ours} w/ warped depth as hint"]
+    ["&\\row{row:ours_warped_depth} & \\textbf{Ours} w/ warped depth as hint"]
     + [warped_depth_ablation[metric_name] for metric_name in used_metrics],
     # ["\\row{row:ours_sdf_conf} & \\textbf{Ours} w/ sampled SDF confidences \& hint MLP"]
     # + [null_elements[metric_name] for metric_name in used_metrics],
-    # ["\\row{row:ours_guided_cv} & \\textbf{Ours} w/ guided cost volume \cite{poggi2022multi}"]
-    # + [guided_mvs_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
+    ["\\row{row:ours_guided_cv} & \\textbf{Ours} w/ guided cost volume \cite{poggi2022multi}"]
+    + [guided_mvs_scannet_online[metric_name] for metric_name in used_metrics],
+    ["&\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
     + [simple_mapping_scannet[metric_name] for metric_name in used_metrics],
     # ["\\row{row:ours_pred_depth_twice} & \\textbf{Ours} w/ current predicted depth run twice"]
     # + [null_elements[metric_name] for metric_name in used_metrics],
-    ["\\row{row:tocd} & SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD \cite{khan2023temporally}"]
+    ["&\\row{row:tocd} & SimpleRecon~\cite{sayed2022simplerecon} w/ TOCD \cite{khan2023temporally}"]
     + [tocd_sr[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP for matching and hints"]
+    ["&\\row{row:ours_single_mlp} & \\textbf{Ours} w/ single MLP for matching and hints"]
     + [single_mlp_ablation[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_no_hint} & \\textbf{Ours} (no hint)"]
+    ["&\\row{row:ours_no_hint} & \\textbf{Ours} (no hint)"]
     + [ours_no_hint_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_fast} & \textbf{Ours} (\incremental, fast)"]
+    ["&\\row{row:ours_fast} & \\textbf{Ours} (\incremental, fast)"]
     + [ours_fast_online_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours} & \textbf{Ours} (\incremental)"]
+    ["&\\row{row:ours} & \\textbf{Ours} (\incremental)"]
     + [ours_online_scannet[metric_name] for metric_name in used_metrics],
+    
+    ["&\\row{row:ours_guided_cv_offline} & \\textbf{Ours} w/ cost volume modulation \cite{poggi2022multi}"]
+    + [guided_mvs_scannet_offline[metric_name] for metric_name in used_metrics],
+    ["&\\row{row:ours} & \\textbf{Ours} (\offline)"]
+    + [ours_offline_scannet[metric_name] for metric_name in used_metrics],
 ]
 
 
