@@ -81,6 +81,11 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/no_weight_abla
 with open(scores_path, "r") as f:
     no_confidence_model = json.load(f)["scores"]
 
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/no_weight_ablation_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    no_confidence_model_offline = json.load(f)["scores"]
+
+
 scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/warped_depth_ablation/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
     warped_depth_ablation = json.load(f)["scores"]
@@ -129,7 +134,7 @@ used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "rmse_log", "a5", "a25"
 scores = [
     ["&\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"]
     + [sr_scannet[metric_name] for metric_name in used_metrics],
-    ["&\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
+    ["&\\row{row:ours_no_confidence} & \\textbf{Ours} w/ hint, without confidence"]
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
     ["&\\row{row:ours_hint_in_cv_enc} & \\textbf{Ours} w/ hint \& confidence to cost volume encoder"]
     + [cost_vol_encoder_hint[metric_name] for metric_name in used_metrics],
@@ -154,9 +159,11 @@ scores = [
     ["&\\row{row:ours} & \\textbf{Ours} (\incremental)"]
     + [ours_online_scannet[metric_name] for metric_name in used_metrics],
     
+    ["&\\row{row:ours_no_confidence_offline} & \\textbf{Ours} w/ hint, without confidence"]
+    + [no_confidence_model_offline[metric_name] for metric_name in used_metrics],
     ["&\\row{row:ours_guided_cv_offline} & \\textbf{Ours} w/ cost volume modulation \cite{poggi2022multi}"]
     + [guided_mvs_scannet_offline[metric_name] for metric_name in used_metrics],
-    ["&\\row{row:ours} & \\textbf{Ours} (\offline)"]
+    ["&\\row{row:ours_offline} & \\textbf{Ours} (\offline)"]
     + [ours_offline_scannet[metric_name] for metric_name in used_metrics],
 ]
 
