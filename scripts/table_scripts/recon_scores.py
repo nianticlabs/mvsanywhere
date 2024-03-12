@@ -228,16 +228,32 @@ def print_table(mask_type="tf", scores_table="online", format_ordering=True):
         #     open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_8.0_ours/{scores_json_name}")
         # )["overall"]
         
-        all_scores_dict["GT Depth Fused 3m 1cm"] = json.load(
-            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_3.0_open3d/{scores_json_name}")
+        # all_scores_dict["GT Depth Fused 3m 1cm"] = json.load(
+        #     open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_3.0_open3d/{scores_json_name}")
+        # )["overall"]        
+
+        # all_scores_dict["GT Depth Fused 5m 1cm"] = json.load(
+        #     open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_5.0_open3d/{scores_json_name}")
+        # )["overall"]   
+
+        # all_scores_dict["GT Depth Fused 8m 1cm"] = json.load(
+        #     open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_8.0_open3d/{scores_json_name}")
+        # )["overall"]
+        
+        all_scores_dict["GT Depth Fused 3m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_3.0_open3d/{scores_json_name}")
         )["overall"]        
 
-        all_scores_dict["GT Depth Fused 5m 1cm"] = json.load(
-            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_5.0_open3d/{scores_json_name}")
+        all_scores_dict["GT Depth Fused 4m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_4.0_open3d/{scores_json_name}")
         )["overall"]   
 
-        all_scores_dict["GT Depth Fused 8m 1cm"] = json.load(
-            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.01_8.0_open3d/{scores_json_name}")
+        all_scores_dict["GT Depth Fused 5m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_5.0_open3d/{scores_json_name}")
+        )["overall"]   
+
+        all_scores_dict["GT Depth Fused 8m 2cm"] = json.load(
+            open(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_8.0_open3d/{scores_json_name}")
         )["overall"]   
         
         

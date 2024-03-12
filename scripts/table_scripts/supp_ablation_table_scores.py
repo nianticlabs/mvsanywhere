@@ -119,13 +119,31 @@ scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mvgmvs_clip_in
 with open(scores_path, "r") as f:
     guided_mvs_scannet_online = json.load(f)["scores"]
 
-scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mvgmvs_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/mvgmvs_clip_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
 with open(scores_path, "r") as f:
     guided_mvs_scannet_offline = json.load(f)["scores"]
 
 scores_path = "scripts/table_scripts/cost_vol_encoder_hint.json"
 with open(scores_path, "r") as f:
     cost_vol_encoder_hint = json.load(f)["scores"]
+
+
+
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ours_gt_incremental/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    ours_gt_incremental = json.load(f)["scores"]
+
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ours_full_mesh_incremental/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    ours_full_mesh_incremental = json.load(f)["scores"]
+
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ours_gt_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    ours_gt_offline = json.load(f)["scores"]
+
+scores_path = "/mnt/nas3/personal/mohameds/geometry_hints/outputs/ours_full_mesh_two_pass/scannet/default/scores/all_frame_avg_metrics_test.json"
+with open(scores_path, "r") as f:
+    ours_full_mesh_offline = json.load(f)["scores"]
 
 show_bold = False
 
@@ -165,6 +183,17 @@ scores = [
     + [guided_mvs_scannet_offline[metric_name] for metric_name in used_metrics],
     ["&\\row{row:ours_offline} & \\textbf{Ours} (\offline)"]
     + [ours_offline_scannet[metric_name] for metric_name in used_metrics],
+    
+    ["&\\row{row:ours_gt_training_incremental} & \\textbf{Ours} w/ GT depth hint training"]
+    + [ours_gt_incremental[metric_name] for metric_name in used_metrics],
+    ["&\\row{row:ours_full_mesh_training_full_mesh_incremental} & \\textbf{Ours} w/ full mesh hint training"]
+    + [ours_full_mesh_incremental[metric_name] for metric_name in used_metrics],
+    
+    ["&\\row{row:ours_gt_training_offline} & \\textbf{Ours} w/ GT depth hint training"]
+    + [ours_gt_offline[metric_name] for metric_name in used_metrics],
+    ["&\\row{row:ours_full_mesh_training_full_mesh_offline} & \\textbf{Ours} w/ full mesh hint training"]
+    + [ours_full_mesh_offline[metric_name] for metric_name in used_metrics],
+
 ]
 
 
