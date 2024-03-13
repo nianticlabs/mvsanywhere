@@ -224,7 +224,7 @@ def prepare_callbacks(
         save_last=True,
         save_top_k=1,
         verbose=True,
-        monitor="val_0_metrics/a5",
+        monitor="val_0_metrics/a5" if opts.fill_depth_hints else "val_metrics/a5",
         mode="max",
         dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
     )
