@@ -606,7 +606,7 @@ class ScannetDataset(GenericMVSDataset):
             # depth_hint_mask_1hw = mask
             # depth_hint_mask_b_1hw = mask_b
             # sampled_weights_1hw = (depth_hint_mask_1hw > 0).float()
-            
+
             partial_hint = torch.rand(1).item() < 0.5 and self.split != "test"
             # partial_hint = False
 

@@ -129,7 +129,9 @@ show_bold = False
 used_metrics = ["abs_diff", "abs_rel", "sq_rel", "rmse", "a5", "a25"]
 
 scores = [
-    ["\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"]
+    [
+        "\\row{row:ours_no_hint_mlp} & \\textbf{Ours} without Hint MLP (as in SimpleRecon~\cite{sayed2022simplerecon})"
+    ]
     + [sr_scannet[metric_name] for metric_name in used_metrics],
     ["\\row{row:ours_no_confidence} & \\textbf{Ours} w/ online hint, without confidence"]
     + [no_confidence_model[metric_name] for metric_name in used_metrics],
@@ -141,7 +143,9 @@ scores = [
     # + [null_elements[metric_name] for metric_name in used_metrics],
     # ["\\row{row:ours_guided_cv} & \\textbf{Ours} w/ guided cost volume \cite{poggi2022multi}"]
     # + [guided_mvs_scannet[metric_name] for metric_name in used_metrics],
-    ["\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"]
+    [
+        "\\row{row:ours_variable_depth_planes} & \\textbf{Ours} w/ variable depth planes \cite{Xin2023ISMAR}"
+    ]
     + [simple_mapping_scannet[metric_name] for metric_name in used_metrics],
     # ["\\row{row:ours_pred_depth_twice} & \\textbf{Ours} w/ current predicted depth run twice"]
     # + [null_elements[metric_name] for metric_name in used_metrics],

@@ -13,7 +13,9 @@ from skimage import measure
 from geometryhints.utils.pytorch3d_extras import marching_cubes
 
 
-def get_frustum_bounds(invK_144, world_T_cam_144, min_depth=0.1, max_depth=10.0, img_h=480, img_w=640):
+def get_frustum_bounds(
+    invK_144, world_T_cam_144, min_depth=0.1, max_depth=10.0, img_h=480, img_w=640
+):
     """
     Gets the frustum bounds for a camera.
     """
@@ -221,14 +223,25 @@ class TSDF:
 
         tsdf_vals = self.tsdf_values
 
-
         # convert bounds to indices
-        min_bounds_3 = torch.floor((min_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int() if min_bounds_3 is not None else None
-        max_bounds_3 = torch.ceil((max_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int() if max_bounds_3 is not None else None
+        min_bounds_3 = (
+            torch.floor((min_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int()
+            if min_bounds_3 is not None
+            else None
+        )
+        max_bounds_3 = (
+            torch.ceil((max_bounds_3 - self.origin.cuda().float()) / self.voxel_size).int()
+            if max_bounds_3 is not None
+            else None
+        )
 
         batched_verts, batched_faces = marching_cubes(
-            tsdf_vals[None].float().cuda(), active_keys, isolevel=0.0, return_local_coords=False,
-            min_bounds=min_bounds_3, max_bounds=max_bounds_3
+            tsdf_vals[None].float().cuda(),
+            active_keys,
+            isolevel=0.0,
+            return_local_coords=False,
+            min_bounds=min_bounds_3,
+            max_bounds=max_bounds_3,
         )
 
         verts = batched_verts[0]

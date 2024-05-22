@@ -146,7 +146,9 @@ class MeshErrorVisualiser(ErrorVisualiser):
 
 
 class TFMeshErrorVisualiser(MeshErrorVisualiser):
-    def filter_mesh_by_visibility(self, mesh: trimesh.Trimesh, occlusion_mask: torch.Tensor, world2grid: torch.Tensor):
+    def filter_mesh_by_visibility(
+        self, mesh: trimesh.Trimesh, occlusion_mask: torch.Tensor, world2grid: torch.Tensor
+    ):
         """Filter the mesh using a visibility mask.
         Code adapted from TransformerFusion, released with MIT License.
 
@@ -192,14 +194,14 @@ class TFMeshErrorVisualiser(MeshErrorVisualiser):
             padding_mode="zeros",
             align_corners=True,
         )
-        
+
         indices_N = points_pred_visibility.squeeze().bool().numpy()
 
         # remove vertices and faces with index = 0, ie is not visible
         mesh.update_faces(indices_N[mesh.faces].all(axis=1))
 
         return mesh
-    
+
     def forward(
         self,
         prediction: trimesh.Trimesh,
