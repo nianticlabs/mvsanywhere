@@ -47,7 +47,7 @@ black:
   stage: static-analysis
   image: python:3.9.7
   script:
-  - pip install black==22.10.0
+  - pip install black==23.1.0
   - make -f Makefile black
   tags:
     - niantic-masala

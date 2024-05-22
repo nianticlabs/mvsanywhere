@@ -13,6 +13,7 @@ from skimage import measure
 import torch
 import trimesh
 
+
 def to_mesh(volume, origin, voxel_size, scale_to_world=True, export_single_mesh=False):
     """Extracts a mesh from the TSDF volume using marching cubes.
 
@@ -25,7 +26,7 @@ def to_mesh(volume, origin, voxel_size, scale_to_world=True, export_single_mesh=
 
     """
     tsdf = torch.tensor(volume)
-    tsdf[tsdf==1] = -1
+    tsdf[tsdf == 1] = -1
     tsdf_np = tsdf.clamp(-1, 1).cpu().numpy()
 
     if export_single_mesh:
@@ -46,8 +47,9 @@ def to_mesh(volume, origin, voxel_size, scale_to_world=True, export_single_mesh=
         verts = origin + verts * voxel_size
 
     mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=norms)
-    
+
     return mesh
+
 
 def main():
     #####################################################################################
@@ -69,7 +71,6 @@ def main():
     )
 
     args = parser.parse_args()
-    
 
     groundtruth_dir = args.groundtruth_dir
     assert os.path.exists(groundtruth_dir)
@@ -79,24 +80,23 @@ def main():
     for scene_id in tqdm(scene_ids):
         # Load predicted mesh.
         numpy_data_path = prediction_dir.replace("SCAN_NAME", scene_id)
-        
+
         data = np.load(numpy_data_path)
-        
+
         origin = np.array(data["origin"])
         voxel_size = data["voxel_size"]
         volume = data["tsdf"]
-        
+
         print("Volume shape:", volume.shape)
         print("Origin:", origin)
         print("Voxel size:", voxel_size)
-        
-        
+
         mesh = to_mesh(volume, origin, voxel_size, scale_to_world=True, export_single_mesh=True)
-        
+
         # save mesh at the same location as the numpy file
         mesh_path = numpy_data_path.replace(".npz", "_single_wall.ply")
         _ = trimesh.exchange.export.export_mesh(mesh, mesh_path)
-        
+
 
 if __name__ == "__main__":
     main()

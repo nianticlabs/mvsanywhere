@@ -62,9 +62,7 @@ class OurFuser(DepthFuser):
         self.extended_neg_truncation = extended_neg_truncation
         self.tsdf_fuser_pred = TSDFFuser(tsdf_pred, max_depth=max_fusion_depth)
 
-    def fuse_frames(
-        self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw
-    ):
+    def fuse_frames(self, depths_b1hw, K_b44, cam_T_world_b44, color_b3hw):
         self.tsdf_fuser_pred.integrate_depth(
             depth_b1hw=depths_b1hw.half(),
             cam_T_world_T_b44=cam_T_world_b44.half(),
@@ -102,10 +100,9 @@ class OurFuser(DepthFuser):
         return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh)
 
     def get_mesh_pytorch3d(self, scale_to_world=True, min_bounds_3=None, max_bounds_3=None):
-        return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(scale_to_world=scale_to_world, 
-                                                           min_bounds_3=min_bounds_3, 
-                                                           max_bounds_3=max_bounds_3
-                                                           )
+        return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(
+            scale_to_world=scale_to_world, min_bounds_3=min_bounds_3, max_bounds_3=max_bounds_3
+        )
 
 
 class Open3DFuser(DepthFuser):
@@ -219,7 +216,9 @@ def get_fuser(opts, scan):
     elif opts.dataset == "3rscan":
         gt_path = ThreeRScanDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
     elif opts.dataset == "7scenes":
-        gt_path = "/mnt/nas/personal/mohameds/geometry_hints/outputs/fused_gt/7scenes/default/meshes/0.04_8.0_ours/SCAN_NAME.ply".replace("SCAN_NAME", scan.replace("/", "_"))
+        gt_path = "/mnt/nas/personal/mohameds/geometry_hints/outputs/fused_gt/7scenes/default/meshes/0.04_8.0_ours/SCAN_NAME.ply".replace(
+            "SCAN_NAME", scan.replace("/", "_")
+        )
     else:
         gt_path = None
 

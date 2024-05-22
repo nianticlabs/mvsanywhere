@@ -213,7 +213,6 @@ def main(opts):
 
     model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
 
-
     opts.load_weights_from_checkpoint = "/mnt/nas/personal/mohameds/geometry_hints/logs/densification_mesh_hint/epoch=7-step=89499.ckpt"
     densification_model = load_model_inference(opts, DensificationModel)
     densification_model = densification_model.cuda().eval()
@@ -378,9 +377,8 @@ def main(opts):
 
             pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
 
-        
             ######################### Run inference again with mesh hint. #########################
-            
+
             # initialize scene averager
             dataset = dataset_class(
                 opts.dataset_path,

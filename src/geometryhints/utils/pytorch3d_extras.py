@@ -28,7 +28,9 @@ class _marching_cubes(Function):
 
     @staticmethod
     def forward(ctx, vol, isolevel, active_voxels, min_bounds, max_bounds):
-        verts, faces, ids = marching_cubes_impl.marching_cubes_(vol, isolevel, active_voxels, min_bounds, max_bounds)
+        verts, faces, ids = marching_cubes_impl.marching_cubes_(
+            vol, isolevel, active_voxels, min_bounds, max_bounds
+        )
         return verts, faces, ids
 
     @staticmethod
@@ -75,7 +77,9 @@ def marching_cubes(
     for i in range(len(vol_batch)):
         vol = vol_batch[i]
         thresh = ((vol.max() + vol.min()) / 2).item() if isolevel is None else isolevel
-        verts, faces, ids = _marching_cubes.apply(vol, thresh, active_voxels, min_bounds, max_bounds)
+        verts, faces, ids = _marching_cubes.apply(
+            vol, thresh, active_voxels, min_bounds, max_bounds
+        )
         if len(faces) > 0 and len(verts) > 0:
             # Convert from world coordinates ([0, D-1], [0, H-1], [0, W-1]) to
             # local coordinates in the range [-1, 1]

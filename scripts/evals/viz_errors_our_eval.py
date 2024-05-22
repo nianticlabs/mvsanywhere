@@ -16,20 +16,18 @@ output_dir.mkdir(exist_ok=True, parents=True)
 gt_mesh_path = Path(
     f"/mnt/nas/personal/mohameds/TransformerFusionEvalData/groundtruth/{scene_id}/mesh_gt.ply"
 )
-visibility_volume_path = Path(
-    "/mnt/nas/personal/mohameds/scannet_test_occlusion_masks/"
-)
+visibility_volume_path = Path("/mnt/nas/personal/mohameds/scannet_test_occlusion_masks/")
 
 tf_groundtruth_dir = "/mnt/nas/personal/mohameds/TransformerFusionEvalData/groundtruth"
 
 pred_mesh_path_paths = [
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_3.0_ours/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_5.0_ours/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_8.0_ours/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_3.0_open3d/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_4.0_open3d/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_5.0_open3d/{scene_id}.ply", 
-    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_8.0_open3d/{scene_id}.ply", 
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_3.0_ours/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_5.0_ours/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/default/meshes/0.02_8.0_ours/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_3.0_open3d/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_4.0_open3d/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_5.0_open3d/{scene_id}.ply",
+    # f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/fused_gt/scannet/dense/meshes/0.02_8.0_open3d/{scene_id}.ply",
     f"/mnt/nas3/personal/faleotti/geometryhints/finerecon/official/1cm/{scene_id}.ply",
 ]
 pred_mesh_path_paths = [Path(p) for p in pred_mesh_path_paths]
@@ -37,7 +35,11 @@ pred_mesh_path_paths = [Path(p) for p in pred_mesh_path_paths]
 for path_ind, path in enumerate(pred_mesh_path_paths):
     assert path.exists()
     # copy the mesh to the output directory
-    trimesh.exchange.export.export_mesh(trimesh.load(path), output_dir / f"{str(path.parent).split('/')[-1].replace('.', '_')}_{path.stem}_{path_ind}_original.ply")
+    trimesh.exchange.export.export_mesh(
+        trimesh.load(path),
+        output_dir
+        / f"{str(path.parent).split('/')[-1].replace('.', '_')}_{path.stem}_{path_ind}_original.ply",
+    )
 
 assert visibility_volume_path.exists()
 
@@ -62,11 +64,22 @@ for pred_path_ind, pred_path in tqdm(enumerate(pred_mesh_path_paths)):
     mesh_error = mesh_error_vis.forward(
         prediction=pred_mesh, target=gt_mesh, visibility_volume=our_visibility_volume
     )
-    trimesh.exchange.export.export_mesh(mesh_error, output_dir / f"{str(pred_path.parent).split('/')[-1].replace('.', '_')}_{pred_path.stem}_{pred_path_ind}_our_mask.ply")
-    
+    trimesh.exchange.export.export_mesh(
+        mesh_error,
+        output_dir
+        / f"{str(pred_path.parent).split('/')[-1].replace('.', '_')}_{pred_path.stem}_{pred_path_ind}_our_mask.ply",
+    )
+
     pred_mesh = trimesh.load(pred_path)
     mesh_error_vis = TFMeshErrorVisualiser(max_val=20)
     mesh_error = mesh_error_vis.forward(
-        prediction=pred_mesh, target=gt_mesh, mask=tf_occlusion_mask, transform=tf_world2grid,
+        prediction=pred_mesh,
+        target=gt_mesh,
+        mask=tf_occlusion_mask,
+        transform=tf_world2grid,
     )
-    trimesh.exchange.export.export_mesh(mesh_error, output_dir / f"{str(pred_path.parent).split('/')[-1].replace('.', '_')}_{pred_path.stem}_{pred_path_ind}_tf_mask.ply")
+    trimesh.exchange.export.export_mesh(
+        mesh_error,
+        output_dir
+        / f"{str(pred_path.parent).split('/')[-1].replace('.', '_')}_{pred_path.stem}_{pred_path_ind}_tf_mask.ply",
+    )

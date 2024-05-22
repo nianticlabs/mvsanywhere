@@ -329,12 +329,12 @@ def main(opts):
                         0.1,
                         10.0,
                         render_height,
-                        render_width ,
+                        render_width,
                     )
 
-                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True, 
-                                                          min_bounds_3=min_bounds_3, 
-                                                          max_bounds_3=max_bounds_3)
+                    mesh, _, _ = fuser.get_mesh_pytorch3d(
+                        scale_to_world=True, min_bounds_3=min_bounds_3, max_bounds_3=max_bounds_3
+                    )
 
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s0_b44"].clone()
