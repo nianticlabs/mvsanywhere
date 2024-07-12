@@ -538,7 +538,7 @@ class DepthModelCVHint(pl.LightningModule):
 
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)
-        
+
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
         cv_min = outputs["lowest_cost_bhw"]

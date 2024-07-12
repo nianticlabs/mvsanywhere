@@ -240,7 +240,6 @@ def main(opts):
                     color_frame,
                 )
 
-
             pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
 
             ######################### Run inference again with mesh hint. #########################
