@@ -34,13 +34,13 @@ class Options:
     dataset: str = "scannet"
 
     # base dataset path.
-    dataset_path: str = "/mnt/scannet-data-png"
+    dataset_path: str = "/datasets/scannetv2"
 
     # number of dataloader workers to use.
     num_workers: int = 12
 
     # where to look for a tuple file.
-    tuple_info_file_location: str = "/mnt/res_nas/mohameds/implicit_recon/multi_view_data/scannet/"
+    tuple_info_file_location: str = "data_splits/ScanNetv2/standard_split/"
 
     # the suffix of a tuple filename, which is concatenated to the split to get
     # the final tuple filename.
@@ -60,7 +60,7 @@ class Options:
 
     # file listing scans to use, since we use tuple files for dataloading, this
     # is only relevant for generating tuple files and certain script guidance.
-    dataset_scan_split_file: str = "/mnt/scannet-data-png2/scannetv2_train.txt"
+    dataset_scan_split_file: str = "data_splits/ScanNetv2/standard_split/scannetv2_train.txt"
 
     # the split to use, script dependant.
     split: str = "train"

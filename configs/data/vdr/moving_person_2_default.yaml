@@ -1,9 +1,0 @@
-!!python/object:doubletake.options.Options
-dataset_path: /mnt/nas/personal/mohameds/vdr/
-tuple_info_file_location: /mnt/nas/personal/mohameds/vdr/tuples/moving_person_2
-dataset_scan_split_file: /mnt/nas/personal/mohameds/vdr/moving_person_2.txt
-dataset: vdr
-mv_tuple_file_suffix: _eight_view_deepvmvs.txt
-num_images_in_tuple: 8
-frame_tuple_type: default
-split: test

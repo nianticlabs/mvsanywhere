@@ -240,17 +240,8 @@ def main(opts):
                     color_frame,
                 )
 
-            # tsdf_pred = TSDF.from_file(f"/mnt/nas3/personal/mohameds/geometry_hints/outputs/hero_model_fast/scannet/default/meshes/0.04_3.0_ours/{scan}_tsdf.npz")
-            # tsdf_pred.cuda()
-            # hint_fuser.tsdf_fuser_pred.tsdf = tsdf_pred
-            pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
 
-            # scene_trimesh_mesh = hint_fuser.get_mesh(convert_to_trimesh=True)
-            # pytorch_hint_mesh = Meshes(
-            #     verts=[torch.tensor(scene_trimesh_mesh.vertices).float()],
-            #     faces=[torch.tensor(scene_trimesh_mesh.faces).float()],
-            # )
-            # pytorch_hint_mesh = pytorch_hint_mesh.cuda()
+            pytorch_hint_mesh, _, _ = hint_fuser.get_mesh_pytorch3d(scale_to_world=True)
 
             ######################### Run inference again with mesh hint. #########################
             # initialize scene averager

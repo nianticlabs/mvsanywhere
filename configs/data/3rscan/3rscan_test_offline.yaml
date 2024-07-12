@@ -1,5 +1,5 @@
 !!python/object:doubletake.options.Options
-dataset_path: /mnt/nas3/shared/datasets/academic_use_only/3RScan
+dataset_path: /datasets/3RScan
 tuple_info_file_location: data_splits/3rscan/
 dataset_scan_split_file: data_splits/3rscan/3rscan_test.txt
 dataset: 3rscan
