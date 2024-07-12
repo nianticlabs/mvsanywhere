@@ -455,7 +455,7 @@ class FastFeatureVolumeManager(FeatureVolumeManager):
             src_Ks: source image inverse intrinsics - B x num_src_frames x 4 x 4
             cur_invK: current image inverse intrinsics - B x 4 x 4
             depth_plane_bdhw: depth planes to use for every spatial location.
-                For SimpleRecon, this will be the same value at each location at
+                For DoubleTake, this will be the same value at each location at
                 each plane.
             batch_size: the batch size.
             num_src_frames: number of source views.

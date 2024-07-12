@@ -146,7 +146,7 @@ class Options:
 
     ################################# Inference ################################
     # base paths for all outputs.
-    output_base_path: str = "/mnt/res_nas/mohameds/simple_recon_output/"
+    output_base_path: str = "results"
 
     # should we run fusion on predicted depths in test.py?
     run_fusion: bool = False
@@ -231,10 +231,7 @@ class Options:
     fill_depth_hints: bool = False
     depth_hint_aug: float = 0.0
     depth_hint_dir: str = None
-    plane_sweep_ablation_ratio: float = 0.0
     load_empty_hint: bool = False
-    null_plane_sweep: bool = False
-    wiggle_render_pose: bool = False
 
 
 class OptionsHandler:

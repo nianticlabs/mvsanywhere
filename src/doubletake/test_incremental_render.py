@@ -94,8 +94,6 @@ def main(opts):
     model = load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
-    model.run_opts.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
-
     # setting up overall result averagers
     all_frame_metrics = None
     all_scene_metrics = None
@@ -156,8 +154,6 @@ def main(opts):
             # initialize scene averager
             scene_frame_metrics = ResultsAverager(opts.name, f"scene {scan} metrics")
 
-            # render_height = int(192/2)
-            # render_width = int(256/2)
             render_height = dataset.image_height // 2
             render_width = dataset.image_width // 2
 
@@ -231,16 +227,6 @@ def main(opts):
                     cam_points_b4N = backprojector(rendered_depth_b1hw, cur_data["invK_s0_b44"])
                     # transform to world
                     pose_to_use = cur_data["world_T_cam_b44"].clone()
-                    if opts.wiggle_render_pose:
-                        rand_t = (torch.randn(3) * 0.04).type_as(pose_to_use)
-                        rand_rot = torch.randn(3) * 0.03
-                        rot_mat = torch.tensor(
-                            rotx(rand_rot[0]) @ roty(rand_rot[1]) @ rotz(rand_rot[2])
-                        ).type_as(pose_to_use)
-                        rand_T = torch.eye(4).cuda().type_as(pose_to_use)
-                        rand_T[:3, :3] = rot_mat
-                        rand_T[:3, 3] = rand_t
-                        pose_to_use = rand_T.unsqueeze(0) @ pose_to_use
 
                     world_points_b4N = pose_to_use @ cam_points_b4N
 
@@ -293,7 +279,6 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
-                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()

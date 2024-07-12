@@ -1,4 +1,5 @@
 import torch
+from loguru import logger
 
 import doubletake.modules.feature_volume as feature_volume
 import doubletake.modules.mesh_hint_volume as mesh_hint_volume
@@ -15,7 +16,7 @@ def load_model_inference(opts, model_class_to_use):
             opts.load_weights_from_checkpoint, args=None
         )
     except:
-        print("Failed to load model normally. Using manual loading via state_dict.")
+        logger.info("Failed to load model normally. Using manual loading via state_dict.")
         model = model_class_to_use(opts)
         model.load_state_dict(torch.load(opts.load_weights_from_checkpoint)["state_dict"])
 
@@ -30,14 +31,14 @@ def load_model_inference(opts, model_class_to_use):
 def load_model_training(opts, model_class_to_use):
     """Loads a model for training."""
     if opts.load_weights_from_checkpoint is not None:
-        print(f"Loading weights from {opts.load_weights_from_checkpoint}.")
+        logger.info(f"Loading weights from {opts.load_weights_from_checkpoint}.")
         model = model_class_to_use.load_from_checkpoint(
             opts.load_weights_from_checkpoint,
             opts=opts,
             args=None,
         )
     elif opts.lazy_load_weights_from_checkpoint is not None:
-        print(f"Lazy loading weights from {opts.lazy_load_weights_from_checkpoint}.")
+        logger.info(f"Lazy loading weights from {opts.lazy_load_weights_from_checkpoint}.")
         model = model_class_to_use(opts)
         state_dict = torch.load(opts.lazy_load_weights_from_checkpoint)["state_dict"]
         available_keys = list(state_dict.keys())
@@ -52,9 +53,9 @@ def load_model_training(opts, model_class_to_use):
 
                     model.state_dict()[param_key].copy_(param)
                 except:
-                    print(f"WARNING: could not load weights for {param_key}")
+                    logger.info(f"WARNING: could not load weights for {param_key}")
     else:
-        print("No weights loaded. Instantiating new model.")
+        logger.info("No weights loaded. Instantiating new model.")
         model = model_class_to_use(opts)
 
     return model

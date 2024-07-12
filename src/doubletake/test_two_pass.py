@@ -95,8 +95,6 @@ def main(opts):
     model = load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
-    model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
-
     # setting up overall result averagers
     all_frame_metrics = None
     all_scene_metrics = None
@@ -180,7 +178,6 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
-                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()
@@ -377,7 +374,6 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
-                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()

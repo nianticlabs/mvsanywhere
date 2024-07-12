@@ -1,8 +1,6 @@
 from typing import List, Optional, Tuple
 
 import torch
-from pytorch3d import _C
-from pytorch3d.ops.marching_cubes_data import EDGE_TO_VERTICES, FACE_TABLE, INDEX
 from pytorch3d.transforms import Translate
 from torch.autograd import Function
 from torch.utils.cpp_extension import load

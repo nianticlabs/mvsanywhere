@@ -95,8 +95,6 @@ def main(opts):
     model = load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
-    model.plane_sweep_ablation_ratio = opts.plane_sweep_ablation_ratio
-
     # setting up overall result averagers
     all_frame_metrics = None
     all_scene_metrics = None
@@ -190,7 +188,6 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
-                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()
@@ -350,18 +347,12 @@ def main(opts):
                     sampled_weights_N = hint_fuser.sample_tsdf(
                         world_points_4N[:3, :].transpose(0, 1),
                         what_to_sample="weights",
-                        # sampling_method="nearest",
                     )
                     sampled_weights_N_list.append(sampled_weights_N)
 
-                # sampled_weights_b1hw = sampled_weights_N.view(1, 1, render_height, render_width)
                 sampled_weights_b1hw = torch.stack(sampled_weights_N_list, 0).view(
                     cur_data["image_b3hw"].shape[0], 1, render_height, render_width
                 )
-
-                # cur_data["depth_hint_b1hw"][sampled_weights_b1hw < 0.025] = float("nan")
-                # cur_data["depth_hint_mask_b_b1hw"] = ~torch.isnan(cur_data["depth_hint_b1hw"])
-                # cur_data["depth_hint_mask_b1hw"] = cur_data["depth_hint_mask_b_b1hw"].float()
 
                 sampled_weights_b1hw[~cur_data["depth_hint_mask_b_b1hw"]] = 0.0
                 cur_data["sampled_weights_b1hw"] = sampled_weights_b1hw
@@ -381,7 +372,6 @@ def main(opts):
                     src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
-                    null_plane_sweep=opts.null_plane_sweep,
                 )
                 end_time.record()
                 torch.cuda.synchronize()

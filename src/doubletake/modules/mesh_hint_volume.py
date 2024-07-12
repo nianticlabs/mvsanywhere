@@ -203,12 +203,6 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
 
         depth_hint_sampled_weights_b1hw[~prev_mesh_hint_depth_mask_b1hw] = 0
 
-        # handle plane sweep ignore
-        plane_sweep_ignore_b = cv_depth_hint_dict["plane_sweep_ignore_b"]
-        nuke_mask_b = torch.ones_like(plane_sweep_ignore_b)
-        nuke_mask_b[plane_sweep_ignore_b] = 0.0
-        nuke_mask_b = nuke_mask_b.view(nuke_mask_b.shape[0], 1, 1, 1)
-
         all_dps = []
         # Intialize the cost volume and the countsx
         # loop through depth planes
@@ -375,10 +369,6 @@ class FeatureMeshHintVolumeManager(CostVolumeManager):
             # run through the MLP!
             mlp_input_features_bhwc = mlp_input_features_bchw.permute(0, 2, 3, 1)
             plane_sweep_features_bhw1 = self.mlp(mlp_input_features_bhwc)
-
-            if not nuke_mask_b.all():
-                # handle plane sweep ignore
-                plane_sweep_features_bhw1 = plane_sweep_features_bhw1 * nuke_mask_b
 
             feature_b1hw = (
                 self.hint_mlp(
@@ -555,7 +545,7 @@ class FastFeatureMeshHintVolumeManager(FeatureMeshHintVolumeManager):
             src_Ks: source image inverse intrinsics - B x num_src_frames x 4 x 4
             cur_invK: current image inverse intrinsics - B x 4 x 4
             depth_plane_bdhw: depth planes to use for every spatial location.
-                For SimpleRecon, this will be the same value at each location at
+                For DoubleTake, this will be the same value at each location at
                 each plane.
             batch_size: the batch size.
             num_src_frames: number of source views.
@@ -773,12 +763,6 @@ class FastFeatureMeshHintVolumeManager(FeatureMeshHintVolumeManager):
             mode="nearest",
         ).bool()
 
-        # handle plane sweep ignore
-        # plane_sweep_ignore_b = cv_depth_hint_dict["plane_sweep_ignore_b"]
-        # nuke_mask_b = torch.ones_like(plane_sweep_ignore_b)
-        # nuke_mask_b[plane_sweep_ignore_b] = 0.0
-        # nuke_mask_b = nuke_mask_b.view(current_hint_map_bdhw, 1, 1, 1)
-
         # get poses distances
         frame_penalty_B, r_measure_B, t_measure_B = pose_distance(tensor_bM_to_B(src_poses))
 
@@ -932,9 +916,6 @@ class FastFeatureMeshHintVolumeManager(FeatureMeshHintVolumeManager):
                 dim=-1,
             )
         )
-        # if not nuke_mask_b.all():
-        #     # handle plane sweep ignore
-        #     plane_sweep_features_bhw1 = plane_sweep_features_bhw1 * nuke_mask_b
 
         feature_volume_bdhw = einops.rearrange(
             combined_output_Bhw1,

@@ -155,7 +155,7 @@ class CostVolumeManager(nn.Module):
             src_Ks: source image inverse intrinsics - B x num_src_frames x 4 x 4
             cur_invK: current image inverse intrinsics - B x 4 x 4
             depth_plane_b1hw: depth plane to use for every spatial location. For
-                SimpleRecon, this will be the same value at each location.
+                DoubleTake, this will be the same value at each location.
             batch_size: the batch size.
             num_src_frames: number of source views.
             num_feat_channels: number of feature channels for feature maps.

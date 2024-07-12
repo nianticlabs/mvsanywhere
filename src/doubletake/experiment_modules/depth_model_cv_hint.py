@@ -38,14 +38,9 @@ logger = logging.getLogger(__name__)
 
 
 class DepthModelCVHint(pl.LightningModule):
-    """Class for SimpleRecon depth estimators.
+    """Class for DoubleTake depth estimators.
 
-    This class handles training and inference for SimpleRecon models.
-
-    Depth maps will be predicted
-
-    It houses experiments for a vanilla cost volume that uses dot product
-    reduction and the full feature volume.
+    This class handles training and inference for DoubleTake models.
 
     It also allows for experimentation on the type of image encoder.
 
@@ -184,19 +179,11 @@ class DepthModelCVHint(pl.LightningModule):
             self.run_opts.image_width // 2,
         )
 
-        # what type of cost volume are we using?
-        if self.run_opts.feature_volume_type == "simple_cost_volume":
-            cost_volume_class = CostVolumeManager
-        elif self.run_opts.feature_volume_type == "mlp_feature_volume":
-            cost_volume_class = FeatureVolumeManager
-        elif self.run_opts.feature_volume_type == "mlp_hint_feature_volume":
-            cost_volume_class = FeatureHintVolumeManager
-        elif self.run_opts.feature_volume_type == "mlp_mesh_hint_feature_volume":
+        if self.run_opts.feature_volume_type == "mlp_mesh_hint_feature_volume":
             cost_volume_class = FeatureMeshHintVolumeManager
         else:
             raise ValueError(
-                f"Unrecognized option {self.run_opts.feature_volume_type} "
-                f"for feature volume type!"
+                f"DoubleTake uses mlp_mesh_hint_feature_volume as feature volume. You selected {self.run_opts.feature_volume_type}, which is not the default "
             )
 
         self.cost_volume = cost_volume_class(
@@ -245,7 +232,7 @@ class DepthModelCVHint(pl.LightningModule):
             cur_image: image tensor of shape B3HW for the reference image.
             src_image: images tensor of shape BM3HW for the source images.
             unbatched_matching_encoder_forward: disable batching and loops
-                through iamges to compute feaures.
+                through images to compute feaures.
         Returns:
             matching_cur_feats: tensor of matching features of size bchw for
                 the reference current image.
@@ -285,7 +272,6 @@ class DepthModelCVHint(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
-        null_plane_sweep=False,
     ):
         """
         Computes a forward pass through the depth model.
@@ -378,26 +364,6 @@ class DepthModelCVHint(pl.LightningModule):
         # Compute image features for the current view. Used for a strong image
         # prior.
         cur_feats = self.encoder(cur_image)
-
-        # # this gets a mask for those batches that have a hint
-        # available_hint_b = torch.any(cur_data["depth_hint_mask_b_b1hw"].flatten(1), 1)
-        # # get the chance of ablating plane sweep
-        # plane_sweep_ablation_ratio = getattr(self.run_opts, "plane_sweep_ablation_ratio", 0.0)
-        # # randomly ablate plane sweep for batches that have a hint. This mask is true when plane sweep should be ignored.
-        # plane_sweep_ablate_b = (torch.rand(available_hint_b.shape) < plane_sweep_ablation_ratio).to(
-        #     available_hint_b.device
-        # )
-        # # Get the final mask for plane sweep.
-        # # True when we have a hint and we flipped a coin and it came out to ignore.
-        # plane_sweep_ignore_b = torch.logical_and(available_hint_b, plane_sweep_ablate_b)
-
-        if null_plane_sweep:
-            assert phase != "train"
-            plane_sweep_ignore_b = torch.ones(cur_image.shape[0]).bool().to(cur_image.device)
-        else:
-            plane_sweep_ignore_b = torch.zeros(cur_image.shape[0]).bool().to(cur_image.device)
-
-        cur_data["plane_sweep_ignore_b"] = plane_sweep_ignore_b
 
         matching_cur_feats, matching_src_feats = self.compute_matching_feats(
             cur_image, src_image, unbatched_matching_encoder_forward
@@ -571,10 +537,8 @@ class DepthModelCVHint(pl.LightningModule):
                 )
 
         # forward pass through the model.
-        outputs = self(
-            phase, cur_data, src_data, null_plane_sweep=dataloader_idx == 3 and phase != "train"
-        )
-
+        outputs = self(phase, cur_data, src_data)
+        
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
         cv_min = outputs["lowest_cost_bhw"]
@@ -585,7 +549,6 @@ class DepthModelCVHint(pl.LightningModule):
 
         depth_hint = cur_data["depth_hint_b1hw"]
         hint_mask = cur_data["depth_hint_mask_b1hw"]
-        hint_mask_b = cur_data["depth_hint_mask_b_b1hw"]
         sampled_weights_1hw = cur_data["sampled_weights_b1hw"]
 
         # estimate normals for groundtruth
@@ -679,16 +642,6 @@ class DepthModelCVHint(pl.LightningModule):
                     on_epoch=not is_train,
                     add_dataloader_idx=False,
                 )
-
-            # log plane sweep ignore mask
-            self.log(
-                f"{prefix}/plane_sweep_ignore_mask",
-                torch.mean(cur_data["plane_sweep_ignore_b"].float()),
-                sync_dist=True,
-                on_step=is_train,
-                on_epoch=not is_train,
-                add_dataloader_idx=False,
-            )
 
             # high_res_validation: it isn't always wise to load in high
             # resolution depth maps so this is an optional flag.
