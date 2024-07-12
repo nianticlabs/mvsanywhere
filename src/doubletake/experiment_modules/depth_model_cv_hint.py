@@ -12,8 +12,7 @@ from doubletake.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from doubletake.modules.cost_volume import CostVolumeManager
-from doubletake.modules.feature_volume import FeatureVolumeManager
+
 from doubletake.modules.layers import TensorFormatter
 from doubletake.modules.mesh_hint_volume import FeatureMeshHintVolumeManager
 from doubletake.modules.networks import (
@@ -23,7 +22,6 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.one_frame_hint_volume import FeatureHintVolumeManager
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
