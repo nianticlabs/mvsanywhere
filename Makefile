@@ -22,7 +22,6 @@ create-mamba-env:
 	@mamba env create -f environment.yml -n "$(MAMBA_ENV_NAME)"
 	@echo -e " Mamba env created!"
 	@echo "Installing pip dependencies..."
-	@mamba run --live-stream -n "$(MAMBA_ENV_NAME)" PIP_CONFIG_FILE=pip.conf pip install --timeout=60 --retries 10 -r requirements.txt
 	@echo -e "🎉🎉 Your new $(MAMBA_ENV_NAME) mamba environment is ready to be used 🎉🎉"
 
 
