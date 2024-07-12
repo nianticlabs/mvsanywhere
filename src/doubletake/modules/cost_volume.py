@@ -3,10 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from doubletake.utils.geometry_utils import (
-    BackprojectDepth,
-    Project3D,
-)
+from doubletake.utils.geometry_utils import BackprojectDepth, Project3D
 
 
 class CostVolumeManager(nn.Module):

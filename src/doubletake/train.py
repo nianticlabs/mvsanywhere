@@ -187,16 +187,13 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
     return train_dataloader, val_dataloaders
 
 
-def prepare_callbacks(
-    opts: options.Options, enable_version_counter: bool = True, is_resume: bool = False
-) -> List[pl.pytorch.callbacks.Callback]:
+def prepare_callbacks(opts: options.Options) -> List[pl.pytorch.callbacks.Callback]:
     """Prepare callbacks for the training.
     In our case, callbacks are the strategy used to save checkpoints during training and the
     learning rate monitoring.
 
     Params:
         opts: options for the current run
-        enable_version_counter: if True, save checkpoints with lightning versioning
     Returns:
         a list of callbacks
     """

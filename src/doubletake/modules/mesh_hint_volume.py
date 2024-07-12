@@ -5,15 +5,8 @@ from torch import Tensor
 
 from doubletake.modules.cost_volume import CostVolumeManager
 from doubletake.modules.networks import MLP
-from doubletake.utils.generic_utils import (
-    combine_dims,
-    tensor_B_to_bM,
-    tensor_bM_to_B,
-)
-from doubletake.utils.geometry_utils import (
-    get_camera_rays,
-    pose_distance,
-)
+from doubletake.utils.generic_utils import combine_dims, tensor_B_to_bM, tensor_bM_to_B
+from doubletake.utils.geometry_utils import get_camera_rays, pose_distance
 
 
 class FeatureMeshHintVolumeManager(CostVolumeManager):

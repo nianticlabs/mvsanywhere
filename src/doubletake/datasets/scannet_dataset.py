@@ -3,7 +3,6 @@ import os
 import numpy as np
 import PIL.Image as pil
 import torch
-from torchvision import transforms
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 from doubletake.utils.generic_utils import read_image_file, readlines
@@ -597,14 +596,7 @@ class ScannetDataset(GenericMVSDataset):
             depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_1hw).bool()
             sampled_weights_1hw = torch.zeros_like(depth_hint_1hw)
         else:
-            # depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id)
-            # depth_hint_1hw = depth
-            # depth_hint_mask_1hw = mask
-            # depth_hint_mask_b_1hw = mask_b
-            # sampled_weights_1hw = (depth_hint_mask_1hw > 0).float()
-
             partial_hint = torch.rand(1).item() < 0.5 and self.split != "test"
-            # partial_hint = False
 
             if partial_hint:
                 depth_hint_root = self.depth_hint_dir.replace("/renders", "/partial_renders")
@@ -630,12 +622,6 @@ class ScannetDataset(GenericMVSDataset):
                 depth_hint_mask_1hw = torch.flip(depth_hint_mask_1hw, (-1,))
                 depth_hint_mask_b_1hw = torch.flip(depth_hint_mask_b_1hw, (-1,))
                 sampled_weights_1hw = torch.flip(sampled_weights_1hw, (-1,))
-
-            if mark_all_empty:
-                depth_hint_mask_1hw = torch.zeros_like(depth_hint_mask_1hw)
-                depth_hint_mask_b_1hw = torch.zeros_like(depth_hint_mask_b_1hw).bool()
-                depth_hint_1hw[:] = torch.nan
-                sampled_weights_1hw = torch.zeros_like(sampled_weights_1hw)
 
         depth_hint_dict["depth_hint_b1hw"] = depth_hint_1hw
         depth_hint_dict["depth_hint_mask_b1hw"] = depth_hint_mask_1hw

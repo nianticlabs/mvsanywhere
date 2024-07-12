@@ -17,10 +17,7 @@ from doubletake.utils.metrics_utils import (
 )
 from doubletake.utils.model_utils import get_model_class, load_model_inference
 from doubletake.utils.rendering_utils import PyTorch3DMeshDepthRenderer
-from doubletake.utils.visualization_utils import (
-    load_and_merge_images,
-    quick_viz_export,
-)
+from doubletake.utils.visualization_utils import load_and_merge_images, quick_viz_export
 
 
 def main(opts):
