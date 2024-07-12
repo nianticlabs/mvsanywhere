@@ -24,9 +24,6 @@ This code is for non-commercial use; please see the [license file](LICENSE) for 
   * [💾 ScanNetv2 Dataset](#-scannetv2-dataset)
   * [📊 Testing and Evaluation](#-testing-and-evaluation)
   * [📊 Mesh Metrics](#-mesh-metrics)
-  * [⏳ Training](#-training)
-    + [🎛️ Finetuning a pretrained model](#%EF%B8%8F-finetuning-a-pretrained-model)
-  * [🔧 Other training and testing options](#-other-training-and-testing-options)
   * [📝🧮👩‍💻 Notation for Transformation Matrices](#-notation-for-transformation-matrices)
   * [🗺️ World Coordinate System](#%EF%B8%8F-world-coordinate-system)
   * [🙏 Acknowledgements](#-acknowledgements)
@@ -271,51 +268,6 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
 We use TransformerFusion's [mesh evaluation](https://github.com/AljazBozic/TransformerFusion/blob/main/src/evaluation/eval.py) for our main results table but set the seed to a fixed value for consistency when randomly sampling meshes. We also report mesh metrics using NeuralRecon's [evaluation](https://github.com/zju3dv/NeuralRecon/blob/master/tools/evaluation.py) in the supplemental material.
 
 For point cloud evaluation, we use TransformerFusion's code but load in a point cloud in place of sampling a mesh's surface.
-
-
-
-## ⏳ Training
-
-By default models and tensorboard event files are saved to `~/tmp/tensorboard/<model_name>`.
-This can be changed with the `--log_dir` flag.
-
-We train with a batch_size of 16 with 16-bit precision on two A100s on the default ScanNetv2 split.
-
-Example command to train with two GPUs:
-```shell
-CUDA_VISIBLE_DEVICES=0,1 python train.py --name HERO_MODEL \
-            --log_dir logs \
-            --config_file configs/models/hero_model.yaml \
-            --data_config configs/data/scannet_default_train.yaml \
-            --gpus 2 \
-            --batch_size 16;
-```
-
-
-The code supports any number of GPUs for training.
-You can specify which GPUs to use with the `CUDA_VISIBLE_DEVICES` environment.
-
-All our training runs were performed on two NVIDIA A100s.
-
-**Different dataset**
-
-You can train on a custom MVS dataset by writing a new dataloader class which inherits from `GenericMVSDataset` at `datasets/generic_mvs_dataset.py`. See the `ScannetDataset` class in `datasets/scannet_dataset.py` or indeed any other class in `datasets` for an example.
-
-
-### 🎛️ Finetuning a pretrained model
-
-To finetune, simple load a checkpoint (not resume!) and train from there:
-```shell
-CUDA_VISIBLE_DEVICES=0 python train.py --config configs/models/hero_model.yaml
-                --data_config configs/data/scannet_default_train.yaml 
-                --load_weights_from_checkpoint weights/hero_model.ckpt
-```
-
-Change the data configs to whatever dataset you want to finetune to. 
-
-## 🔧 Other training and testing options
-
-See `options.py` for the range of other training options, such as learning rates and ablation settings, and testing options.
 
 
 ## 📝🧮👩‍💻 Notation for Transformation Matrices
