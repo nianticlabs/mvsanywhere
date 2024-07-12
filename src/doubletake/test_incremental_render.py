@@ -199,18 +199,19 @@ def main(opts):
                 if batch_ind * opts.batch_size > 0:
                     hint_start_time.record()
 
-                    min_bounds_3, max_bounds_3 = get_frustum_bounds(
-                        cur_data["invK_s0_b44"],
-                        cur_data["world_T_cam_b44"],
-                        0.1,
-                        10.0,
-                        render_height,
-                        render_width,
-                    )
+                    # min_bounds_3, max_bounds_3 = get_frustum_bounds(
+                    #     cur_data["invK_s0_b44"],
+                    #     cur_data["world_T_cam_b44"],
+                    #     0.1,
+                    #     10.0,
+                    #     render_height,
+                    #     render_width,
+                    # )
 
-                    mesh, _, _ = fuser.get_mesh_pytorch3d(
-                        scale_to_world=True, min_bounds_3=min_bounds_3, max_bounds_3=max_bounds_3
-                    )
+                    # mesh, _, _ = fuser.get_mesh_pytorch3d(
+                    #     scale_to_world=True, min_bounds_3=min_bounds_3, max_bounds_3=max_bounds_3
+                    # )
+                    mesh, _, _ = fuser.get_mesh_pytorch3d(scale_to_world=True)
 
                     # renderer expects normalized intrinsics.
                     K_b44 = cur_data["K_s0_b44"].clone()
