@@ -23,7 +23,6 @@ This code is for non-commercial use; please see the [license file](LICENSE) for 
   * [🏃 Running out of the box!](#-running-out-of-the-box)
   * [💾 ScanNetv2 Dataset](#-scannetv2-dataset)
   * [📊 Testing and Evaluation](#-testing-and-evaluation)
-  * [👉☁️ Point Cloud Fusion](#%EF%B8%8F-point-cloud-fusion)
   * [📊 Mesh Metrics](#-mesh-metrics)
   * [⏳ Training](#-training)
     + [🎛️ Finetuning a pretrained model](#%EF%B8%8F-finetuning-a-pretrained-model)
@@ -266,22 +265,6 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --dump_depth_visualization \
             --batch_size 4;
 ```
-## 👉☁️ Point Cloud Fusion
-
-We also allow point cloud fusion of depth maps using the fuser from 3DVNet's [repo](https://github.com/alexrich021/3dvnet/blob/main/mv3d/eval/pointcloudfusion_custom.py). 
-
-```bash
-# Example command to fuse depths into point clouds.
-CUDA_VISIBLE_DEVICES=0 python pc_fusion.py --name HERO_MODEL \
-            --output_base_path OUTPUT_PATH \
-            --config_file configs/models/hero_model.yaml \
-            --load_weights_from_checkpoint weights/hero_model.ckpt \
-            --data_config configs/data/scannet_dense_test.yaml \
-            --num_workers 8 \
-            --batch_size 4;
-```
-
-Change `configs/data/scannet_dense_test.yaml` to `configs/data/scannet_default_test.yaml` to use keyframes only if you don't want to wait too long.
 
 ## 📊 Mesh Metrics
 
@@ -355,7 +338,6 @@ We thank Aljaž Božič of [TransformerFusion](https://github.com/AljazBozic/Tra
 
 The tuple generation scripts make heavy use of a modified version of DeepVideoMVS's [Keyframe buffer](https://github.com/ardaduz/deep-video-mvs/blob/master/dvmvs/keyframe_buffer.py) (thanks again Arda and co!).
 
-The PyTorch point cloud fusion module at `torch_point_cloud_fusion` code is borrowed from 3DVNet's [repo](https://github.com/alexrich021/3dvnet/blob/main/mv3d/eval/pointcloudfusion_custom.py). Thanks Alexander Rich!
 
 We'd also like to thank Niantic's infrastructure team for quick actions when we needed them. Thanks folks!
 
