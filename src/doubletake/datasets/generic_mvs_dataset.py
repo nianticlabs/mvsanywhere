@@ -62,7 +62,6 @@ class GenericMVSDataset(Dataset):
         image_depth_ratio=2,
         include_full_res_depth=False,
         include_full_depth_K=False,
-        color_transform=transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
         shuffle_tuple=False,
         pass_frame_id=False,
         skip_frames=None,
@@ -103,8 +102,6 @@ class GenericMVSDataset(Dataset):
                 size (image_height, image_width)/image_depth_ratio.
             include_full_res_depth: if true will return depth maps from the
                 dataset at the highest resolution available.
-            color_transform: optional color transform that applies when split is
-                "train".
             shuffle_tuple: by default source images will be ordered according to
                 overall pose distance to the reference image. When this flag is
                 true, source images will be shuffled. Only used for ablation.
@@ -190,8 +187,6 @@ class GenericMVSDataset(Dataset):
                     "Only basic dataloader functions are available. ".center(80, "#")
                 )
                 print(f"".center(80, "#"), "\n")
-
-        self.color_transform = color_transform
 
         self.image_width = image_width
         self.image_height = image_height
@@ -562,10 +557,6 @@ class GenericMVSDataset(Dataset):
 
         # Load image
         image = self.load_color(scan_id, frame_id)
-
-        # # Augment images
-        # if self.split == "train":
-        #     image = self.color_transform(image)
 
         if self.rotate_images:
             image = torch.rot90(image, 3, [1, 2])

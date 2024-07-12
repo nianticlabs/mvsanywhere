@@ -85,7 +85,6 @@ class ThreeRScanDataset(GenericMVSDataset):
         include_full_res_depth=False,
         limit_to_scan_id=None,
         num_images_in_tuple=None,
-        color_transform=transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
         tuple_info_file_location=None,
         image_height=384,
         image_width=512,
@@ -116,7 +115,6 @@ class ThreeRScanDataset(GenericMVSDataset):
             include_full_res_depth=include_full_res_depth,
             limit_to_scan_id=limit_to_scan_id,
             num_images_in_tuple=num_images_in_tuple,
-            color_transform=color_transform,
             tuple_info_file_location=tuple_info_file_location,
             image_height=image_height,
             image_width=image_width,
@@ -164,8 +162,6 @@ class ThreeRScanDataset(GenericMVSDataset):
                 size (image_height, image_width)/image_depth_ratio.
             include_full_res_depth: if true will return depth maps from the 
                 dataset at the highest resolution available.
-            color_transform: optional color transform that applies when split is
-                "train".
             shuffle_tuple: by default source images will be ordered according to 
                 overall pose distance to the reference image. When this flag is
                 true, source images will be shuffled. Only used for ablation.
