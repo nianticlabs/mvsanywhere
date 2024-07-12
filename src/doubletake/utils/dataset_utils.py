@@ -1,10 +1,7 @@
 import os
 from pathlib import Path
 
-from doubletake.datasets.arkit_dataset import ARKitDataset
-from doubletake.datasets.colmap_dataset import ColmapDataset
 from doubletake.datasets.scannet_dataset import ScannetDataset
-from doubletake.datasets.scanniverse_dataset import ScanniverseDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
 from doubletake.datasets.vdr_dataset import VDRDataset

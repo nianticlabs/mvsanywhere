@@ -15,7 +15,7 @@ def run():
     "--checkpoint",
     help="Path to the model checkpoint to use",
     type=Path,
-    default=Path("checkpoints/.ckpt"),
+    default=Path("checkpoints/doubletake_model.ckpt"),
 )
 @click.option(
     "--output-dir",
@@ -23,15 +23,37 @@ def run():
     type=Path,
     default=Path("results"),
 )
-def evalute_incremental_render(checkpoint: str, output_dir: Path):
-    logger.info("Generating TSDFs and 2D embeddings using our model for each scan")
+def incremental(checkpoint: str, output_dir: Path):
+    logger.info("Evaluating the model in incremental mode")
     subprocess.run(
         [
             "python",
             "-m",
             "doubletake.test_incremental_render",
-            f"load_weights_from_checkpoint={str(checkpoint)}",
-            f"output_base_path={output_dir}",
-            "cache_depths=False",
-        ]
+            "--config_file",
+            "configs/models/doubletake_model.yaml",
+            "--data_config",
+            "configs/data/scannet_default_test.yaml",
+            "--load_weights_from_checkpoint",
+            f"{str(checkpoint)}",
+            "--batch_size",
+            "1",
+            "--output_base_path",
+            f"{str(output_dir)}",
+            "--depth_hint_aug",     ## we want to use hints
+            "0.0",
+            "--load_empty_hint",    ## we don't have hints in advance
+            "--name",
+            "incremental",  
+            "--run_fusion",     ## we want to build the mesh while we go
+            "--fusion_resolution",
+            "0.02",
+            "--extended_neg_truncation",
+            "--num_workers",
+            str(12),
+        ],
+        check=True
     )
+
+if __name__ == "__main__":
+    run()
