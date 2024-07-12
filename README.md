@@ -1,4 +1,4 @@
-# GeometryHints
+# DoubleTake: Geometry Guided Depth Estimation
 
 ## Installation
 

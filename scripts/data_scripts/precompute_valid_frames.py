@@ -10,7 +10,7 @@
         --split test
     
     where scannet_default_test.yaml looks like: 
-        !!python/object:geometryhints.options.Options
+        !!python/object:doubletake.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: SCANNET_PATH/tuples
         dataset_scan_split_file: SCANNET_PATH/scannetv2_test.txt
@@ -27,7 +27,6 @@
 """
 
 import os
-import sys
 
 import random
 import string
@@ -37,8 +36,8 @@ from multiprocessing.pool import Pool
 from pathlib import Path
 
 import numpy as np
-import geometryhints.options as options
-from geometryhints.utils.dataset_utils import get_dataset
+import doubletake.options as options
+from doubletake.utils.dataset_utils import get_dataset
 
 
 def process_scan(opts_temp_filepath, scan, count, progress):

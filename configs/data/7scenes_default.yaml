@@ -1,4 +1,4 @@
-!!python/object:geometryhints.options.Options
+!!python/object:doubletake.options.Options
 dataset_path: /mnt/nas/personal/mohameds/7scenes/7scenes
 tuple_info_file_location: data_splits/7Scenes/dvmvs_split/
 dataset_scan_split_file: data_splits/7Scenes/dvmvs_split/dvmvs_test_split.txt

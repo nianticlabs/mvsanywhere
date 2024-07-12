@@ -1,4 +1,4 @@
-!!python/object:geometryhints.options.Options
+!!python/object:doubletake.options.Options
 dataset_path: /mnt/nas3/personal/mfirman/data/geometryhints_test_data
 tuple_info_file_location: /mnt/nas3/personal/mfirman/data/geometryhints_test_data/tuples
 dataset_scan_split_file: /mnt/nas3/personal/mfirman/data/geometryhints_test_data/landscape_files.txt

@@ -1,16 +1,13 @@
 *.pyc
 .vscode/
-debug_scripts/
 logs/
 logs
 models/*.ckpt
 weights/*.ckpt
 **__pycache__**
 
-debug_scripts
 logs
 results
-debug_dump
 
 .mypy_cache
 

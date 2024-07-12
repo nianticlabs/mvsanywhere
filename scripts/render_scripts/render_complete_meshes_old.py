@@ -5,22 +5,21 @@ import torch
 from pathlib import Path
 
 import trimesh
-from geometryhints.options import OptionsHandler
-from geometryhints.tools.tsdf import TSDF
-from geometryhints.utils.dataset_utils import get_dataset
-from geometryhints.utils.generic_utils import readlines
-import os
+from doubletake.options import OptionsHandler
+from doubletake.tools.tsdf import TSDF
+from doubletake.utils.dataset_utils import get_dataset
+from doubletake.utils.generic_utils import readlines
 
 import numpy as np
 import open3d as o3d
 import torch
 import tqdm
 from PIL import Image
-from geometryhints.utils.geometry_utils import BackprojectDepth
-from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
+from doubletake.utils.geometry_utils import BackprojectDepth
+from doubletake.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 
 
-from geometryhints.utils.visualization_utils import colormap_image, save_viz_video_frames
+from doubletake.utils.visualization_utils import colormap_image, save_viz_video_frames
 
 
 class SimpleScanNetDataset(torch.utils.data.Dataset):

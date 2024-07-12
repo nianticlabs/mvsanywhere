@@ -1,4 +1,4 @@
-!!python/object:geometryhints.options.Options
+!!python/object:doubletake.options.Options
 dataset_path: /mnt/nas/personal/mohameds/vdr/
 tuple_info_file_location: /mnt/nas/personal/mohameds/vdr/tuples/moving_person_2
 dataset_scan_split_file: /mnt/nas/personal/mohameds/vdr/moving_person_2.txt
