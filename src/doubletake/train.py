@@ -1,22 +1,3 @@
-""" 
-    Trains a DepthModel model. Uses an MVS dataset from datasets.
-
-    - Outputs logs and checkpoints to opts.log_dir/opts.name
-    - Supports mixed precision training by setting '--precision 16'
-
-    We train with a batch_size of 16 with 16-bit precision on two A100s.
-
-    Example command to train with two GPUs
-        python train.py --name HERO_MODEL \
-                    --log_dir logs \
-                    --config_file configs/models/hero_model.yaml \
-                    --data_config configs/data/scannet_default_train.yaml \
-                    --gpus 2 \
-                    --batch_size 16;
-                    
-"""
-
-
 import os
 from pathlib import Path
 from typing import List, Optional, Tuple

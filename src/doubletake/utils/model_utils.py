@@ -2,21 +2,11 @@ import torch
 
 import doubletake.modules.feature_volume as feature_volume
 import doubletake.modules.mesh_hint_volume as mesh_hint_volume
-from doubletake.experiment_modules.densification_model import DensificationModel
-from doubletake.experiment_modules.depth_model import DepthModel
 from doubletake.experiment_modules.depth_model_cv_hint import DepthModelCVHint
 
 
 def get_model_class(opts):
-    if opts.model_type == "depth_model":
-        model_class_to_use = DepthModel
-    elif opts.model_type == "cv_hint_depth_model":
-        model_class_to_use = DepthModelCVHint
-    elif opts.model_type == "densification":
-        model_class_to_use = DensificationModel
-    else:
-        raise ValueError(f"Unknown model type: {opts.model_type}")
-    return model_class_to_use
+    return DepthModelCVHint
 
 
 def load_model_inference(opts, model_class_to_use):
