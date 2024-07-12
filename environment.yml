@@ -9,6 +9,7 @@ dependencies:
   - clang=15.0.7
   - llvm-openmp=15.0.7
   - python=3.9.7
+  - numpy=1.26.4
   - pytorch=2.0.1
   - torchvision
   - pytorch-cuda=11.7
