@@ -3,7 +3,7 @@ from loguru import logger
 
 import doubletake.modules.feature_volume as feature_volume
 import doubletake.modules.mesh_hint_volume as mesh_hint_volume
-from doubletake.experiment_modules.depth_model_cv_hint import DepthModelCVHint
+from doubletake.experiment_modules.doubletake_model import DepthModelCVHint
 
 
 def get_model_class(opts):
