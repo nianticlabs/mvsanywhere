@@ -1,5 +1,7 @@
 *.pyc
 .vscode/
+debug_scripts/
+debug_dump
 logs/
 logs
 models/*.ckpt
