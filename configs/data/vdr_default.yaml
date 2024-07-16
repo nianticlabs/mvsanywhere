@@ -1,5 +1,5 @@
 !!python/object:doubletake.options.Options
-dataset_path: /datasets/vdr
+dataset_path: datasets/vdr
 tuple_info_file_location: data_splits/vdr/
 dataset_scan_split_file: data_splits/vdr/scans.txt
 dataset: vdr
