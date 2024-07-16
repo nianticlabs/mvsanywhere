@@ -12,7 +12,6 @@ from doubletake.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-
 from doubletake.modules.cost_volume import CostVolumeManager
 from doubletake.modules.feature_volume import FeatureVolumeManager
 from doubletake.modules.layers import TensorFormatter

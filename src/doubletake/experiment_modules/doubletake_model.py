@@ -12,7 +12,6 @@ from doubletake.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-
 from doubletake.modules.layers import TensorFormatter
 from doubletake.modules.mesh_hint_volume import FeatureMeshHintVolumeManager
 from doubletake.modules.networks import (

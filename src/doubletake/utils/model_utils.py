@@ -17,7 +17,6 @@ def get_model_class(opts):
     return model_class_to_use
 
 
-
 def load_model_inference(opts, model_class_to_use):
     try:
         model = model_class_to_use.load_from_checkpoint(
