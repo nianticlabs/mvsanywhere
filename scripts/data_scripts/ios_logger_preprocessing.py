@@ -1,8 +1,8 @@
 import os
 import sys
 
-from geometryhints.datasets.arkit_dataset import process_data
-import geometryhints.options as options
+from doubletake.datasets.arkit_dataset import process_data
+import doubletake.options as options
 
 """ Download scans and extract each to a folder with their name like so:
     dataset_path

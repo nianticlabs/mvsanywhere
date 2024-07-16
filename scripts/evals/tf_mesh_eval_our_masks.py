@@ -10,7 +10,7 @@ from tqdm import tqdm
 import open3d as o3d
 import json
 
-from geometryhints.utils.volume_utils import SimpleVolume
+from doubletake.utils.volume_utils import SimpleVolume
 
 """ 
 ```

@@ -10,8 +10,8 @@ import tqdm
 from PIL import Image
 from pytorch3d.renderer import MeshRasterizer, RasterizationSettings
 from pytorch3d.structures import Meshes
-from geometryhints.utils.generic_utils import readlines, to_gpu
-from geometryhints.utils.volume_utils import SimpleVolume, VisibilityAggregator
+from doubletake.utils.generic_utils import readlines, to_gpu
+from doubletake.utils.volume_utils import SimpleVolume, VisibilityAggregator
 from pytorch3d.utils import cameras_from_opencv_projection
 
 import trimesh

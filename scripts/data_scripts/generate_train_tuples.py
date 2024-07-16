@@ -13,7 +13,7 @@
         --num_workers 16 
 
     where scannet_default_train.yaml looks like: 
-        !!python/object:geometryhints.options.Options
+        !!python/object:doubletake.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: $tuples_directory$
         dataset_scan_split_file: $train_split_list_location$
@@ -46,9 +46,9 @@ from multiprocessing.pool import Pool
 from pathlib import Path
 
 import numpy as np
-import geometryhints.options as options
-from geometryhints.tools.keyframe_buffer import DVMVS_Config, is_valid_pair
-from geometryhints.utils.dataset_utils import get_dataset
+import doubletake.options as options
+from doubletake.tools.keyframe_buffer import DVMVS_Config, is_valid_pair
+from doubletake.utils.dataset_utils import get_dataset
 
 
 def gather_pairs_train(

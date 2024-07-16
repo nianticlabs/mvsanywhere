@@ -13,7 +13,7 @@
         --num_workers 16
     
     where scannet_default_test.yaml looks like: 
-        !!python/object:geometryhints.options.Options
+        !!python/object:doubletake.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: $tuples_directory$
         dataset_scan_split_file: $test_split_list_location$
@@ -54,10 +54,10 @@ from multiprocessing.pool import Pool
 from pathlib import Path
 
 import numpy as np
-import geometryhints.options as options
-import geometryhints.tools as tools
-from geometryhints.tools.keyframe_buffer import DVMVS_Config
-from geometryhints.utils.dataset_utils import get_dataset
+import doubletake.options as options
+import doubletake.tools as tools
+from doubletake.tools.keyframe_buffer import DVMVS_Config
+from doubletake.utils.dataset_utils import get_dataset
 
 
 def compute_offline_tuple(

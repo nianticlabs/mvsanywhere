@@ -4,8 +4,8 @@ import torch
 
 import trimesh
 
-from geometryhints.utils.errors import MeshErrorVisualiser
-from geometryhints.utils.volume_utils import SimpleVolume
+from doubletake.utils.errors import MeshErrorVisualiser
+from doubletake.utils.volume_utils import SimpleVolume
 
 scene_id = "scene0707_00"
 gt_mesh_path = Path(

@@ -2,12 +2,12 @@ import torch
 
 from pathlib import Path
 
-from geometryhints.datasets.scannet_dataset import ScannetDataset
-from geometryhints.options import OptionsHandler
-from geometryhints.tools.partial_fuser import PartialFuser
-from geometryhints.tools.tsdf import TSDF
-from geometryhints.utils.dataset_utils import get_dataset
-from geometryhints.utils.generic_utils import readlines, to_gpu
+from doubletake.datasets.scannet_dataset import ScannetDataset
+from doubletake.options import OptionsHandler
+from doubletake.tools.partial_fuser import PartialFuser
+from doubletake.tools.tsdf import TSDF
+from doubletake.utils.dataset_utils import get_dataset
+from doubletake.utils.generic_utils import readlines, to_gpu
 
 import numpy as np
 import open3d as o3d
@@ -16,11 +16,11 @@ import torch.nn.functional as F
 
 import tqdm
 from PIL import Image
-from geometryhints.utils.geometry_utils import BackprojectDepth
-from geometryhints.utils.rendering_utils import PyTorch3DMeshDepthRenderer
+from doubletake.utils.geometry_utils import BackprojectDepth
+from doubletake.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 
 
-from geometryhints.utils.visualization_utils import colormap_image, save_viz_video_frames
+from doubletake.utils.visualization_utils import colormap_image, save_viz_video_frames
 
 
 class TSDFRaycaster(torch.nn.Module):
