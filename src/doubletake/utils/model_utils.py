@@ -4,10 +4,18 @@ from loguru import logger
 import doubletake.modules.feature_volume as feature_volume
 import doubletake.modules.mesh_hint_volume as mesh_hint_volume
 from doubletake.experiment_modules.doubletake_model import DepthModelCVHint
+from doubletake.experiment_modules.sr_depth_model import DepthModel
 
 
 def get_model_class(opts):
-    return DepthModelCVHint
+    if opts.model_type == "depth_model":
+        model_class_to_use = DepthModel
+    elif opts.model_type == "cv_hint_depth_model":
+        model_class_to_use = DepthModelCVHint
+    else:
+        raise ValueError(f"Unknown model type: {opts.model_type}")
+    return model_class_to_use
+
 
 
 def load_model_inference(opts, model_class_to_use):
