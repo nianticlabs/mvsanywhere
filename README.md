@@ -121,6 +121,39 @@ SCANNET_ROOT
 ```
 </details>
 
+## 💾 3RScan Dataset
+
+This section explains how to prepare 3RScan for testing:
+
+Please download and extract the dataset by following the instructions [here](https://github.com/WaldJohannaU/3RScan).
+
+The dataset should be formatted like so:
+
+```
+<dataset_path>
+  <scanId>
+  |-- mesh.refined.v2.obj
+      Reconstructed mesh
+  |-- mesh.refined.mtl
+      Corresponding material file
+  |-- mesh.refined_0.png
+      Corresponding mesh texture
+  |-- sequence.zip
+      Calibrated RGB-D sensor stream with color and depth frames, camera poses
+  |-- labels.instances.annotated.v2.ply
+      Visualization of semantic segmentation
+  |-- mesh.refined.0.010000.segs.v2.json
+      Over-segmentation of annotation mesh
+  |-- semseg.v2.json
+            Instance segmentation of the mesh (contains the labels)
+```
+
+Please make sure to extract each `sequence.zip` inside every scanId folder.
+
+We provide the frame tuple files for this dataset (see for eg. `data_splits/3rscan/test_eight_view_deepvmvs.txt`) but if you need recreate them, you can do so by following the instructions [here](https://github.com/nianticlabs/simplerecon/tree/main?tab=readme-ov-file#%EF%B8%8F%EF%B8%8F%EF%B8%8F-frame-tuples).
+
+NOTE: we only use 3RScan dataset for testing and the data split used (`data_splits/3rscan/3rscan_test.txt`) corresponds to the validation split in the original dataset repo (`splits/val.txt`). We use the val split as the transformations that align the reference scan to the rescans are readily available for the train and val splits. 
+
 
 ## 📊 Testing and Evaluation
 
@@ -217,6 +250,27 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --num_workers 8 \
             --dump_depth_visualization \
             --batch_size 4;
+```
+
+### Revisit Evaluation
+
+You can evaluate our model in the revist scenario (i.e using the geometry from a previous visit as ‘hints’ for our current depth estimates) on the 3RScan dataset by running the following command:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -m doubletake.test_revisit \
+            --config_file configs/models/doubletake_model.yaml \
+            --load_weights_from_checkpoint ./models/doubletake_model.ckpt \
+            --data_config configs/data/3rscan/3rscan_test.yaml \
+            --dataset_path PATH/TO/3RScan_dataset \
+            --num_workers 12 \
+            --batch_size 6 \
+            --output_base_path ./outputs/ \
+            --depth_hint_aug 0.0 \
+            --load_empty_hint \
+            --name final_model_3rscan_revisit \
+            --run_fusion \
+            --rotate_images \
+            --cache_depths
 ```
 
 ## 📊 Mesh Metrics
