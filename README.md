@@ -22,6 +22,7 @@ This code is for non-commercial use; please see the [license file](LICENSE) for 
   * [📦 Pretrained Models](#-pretrained-models)
   * [🏃 Running out of the box!](#-running-out-of-the-box)
   * [💾 ScanNetv2 Dataset](#-scannetv2-dataset)
+  * [💾 3RScan Dataset](#-3rscan-dataset)
   * [📊 Testing and Evaluation](#-testing-and-evaluation)
   * [📊 Mesh Metrics](#-mesh-metrics)
   * [📝🧮👩‍💻 Notation for Transformation Matrices](#-notation-for-transformation-matrices)
@@ -87,39 +88,121 @@ See the section below on testing and evaluation. Make sure to use the correct co
 
 ## 💾 ScanNetv2 Dataset
 
-This section explains how to prepare ScanNetv2 for training and testing: in fact, ScanNetv2 only provides meshes with semantic labels, but not with planes.
-Following previous works, we process the dataset extracting planar information with RANSAC.
+~~Please follow the instructions [here](https://github.com/ScanNet/ScanNet) to download the dataset. This dataset is quite big (>2TB), so make sure you have enough space, especially for extracting files.~~
 
-🕒 Please note that the data preparation scripts will take a few hours to run.
+~~Once downloaded, use this [script](https://github.com/ScanNet/ScanNet/tree/master/SensReader/python) to export raw sensor data to images and depth files.~~
 
-<details>
-<summary>ScanNetv2 download (training & testing)</summary>
+We've written a quick tutorial and included modified scripts to help you with downloading and extracting ScanNetv2. You can find them at [data_scripts/scannet_wrangling_scripts/](data_scripts/scannet_wrangling_scripts)
 
-  Please follow instructions reported in [SimpleRecon](https://github.com/nianticlabs/simplerecon/tree/main/data_scripts/scannet_wrangling_scripts)
+You should change the `dataset_path` config argument for ScanNetv2 data configs at `configs/data/` to match where your dataset is.
 
-You should get at the end a ScanNetv2 root folder that looks like:
+The codebase expects ScanNetv2 to be in the following format:
 
-```shell
-SCANNET_ROOT
-├── scans_test (test scans)
-│   ├── scene0707
-│   │   ├── scene0707_00_vh_clean_2.ply (gt mesh)
-│   │   ├── sensor_data
-│   │   │   ├── frame-000261.pose.txt
-│   │   │   ├── frame-000261.color.jpg 
-│   │   │   └── frame-000261.depth.png (full res depth, stored scale *1000)
-│   │   ├── scene0707.txt (scan metadata and image sizes)
-│   │   └── intrinsic
-│   │       ├── intrinsic_depth.txt
-│   │       └── intrinsic_color.txt
-│   └── ...
-└── scans (val and train scans)
-    ├── scene0000_00
-    │   └── (see above)
-    ├── scene0000_01
-    └── ....
+    dataset_path
+        scans_test (test scans)
+            scene0707
+                scene0707_00_vh_clean_2.ply (gt mesh)
+                sensor_data
+                    frame-000261.pose.txt
+                    frame-000261.color.jpg 
+                    frame-000261.color.512.png (optional, image at 512x384)
+                    frame-000261.color.640.png (optional, image at 640x480)
+                    frame-000261.depth.png (full res depth, stored scale *1000)
+                    frame-000261.depth.256.png (optional, depth at 256x192 also
+                                                scaled)
+                scene0707.txt (scan metadata and image sizes)
+                intrinsic
+                    intrinsic_depth.txt
+                    intrinsic_color.txt
+            ...
+        scans (val and train scans)
+            scene0000_00
+                (see above)
+            scene0000_01
+            ....
+
+In this example `scene0707.txt` should contain the scan's metadata:
+
+        colorHeight = 968
+        colorToDepthExtrinsics = 0.999263 -0.010031 0.037048 ........
+        colorWidth = 1296
+        depthHeight = 480
+        depthWidth = 640
+        fx_color = 1170.187988
+        fx_depth = 570.924255
+        fy_color = 1170.187988
+        fy_depth = 570.924316
+        mx_color = 647.750000
+        mx_depth = 319.500000
+        my_color = 483.750000
+        my_depth = 239.500000
+        numColorFrames = 784
+        numDepthFrames = 784
+        numIMUmeasurements = 1632
+
+`frame-000261.pose.txt` should contain pose in the form:
+
+        -0.384739 0.271466 -0.882203 4.98152
+        0.921157 0.0521417 -0.385682 1.46821
+        -0.0587002 -0.961035 -0.270124 1.51837
+
+`frame-000261.color.512.png` and `frame-000261.color.640.png` are precached resized versions of the original image to save load and compute time during training and testing. `frame-000261.depth.256.png` is also a 
+precached resized version of the depth map. 
+
+All resized precached versions of depth and images are nice to have but not 
+required. If they don't exist, the full resolution versions will be loaded, and downsampled on the fly.
+
+
+## 🖼️🖼️🖼️ Frame Tuples
+
+By default, we estimate a depth map for each keyframe in a scan. We use DeepVideoMVS's heuristic for keyframe separation and construct tuples to match. We use the depth maps at these keyframes for depth fusion. For each keyframe, we associate a list of source frames that will be used to build the cost volume. We also use dense tuples, where we predict a depth map for each frame in the data, and not just at specific keyframes; these are mostly used for visualization.
+
+We generate and export a list of tuples across all scans that act as the dataset's elements. We've precomputed these lists and they are available at `data_splits` under each dataset's split. For ScanNet's test scans they are at `data_splits/ScanNetv2/standard_split`. Our core depth numbers are computed using `data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs.txt`.
+
+
+
+Here's a quick taxonamy of the type of tuples for test:
+
+- `default`: a tuple for every keyframe following DeepVideoMVS where all source frames are in the past. Used for all depth and mesh evaluation unless stated otherwise. For ScanNet use `data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs.txt`.
+- `offline`: a tuple for every frame in the scan where source frames can be both in the past and future relative to the current frame. These are useful when a scene is captured offline, and you want the best accuracy possible. With online tuples, the cost volume will contain empty regions as the camera moves away and all source frames lag behind; however with offline tuples, the cost volume is full on both ends, leading to a better scale (and metric) estimate.
+- `dense`: an online tuple (like default) for every frame in the scan where all source frames are in the past. For ScanNet this would be `data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs_dense.txt`.
+- `offline`: an offline tuple for every keyframefor every keyframe in the scan.
+
+
+For the train and validation sets, we follow the same tuple augmentation strategy as in DeepVideoMVS and use the same core generation script.
+
+If you'd like to generate these tuples yourself, you can use the scripts at `data_scripts/generate_train_tuples.py` for train tuples and `data_scripts/generate_test_tuples.py` for test tuples. These follow the same config format as `test.py` and will use whatever dataset class you build to read pose informaiton.
+
+Example for test:
+
+```bash
+# default tuples
+python ./data_scripts/generate_test_tuples.py 
+    --data_config configs/data/scannet_default_test.yaml
+    --num_workers 16
+
+# dense tuples
+python ./data_scripts/generate_test_tuples.py 
+    --data_config configs/data/scannet_dense_test.yaml
+    --num_workers 16
 ```
-</details>
+
+Examples for train:
+
+```bash
+# train
+python ./data_scripts/generate_train_tuples.py 
+    --data_config configs/data/scannet_default_train.yaml
+    --num_workers 16
+
+# val
+python ./data_scripts/generate_val_tuples.py 
+    --data_config configs/data/scannet_default_val.yaml
+    --num_workers 16
+```
+
+These scripts will first check each frame in the dataset to make sure it has an existing RGB frame, an existing depth frame (if appropriate for the dataset), and also an existing and valid pose file. It will save these `valid_frames` in a text file in each scan's folder, but if the directory is read only, it will ignore saving a `valid_frames` file and generate tuples anyway.
+
 
 ## 💾 3RScan Dataset
 
