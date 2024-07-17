@@ -5,15 +5,9 @@ from collections import OrderedDict
 import numpy as np
 import PIL.Image as pil
 import torch
-from torchvision import transforms
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
-from doubletake.utils.generic_utils import (
-    crop_or_pad,
-    fov_to_image_dimension,
-    read_image_file,
-    readlines,
-)
+from doubletake.utils.generic_utils import read_image_file, readlines
 
 
 class ThreeRScanDataset(GenericMVSDataset):
@@ -25,53 +19,46 @@ class ThreeRScanDataset(GenericMVSDataset):
 
     This dataset expects 3RScanv2 to be in the following format:
 
-    dataset_path
-        {scene_id}
-            scene0707_00_vh_clean_2.ply (gt mesh)
-            sensor_data
-                frame-000261.pose.txt
-                frame-000261.color.jpg
-                frame-000261.color.512.png (optional, image at 512x384)
-                frame-000261.color.640.png (optional, image at 640x480)
-                frame-000261.depth.png (full res depth, stored scale *1000)
-                frame-000261.depth.256.png (optional, depth at 256x192 also
-                                            scaled)
-            _info.txt (scan metadata and intrinsics)
-            ...
+    <dataset_path>
+        <scanId>
+        |-- mesh.refined.v2.obj
+            Reconstructed mesh
+        |-- mesh.refined.mtl
+            Corresponding material file
+        |-- mesh.refined_0.png
+            Corresponding mesh texture
+        |-- sequence.zip
+            Calibrated RGB-D sensor stream with color and depth frames, camera poses
+        |-- sensor_data
+            extracted sensor data from the sequence.zip
+            |-- _info.txt
+                Metadata file
+            |-- frame-000000.color.jpg
+                Color image
+            |-- frame-000000.depth.pgm
+                Depth image
+            |-- frame-000000.pose.txt
+                Camera pose
+        |-- labels.instances.annotated.v2.ply
+            Visualization of semantic segmentation
+        |-- mesh.refined.0.010000.segs.v2.json
+            Over-segmentation of annotation mesh
+        |-- semseg.v2.json
+            Instance segmentation of the mesh (contains the labels)
 
-    TODO: update this docstring
-    In this example _info.txt should contain the scan's metadata and
-    intrinsics:
-        colorHeight = 968
-        colorToDepthExtrinsics = 0.999263 -0.010031 0.037048 -0.038549 ........
-        colorWidth = 1296
-        depthHeight = 480
-        depthWidth = 640
-        fx_color = 1170.187988
-        fx_depth = 570.924255
-        fy_color = 1170.187988
-        fy_depth = 570.924316
-        mx_color = 647.750000
-        mx_depth = 319.500000
-        my_color = 483.750000
-        my_depth = 239.500000
-        numColorFrames = 784
-        numDepthFrames = 784
-        numIMUmeasurements = 1632
-
-    frame-000261.pose.txt should contain pose in the form:
-        -0.384739 0.271466 -0.882203 4.98152
-        0.921157 0.0521417 -0.385682 1.46821
-        -0.0587002 -0.961035 -0.270124 1.51837
-
-    frame-000261.color.512.png is a precached resized version of the original
-    image to save load and compute time during training and testing. Similarly
-    for frame-000261.color.640.png. frame-000261.depth.256.png is also a
-    precached resized version of the depth map.
-
-    All resized precached versions of depth and images are nice to have but not
-    required. If they don't exist, the full res versions will be loaded, and
-    downsampled on the fly.
+    _info.txt contains for example the following information:
+        m_versionNumber = 4
+        m_sensorName = tangoDevice (calibrated)
+        m_colorWidth = 960
+        m_colorHeight = 540
+        m_depthWidth = 224
+        m_depthHeight = 172
+        m_depthShift = 1000
+        m_calibrationColorIntrinsic = 877.5 0 479.75 0 0 877.5 269.75 0 0 0 1 0 0 0 0 1
+        m_calibrationColorExtrinsic = 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1
+        m_calibrationDepthIntrinsic = 204.75 0 111.558 0 0 279.5 85.5793 0 0 0 1 0 0 0 0 1
+        m_calibrationDepthExtrinsic = 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1
+        m_frames.size = 443
 
     NOTE: This dataset will place NaNs where gt depth maps are invalid.
 
@@ -180,15 +167,6 @@ class ThreeRScanDataset(GenericMVSDataset):
         self.min_valid_depth = min_valid_depth
         self.max_valid_depth = max_valid_depth
 
-        self.target_fov = None
-        if modify_to_fov:
-            self.target_fov = [58.18, 45.12]
-
-        if self.target_fov:
-            print("#####################################")
-            print(f"using target fov: {self.target_fov}")
-            print("#####################################")
-
     @staticmethod
     def get_sub_folder_dir(split):
         """Where scans are for each split."""
@@ -256,29 +234,6 @@ class ThreeRScanDataset(GenericMVSDataset):
             if len(rescans) > 0:
                 rescan_map[scene["reference"]] = rescans
         return rescan_map
-
-    # def get_rescan_transform(self, source_scan_id, target_scan_id):
-    #     """
-    #     Returns the transform that transforms points from source to target.
-    #     args:
-    #         source_scan_id: the source scan id.
-    #         target_scan_id: the target scan id.
-    #     returns:
-    #         transform: 4x4 numpy array that transforms points from source to
-    #             target.
-    #     """
-    #     if (
-    #         source_scan_id in self.rescan_transforms
-    #         and target_scan_id in self.rescan_transforms[source_scan_id]
-    #     ):
-    #         return np.linalg.inv(self.rescan_transforms[source_scan_id][target_scan_id])
-    #     elif (
-    #         target_scan_id in self.rescan_transforms
-    #         and source_scan_id in self.rescan_transforms[target_scan_id]
-    #     ):
-    #         return self.rescan_transforms[target_scan_id][source_scan_id]
-    #     else:
-    #         raise ValueError(f"no transform found for {source_scan_id} to {target_scan_id}")
 
     def _parse_metadata(self, metadata_file_path):
         """
@@ -552,36 +507,6 @@ class ThreeRScanDataset(GenericMVSDataset):
 
         return os.path.join(sensor_data_dir, f"frame-{frame_id}.pose.txt")
 
-    def get_target_fov_hw(self, scan_id):
-        """
-        Returns the target fov crop height and width for a scan.
-        args:
-            scan_id: the scan this file belongs to.
-        returns:
-            target_fov_crop_hw: tuple of the target fov crop height and width.
-        """
-
-        metadata = self.get_metadata(scan_id)
-
-        K = torch.tensor(metadata["m_calibrationColorIntrinsic"]).float()
-
-        # print(f"original K: {K}")
-
-        # fov_x = 2 * np.arctan(int(metadata["m_colorWidth"]) / (2 * K[0, 0])) * 180 / np.pi
-        # fov_y = 2 * np.arctan(int(metadata["m_colorHeight"]) / (2 * K[1, 1])) * 180 / np.pi
-
-        # print("loading color with fov:")
-        # print(f"current fov: {fov_x}, {fov_y}")
-        # print(f"target fov: {self.target_fov}")
-
-        # load in basic intrinsics for the full size depth map.
-        # parse metadata
-        new_width = int(np.round(fov_to_image_dimension(self.target_fov[0], K[0, 0])))
-        new_height = int(np.round(fov_to_image_dimension(self.target_fov[1], K[1, 1])))
-        target_fov_crop_hw = (new_height, new_width)
-
-        return target_fov_crop_hw
-
     def get_metadata(self, scan_id):
         """
         Returns the metadata for a scan.
@@ -594,63 +519,6 @@ class ThreeRScanDataset(GenericMVSDataset):
         metadata_filename = os.path.join(scene_path, "sensor_data", "_info.txt")
         metadata = self._parse_metadata(metadata_filename)
         return metadata
-
-    def read_fov_cropped_image_file(
-        self,
-        color_filepath,
-        native_h,
-        native_w,
-        target_fov_crop_h,
-        target_fov_crop_w,
-        target_h,
-        target_w,
-        resampling_mode,
-        value_scale_factor=1.0,
-        pad_mode="constant",
-    ):
-        """
-        Reads the image file, resizes it to native_h, native_w, crops it to
-        target_fov_crop_h, target_fov_crop_w, and then resizes it to
-        target_h, target_w.
-        args:
-            color_filepath: the filepath for the color image.
-            native_h, native_w: the height and width of the native image.
-            target_fov_crop_h, target_fov_crop_w: the height and width of the
-                cropped image.
-            target_h, target_w: the height and width of the resized image.
-            resampling_mode: the resampling mode for the image.
-            value_scale_factor: the scale factor for the image values.
-            pad_mode: the padding mode for the image.
-        returns:
-            image: the resized and cropped image.
-        """
-
-        image = read_image_file(
-            color_filepath,
-            height=native_h,
-            width=native_w,
-            resampling_mode=resampling_mode,
-            value_scale_factor=value_scale_factor,
-            disable_warning=True,
-        )
-        image_bchw = image.unsqueeze(0).numpy()
-        # print(f"image shape: {image_bchw.shape}")
-        cropped_image_bchw = crop_or_pad(
-            image_bchw, target_fov_crop_h, target_fov_crop_w, pad_mode=pad_mode
-        )
-        # print(f"target_fov_crop_hw: {target_fov_crop_h, target_fov_crop_w}")
-        # print(f"cropped image shape: {cropped_image_bchw.shape}")
-        if resampling_mode == pil.NEAREST:
-            mode = "nearest"
-        elif resampling_mode == pil.BILINEAR:
-            mode = "bilinear"
-        else:
-            raise ValueError(f"resampling mode {self.image_resampling_mode} not supported")
-        image = torch.nn.functional.interpolate(
-            torch.tensor(cropped_image_bchw), (target_h, target_w), mode=mode
-        ).squeeze(0)
-        # print(f"resized image shape: {image.shape}")
-        return image
 
     def load_color(self, scan_id, frame_id):
         """Loads a frame's RGB file, resizes it to configured RGB size.
@@ -667,28 +535,13 @@ class ThreeRScanDataset(GenericMVSDataset):
 
         color_filepath = self.get_color_filepath(scan_id, frame_id)
 
-        if self.target_fov:
-            target_fov_crop_hw = self.get_target_fov_hw(scan_id)
-            metadata = self.get_metadata(scan_id)
-            image = self.read_fov_cropped_image_file(
-                color_filepath=color_filepath,
-                native_h=int(metadata["m_colorHeight"]),
-                native_w=int(metadata["m_colorWidth"]),
-                target_fov_crop_h=target_fov_crop_hw[0],
-                target_fov_crop_w=target_fov_crop_hw[1],
-                target_h=self.image_height,
-                target_w=self.image_width,
-                resampling_mode=self.image_resampling_mode,
-                # pad_mode="reflect",
-            )
-        else:
-            image = read_image_file(
-                color_filepath,
-                height=self.image_height,
-                width=self.image_width,
-                resampling_mode=self.image_resampling_mode,
-                disable_warning=self.disable_resize_warning,
-            )
+        image = read_image_file(
+            color_filepath,
+            height=self.image_height,
+            width=self.image_width,
+            resampling_mode=self.image_resampling_mode,
+            disable_warning=self.disable_resize_warning,
+        )
 
         return image
 
@@ -708,28 +561,13 @@ class ThreeRScanDataset(GenericMVSDataset):
 
         color_high_res_filepath = self.get_high_res_color_filepath(scan_id, frame_id)
 
-        if self.target_fov:
-            target_fov_crop_hw = self.get_target_fov_hw(scan_id)
-            metadata = self.get_metadata(scan_id)
-            high_res_color = self.read_fov_cropped_image_file(
-                color_filepath=color_high_res_filepath,
-                native_h=int(metadata["m_colorHeight"]),
-                native_w=int(metadata["m_colorWidth"]),
-                target_fov_crop_h=target_fov_crop_hw[0],
-                target_fov_crop_w=target_fov_crop_hw[1],
-                target_h=self.high_res_image_height,
-                target_w=self.high_res_image_width,
-                resampling_mode=self.image_resampling_mode,
-            )
-
-        else:
-            high_res_color = read_image_file(
-                color_high_res_filepath,
-                height=self.high_res_image_height,
-                width=self.high_res_image_width,
-                resampling_mode=self.image_resampling_mode,
-                disable_warning=self.disable_resize_warning,
-            )
+        high_res_color = read_image_file(
+            color_high_res_filepath,
+            height=self.high_res_image_height,
+            width=self.high_res_image_width,
+            resampling_mode=self.image_resampling_mode,
+            disable_warning=self.disable_resize_warning,
+        )
 
         return high_res_color
 
@@ -764,24 +602,8 @@ class ThreeRScanDataset(GenericMVSDataset):
         K_native = torch.tensor(metadata["m_calibrationColorIntrinsic"]).float()
         K = K_native.clone()
 
-        if self.target_fov:
-            target_fov_crop_hw = self.get_target_fov_hw(scan_id)
-
-            # centre crop the intrinsics
-            left = (float(metadata["m_colorWidth"]) - target_fov_crop_hw[1]) / 2
-            top = (float(metadata["m_colorHeight"]) - target_fov_crop_hw[0]) / 2
-
-            K[0, 2] -= left
-            K[1, 2] -= top
-
-            # normalize intrinsics to the dataset's configured color resolution, taking into account the target fov.
-            K[0] /= target_fov_crop_hw[1]
-            K[1] /= target_fov_crop_hw[0]
-            K[0, 2] = 0.5
-            K[1, 2] = 0.5
-        else:
-            K[0] /= float(metadata["m_colorWidth"])
-            K[1] /= float(metadata["m_colorHeight"])
+        K[0] /= float(metadata["m_colorWidth"])
+        K[1] /= float(metadata["m_colorHeight"])
 
         # optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
@@ -811,7 +633,6 @@ class ThreeRScanDataset(GenericMVSDataset):
             K[1, 1] = temp[0, 0]
             K[1, 2] = temp[0, 2]
             K[0, 2] = self.depth_height - temp[1, 2]
-            # K[0, 2] = temp[1, 2]
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(5):
@@ -847,30 +668,15 @@ class ThreeRScanDataset(GenericMVSDataset):
         if not os.path.exists(depth_filepath):
             depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
 
-        if self.target_fov:
-            target_fov_crop_hw = self.get_target_fov_hw(scan_id)
-            metadata = self.get_metadata(scan_id)
-            depth = self.read_fov_cropped_image_file(
-                color_filepath=depth_filepath,
-                native_h=int(metadata["m_colorHeight"]),
-                native_w=int(metadata["m_colorWidth"]),
-                target_fov_crop_h=target_fov_crop_hw[0],
-                target_fov_crop_w=target_fov_crop_hw[1],
-                target_h=self.depth_height,
-                target_w=self.depth_width,
-                value_scale_factor=1e-3,
-                resampling_mode=pil.NEAREST,
-            )
-        else:
-            # Load depth, resize
-            depth = read_image_file(
-                depth_filepath,
-                height=self.depth_height,
-                width=self.depth_width,
-                value_scale_factor=1e-3,
-                resampling_mode=pil.NEAREST,
-                disable_warning=True,
-            )
+        # Load depth, resize
+        depth = read_image_file(
+            depth_filepath,
+            height=self.depth_height,
+            width=self.depth_width,
+            value_scale_factor=1e-3,
+            resampling_mode=pil.NEAREST,
+            disable_warning=True,
+        )
 
         # Get the float valid mask
         mask_b = (depth > self.min_valid_depth) & (depth < self.max_valid_depth)
@@ -900,23 +706,7 @@ class ThreeRScanDataset(GenericMVSDataset):
         full_res_depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         # Load depth
 
-        if self.target_fov:
-            target_fov_crop_hw = self.get_target_fov_hw(scan_id)
-            metadata = self.get_metadata(scan_id)
-            full_res_depth = self.read_fov_cropped_image_file(
-                color_filepath=full_res_depth_filepath,
-                native_h=int(metadata["m_colorHeight"]),
-                native_w=int(metadata["m_colorWidth"]),
-                target_fov_crop_h=target_fov_crop_hw[0],
-                target_fov_crop_w=target_fov_crop_hw[1],
-                target_h=self.native_depth_height,
-                target_w=self.native_depth_width,
-                value_scale_factor=1e-3,
-                resampling_mode=pil.NEAREST,
-            )
-
-        else:
-            full_res_depth = read_image_file(full_res_depth_filepath, value_scale_factor=1e-3)
+        full_res_depth = read_image_file(full_res_depth_filepath, value_scale_factor=1e-3)
 
         # Get the float valid mask
         full_res_mask_b = (full_res_depth > self.min_valid_depth) & (
