@@ -358,9 +358,14 @@ CUDA_VISIBLE_DEVICES=0 python -m doubletake.test_revisit \
 
 ## 📊 Mesh Metrics
 
-We use TransformerFusion's [mesh evaluation](https://github.com/AljazBozic/TransformerFusion/blob/main/src/evaluation/eval.py) for our main results table but set the seed to a fixed value for consistency when randomly sampling meshes. We also report mesh metrics using NeuralRecon's [evaluation](https://github.com/zju3dv/NeuralRecon/blob/master/tools/evaluation.py) in the supplemental material.
+We use a mesh evaluation protocol similar to TransformerFusion's, but use occlusion masks that better fit available geometry in the ground truth.
 
-For point cloud evaluation, we use TransformerFusion's code but load in a point cloud in place of sampling a mesh's surface.
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/evals/mesh_eval.py \
+    --groundtruth_dir SCANNET_TEST_FOLDER_PATH  \
+    --prediction_dir ROOT_PRED_DIRECTORY/SCAN_NAME.ply \
+```
+ 
 
 
 ## 📝🧮👩‍💻 Notation for Transformation Matrices
