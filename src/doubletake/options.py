@@ -77,7 +77,6 @@ class Options:
 
     # whether to rotate images 90 degress clockwise (used for 3RScan data and VDR)
     rotate_images: bool = False
-    modify_to_fov: bool = False
 
     ############################## hyperparameters #############################
     # learning rate

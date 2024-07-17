@@ -138,7 +138,6 @@ def main(opts):
                 depth_hint_dir=opts.depth_hint_dir,
                 load_empty_hints=opts.load_empty_hint,
                 rotate_images=opts.rotate_images,
-                modify_to_fov=opts.modify_to_fov,
             )
 
             assert len(dataset) > 0, f"Dataset {scan} is empty."

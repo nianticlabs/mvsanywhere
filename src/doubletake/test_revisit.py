@@ -140,7 +140,6 @@ def main(opts):
                 load_empty_hints=True,
                 disable_flip=True,
                 rotate_images=opts.rotate_images,
-                modify_to_fov=opts.modify_to_fov,
             )
 
             dataloader = torch.utils.data.DataLoader(
@@ -278,7 +277,6 @@ def main(opts):
                 load_empty_hints=True,
                 disable_flip=True,
                 rotate_images=opts.rotate_images,
-                modify_to_fov=opts.modify_to_fov,
             )
 
             dataloader = torch.utils.data.DataLoader(
