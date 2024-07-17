@@ -74,7 +74,6 @@ class SevenScenesDataset(GenericMVSDataset):
         depth_hint_dir=None,
         load_empty_hints=True,
         rotate_images=False,
-        modify_to_fov=False,
         disable_flip=True,
     ):
         super().__init__(

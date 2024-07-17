@@ -76,7 +76,6 @@ class GenericMVSDataset(Dataset):
         depth_hint_dir=None,
         disable_flip=False,
         rotate_images=False,
-        target_fov=None,
     ):
         """
         Args:

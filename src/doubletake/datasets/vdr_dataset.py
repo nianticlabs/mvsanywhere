@@ -57,7 +57,6 @@ class VDRDataset(GenericMVSDataset):
         depth_hint_dir=None,
         disable_flip=False,
         rotate_images=False,
-        modify_to_fov=False,
     ):
         super().__init__(
             dataset_path=dataset_path,
