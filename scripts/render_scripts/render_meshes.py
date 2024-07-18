@@ -28,7 +28,7 @@ For partial meshes run:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
 --data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
---cached_depth_path hero_model/scannet/default/depths 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/partial_renders
 --dataset_path /mnt/scannet/ 
 --batch_size 4 
@@ -40,7 +40,7 @@ For full mesh renders, use:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
 --data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
---cached_depth_path hero_model/scannet/default/depths 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/renders
 --dataset_path /mnt/scannet/ 
 --batch_size 4 

@@ -383,25 +383,72 @@ on both train and val splits. Something like this:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test 
-    --config_file /mnt/nas3/personal/mohameds/weights/geometryhints/hero_model_fast/version_2/config.yaml 
-    --load_weights_from_checkpoint /mnt/nas3/personal/mohameds/weights/geometryhints/hero_model_fast/version_2/checkpoints/epoch=14-step=108993.ckpt 
-    --data_config configs/data/scannet_default_train_test.yaml  
+    --config_file configs/models/simplerecon_model.yaml
+    --load_weights_from_checkpoint simplerecon_model_weights.ckpt
+    --data_config configs/data/scannet_default_train_inference_style.yaml  
     --num_workers 8
     --batch_size 8
     --cache_depths 
     --run_fusion 
     --output_base_path YOUR_OUTPUT_DIR
-    --dataset_path /mnt/scannet;
+    --dataset_path SCANNET_DIR;
+
+CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test 
+    --config_file configs/models/simplerecon_model.yaml
+    --load_weights_from_checkpoint simplerecon_model_weights.ckpt
+    --data_config configs/data/scannet_default_val_inference_style.yaml  
+    --num_workers 8
+    --batch_size 8
+    --cache_depths 
+    --run_fusion 
+    --output_base_path YOUR_OUTPUT_DIR
+    --dataset_path SCANNET_DIR;
+```
+
+With these cached depths, you can generate mesh renders for training:
+```bash
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
+--output_root renders/partial_renders
+--dataset_path SCANNET_DIR
+--batch_size 4 
+--data_to_render both 
+--partial 1;
+
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
+--output_root renders/renders
+--dataset_path /mnt/scannet/ 
+--batch_size 4 
+--data_to_render both 
+--partial 0;
+
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
+--output_root renders/partial_renders
+--dataset_path SCANNET_DIR
+--batch_size 4 
+--data_to_render both 
+--partial 1;
+
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
+--cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
+--output_root renders/renders
+--dataset_path /mnt/scannet/ 
+--batch_size 4
+--data_to_render both
+--partial 0;
 ```
 
 ## 🙏 Acknowledgements
 
-We thank Aljaž Božič of [TransformerFusion](https://github.com/AljazBozic/TransformerFusion), Jiaming Sun of [Neural Recon](https://zju3dv.github.io/neuralrecon/), and Arda Düzçeker of [DeepVideoMVS](https://github.com/ardaduz/deep-video-mvs) for quickly providing useful information to help with baselines and for making their codebases readily available, especially on short notice.
+The tuple generation scripts make heavy use of a modified version of DeepVideoMVS's [Keyframe buffer](https://github.com/ardaduz/deep-video-mvs/blob/master/dvmvs/keyframe_buffer.py) (thanks Arda and co!).
 
-The tuple generation scripts make heavy use of a modified version of DeepVideoMVS's [Keyframe buffer](https://github.com/ardaduz/deep-video-mvs/blob/master/dvmvs/keyframe_buffer.py) (thanks again Arda and co!).
-
-
-We'd also like to thank Niantic's infrastructure team for quick actions when we needed them. Thanks folks!
+We'd like to thank the Niantic Raptor R\&D infrastructure team - Saki Shinoda, Jakub Powierza, and Stanimir Vichev - for their valuable infrastructure support.
 
 ## 📜 BibTeX
 
