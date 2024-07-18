@@ -408,40 +408,40 @@ CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test
 With these cached depths, you can generate mesh renders for training:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
-    --data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
-    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
-    --output_root renders/partial_renders
-    --dataset_path SCANNET_DIR
-    --batch_size 4 
-    --data_to_render both 
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_train_inference_style.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/partial_renders \
+    --dataset_path SCANNET_DIR \
+    --batch_size 4 \
+    --data_to_render both \
     --partial 1;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
-    --data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
-    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
-    --output_root renders/renders
-    --dataset_path /mnt/scannet/ 
-    --batch_size 4 
-    --data_to_render both 
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_train_inference_style.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/renders \
+    --dataset_path /mnt/scannet/ \
+    --batch_size 4 \
+    --data_to_render both \
     --partial 0;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
-    --data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
-    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
-    --output_root renders/partial_renders
-    --dataset_path SCANNET_DIR
-    --batch_size 4 
-    --data_to_render both 
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_val_inference_style.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/partial_renders \
+    --dataset_path SCANNET_DIR \
+    --batch_size 4 \
+    --data_to_render both \
     --partial 1;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
-    --data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
-    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
-    --output_root renders/renders
-    --dataset_path /mnt/scannet/ 
-    --batch_size 4
-    --data_to_render both
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_val_inference_style.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/renders \
+    --dataset_path /mnt/scannet/ \
+    --batch_size 4 \
+    --data_to_render both \
     --partial 0;
 ```
 
