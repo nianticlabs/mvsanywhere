@@ -87,11 +87,6 @@ This command uses `vdr_dense.yaml` which will generate depths for every frame an
 See the section below on testing and evaluation. Make sure to use the correct config flags for datasets. 
 
 ## 💾 ScanNetv2 Dataset
-
-~~Please follow the instructions [here](https://github.com/ScanNet/ScanNet) to download the dataset. This dataset is quite big (>2TB), so make sure you have enough space, especially for extracting files.~~
-
-~~Once downloaded, use this [script](https://github.com/ScanNet/ScanNet/tree/master/SensReader/python) to export raw sensor data to images and depth files.~~
-
 We've written a quick tutorial and included modified scripts to help you with downloading and extracting ScanNetv2. You can find them at [data_scripts/scannet_wrangling_scripts/](data_scripts/scannet_wrangling_scripts)
 
 You should change the `dataset_path` config argument for ScanNetv2 data configs at `configs/data/` to match where your dataset is.
@@ -381,6 +376,14 @@ Finally this notation allows for representing both rotations and translations su
 ## 🗺️ World Coordinate System
 
 This repo is geared towards ScanNet, so while its functionality should allow for any coordinate system (signaled via input flags), the model weights we provide assume a ScanNet coordinate system. This is important since we include ray information as part of metadata. Other datasets used with these weights should be transformed to the ScanNet system. The dataset classes we include will perform the appropriate transforms. 
+
+
+## 🔨💾 Training Data Preperation
+To train a DoubleTake model you'll need the ScanNetv2 dataset and renders of a mesh from an SR model. 
+
+To generate mesh renders, you'll first need to run a SimpleRecon model and cache those depths to disk. You should
+use `scannet_default_train.yaml` and `scannet_default_val.yaml` for this. 
+
 
 ## 🙏 Acknowledgements
 

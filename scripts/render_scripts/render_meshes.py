@@ -19,6 +19,42 @@ from doubletake.utils.rendering_utils import PyTorch3DMeshDepthRenderer
 
 from doubletake.utils.visualization_utils import colormap_image, save_viz_video_frames
 
+"""
+
+This script loads SR depths, fuses them incrementally, and renders the meshes and weights at each step. 
+It can also render the meshes and weights for the full scan at the end.
+
+For partial meshes run:
+```
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet_default_train.yaml 
+--cached_depth_path hero_model/scannet/default/depths 
+--output_root renders/partial_renders
+--dataset_path /mnt/scannet/ 
+--batch_size 4 
+--data_to_render both 
+--partial 1;
+```
+
+For full mesh renders, use:
+```
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
+--data_config configs/data/scannet_default_train.yaml 
+--cached_depth_path hero_model/scannet/default/depths 
+--output_root renders/renders
+--dataset_path /mnt/scannet/ 
+--batch_size 4 
+--data_to_render both 
+--partial 0;
+```
+
+You'll need the same for validation.
+
+NOTE: if you run SimpleRecon on the train set, the code will flip images going through the model,
+so the cached depths, poses, and intriniscs will be flipped. The fuser here will use those directly,
+and it will fuse correctly as long as the associated pose from the cached file is used. 
+
+"""
 
 class SimpleScanNetDataset(torch.utils.data.Dataset):
     """Simple Dataset for loading ScanNet frames."""

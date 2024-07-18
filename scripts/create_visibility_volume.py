@@ -17,6 +17,15 @@ from pytorch3d.utils import cameras_from_opencv_projection
 import trimesh
 
 
+"""
+This script creates visibility volumes for ScanNet scenes. It does this by 
+loading rednered depth maps from GT meshes, backprojecting those meshes into 
+a volume, and marking any voxels up to that depth (plus some buffer) as visible.
+
+The script doesn't render the GT meshes, it assumes that the rendered depth maps
+are already available. See `load_rendered_depth`.
+"""
+
 class SimpleScanNetDataset(torch.utils.data.Dataset):
     """Simple Dataset for loading ScanNet frames and rendered mesh depths."""
 
@@ -36,13 +45,6 @@ class SimpleScanNetDataset(torch.utils.data.Dataset):
         self._get_available_frames(frame_interval=frame_interval)
 
     def _get_available_frames(self, frame_interval: int):
-        # # get a list of available frames by looking for frames in the rendered depths root
-        # self.available_frames = []
-        # for frame in os.listdir(self.rendered_depths_root / self.scan_name / "frames"):
-        #     if frame.endswith("_depth.png"):
-        #         self.available_frames.append(int(frame.split("_")[0]))
-        # self.available_frames.sort()
-
         # get image files under each scan in /mnt/scannet/scans_test/scene0707_00/sensor_data
         self.available_frames = []
         frames = os.listdir(self.scan_data_root / self.scan_name / "sensor_data")
