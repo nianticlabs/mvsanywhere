@@ -27,7 +27,7 @@ It can also render the meshes and weights for the full scan at the end.
 For partial meshes run:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet_default_train.yaml 
+--data_config configs/data/scannet/scannet_default_train.yaml 
 --cached_depth_path hero_model/scannet/default/depths 
 --output_root renders/partial_renders
 --dataset_path /mnt/scannet/ 
@@ -39,7 +39,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 For full mesh renders, use:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet_default_train.yaml 
+--data_config configs/data/scannet/scannet_default_train.yaml 
 --cached_depth_path hero_model/scannet/default/depths 
 --output_root renders/renders
 --dataset_path /mnt/scannet/ 

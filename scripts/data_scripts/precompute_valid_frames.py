@@ -5,7 +5,7 @@
     Run like so for test (default):
     
     python ./scripts/precompute_valid_frames.py 
-        --data_config configs/data/scannet_default_test.yaml
+        --data_config configs/data/scannet/scannet_default_test.yaml
         --num_workers 16 
         --split test
     

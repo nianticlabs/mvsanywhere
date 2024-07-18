@@ -173,7 +173,7 @@ Example for test:
 ```bash
 # default tuples
 python ./data_scripts/generate_test_tuples.py 
-    --data_config configs/data/scannet_default_test.yaml
+    --data_config configs/data/scannet/scannet_default_test.yaml
     --num_workers 16
 
 # dense tuples
@@ -187,12 +187,12 @@ Examples for train:
 ```bash
 # train
 python ./data_scripts/generate_train_tuples.py 
-    --data_config configs/data/scannet_default_train.yaml
+    --data_config configs/data/scannet/scannet_default_train.yaml
     --num_workers 16
 
 # val
 python ./data_scripts/generate_val_tuples.py 
-    --data_config configs/data/scannet_default_val.yaml
+    --data_config configs/data/scannet/scannet_default_val.yaml
     --num_workers 16
 ```
 
@@ -277,7 +277,7 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --output_base_path OUTPUT_PATH \
             --config_file configs/models/hero_model.yaml \
             --load_weights_from_checkpoint weights/hero_model.ckpt \
-            --data_config configs/data/scannet_default_test.yaml \
+            --data_config configs/data/scannet/scannet_default_test.yaml \
             --num_workers 8 \
             --run_fusion \
             --batch_size 8;
@@ -294,7 +294,7 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --output_base_path OUTPUT_PATH \
             --config_file configs/models/hero_model.yaml \
             --load_weights_from_checkpoint weights/hero_model.ckpt \
-            --data_config configs/data/scannet_default_test.yaml \
+            --data_config configs/data/scannet/scannet_default_test.yaml \
             --num_workers 8 \
             --cache_depths \
             --batch_size 8;
@@ -304,7 +304,7 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --output_base_path OUTPUT_PATH \
             --config_file configs/models/hero_model.yaml \
             --load_weights_from_checkpoint weights/hero_model.ckpt \
-            --data_config configs/data/scannet_default_test.yaml \
+            --data_config configs/data/scannet/scannet_default_test.yaml \
             --num_workers 8 \
             --run_fusion \
             --depth_fuser open3d \
@@ -324,7 +324,7 @@ CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
             --output_base_path OUTPUT_PATH \
             --config_file configs/models/hero_model.yaml \
             --load_weights_from_checkpoint weights/hero_model.ckpt \
-            --data_config configs/data/scannet_default_test.yaml \
+            --data_config configs/data/scannet/scannet_default_test.yaml \
             --num_workers 8 \
             --dump_depth_visualization \
             --batch_size 4;

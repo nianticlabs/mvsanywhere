@@ -9,7 +9,7 @@
     Run like so for generating a list of train tuples of eight frames (default):
     
     python ./data_scripts/generate_train_tuples.py 
-        --data_config configs/data/scannet_default_train.yaml
+        --data_config configs/data/scannet/scannet_default_train.yaml
         --num_workers 16 
 
     where scannet_default_train.yaml looks like: 

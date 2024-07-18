@@ -33,7 +33,7 @@ def incremental(checkpoint: str, output_dir: Path):
             "--config_file",
             "configs/models/doubletake_model.yaml",
             "--data_config",
-            "configs/data/scannet_default_test.yaml",
+            "configs/data/scannet/scannet_default_test.yaml",
             "--load_weights_from_checkpoint",
             str(checkpoint),
             "--batch_size",
