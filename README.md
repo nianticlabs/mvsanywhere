@@ -265,10 +265,6 @@ You can optionnally ask for predicted depths used for fusion to be masked
 when no vaiid MVS information exists using `--mask_pred_depths`. This is not 
 enabled by default.
 
-You can also fuse the best guess depths from the cost volume before the 
-cost volume encoder-decoder that introduces a strong image prior. You can do this by using 
-`--fusion_use_raw_lowest_cost`.
-
 Meshes will be stored under `results_path/meshes/`.
 
 ```bash
@@ -382,8 +378,21 @@ This repo is geared towards ScanNet, so while its functionality should allow for
 To train a DoubleTake model you'll need the ScanNetv2 dataset and renders of a mesh from an SR model. 
 
 To generate mesh renders, you'll first need to run a SimpleRecon model and cache those depths to disk. You should
-use `scannet_default_train.yaml` and `scannet_default_val.yaml` for this. 
+use `scannet_default_train_inference_style.yaml` and `scannet_default_val_inference_style.yaml` for this. These conigs run the model on test-style keyframes 
+on both train and val splits. Something like this:
 
+```bash
+CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test 
+    --config_file /mnt/nas3/personal/mohameds/weights/geometryhints/hero_model_fast/version_2/config.yaml 
+    --load_weights_from_checkpoint /mnt/nas3/personal/mohameds/weights/geometryhints/hero_model_fast/version_2/checkpoints/epoch=14-step=108993.ckpt 
+    --data_config configs/data/scannet_default_train_test.yaml  
+    --num_workers 8
+    --batch_size 8
+    --cache_depths 
+    --run_fusion 
+    --output_base_path YOUR_OUTPUT_DIR
+    --dataset_path /mnt/scannet;
+```
 
 ## 🙏 Acknowledgements
 

@@ -27,7 +27,7 @@ It can also render the meshes and weights for the full scan at the end.
 For partial meshes run:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train.yaml 
+--data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
 --cached_depth_path hero_model/scannet/default/depths 
 --output_root renders/partial_renders
 --dataset_path /mnt/scannet/ 
@@ -39,7 +39,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 For full mesh renders, use:
 ```
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train.yaml 
+--data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
 --cached_depth_path hero_model/scannet/default/depths 
 --output_root renders/renders
 --dataset_path /mnt/scannet/ 
@@ -48,12 +48,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 --partial 0;
 ```
 
-You'll need the same for validation.
-
-NOTE: if you run SimpleRecon on the train set, the code will flip images going through the model,
-so the cached depths, poses, and intriniscs will be flipped. The fuser here will use those directly,
-and it will fuse correctly as long as the associated pose from the cached file is used. 
-
+You'll need the same for validation using configs/data/scannet/scannet_default_val_inference_style.yaml 
 """
 
 class SimpleScanNetDataset(torch.utils.data.Dataset):

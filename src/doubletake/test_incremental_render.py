@@ -43,8 +43,6 @@ def main(opts):
             mesh_output_folder_name = mesh_output_folder_name + "_masked"
         if opts.fuse_color:
             mesh_output_folder_name = mesh_output_folder_name + "_color"
-        if opts.fusion_use_raw_lowest_cost:
-            mesh_output_folder_name = mesh_output_folder_name + "_raw_cv"
         if opts.extended_neg_truncation:
             mesh_output_folder_name = mesh_output_folder_name + "_neg_trunc"
 
@@ -344,29 +342,6 @@ def main(opts):
                             mode="nearest",
                         ).bool()
                         overall_mask_b1hw = overall_mask_bkhw.sum(1, keepdim=True) > 2
-
-                        upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
-
-                    # fuse the raw best guess depths from the cost volume, off
-                    # by default
-                    if opts.fusion_use_raw_lowest_cost:
-                        # upsampled_depth_pred_b1hw becomes the argmax from the
-                        # cost volume
-                        upsampled_depth_pred_b1hw = outputs["lowest_cost_bhw"].unsqueeze(1)
-
-                        upsampled_depth_pred_b1hw = F.interpolate(
-                            upsampled_depth_pred_b1hw,
-                            size=(depth_gt.shape[-2], depth_gt.shape[-1]),
-                            mode="nearest",
-                        )
-
-                        overall_mask_b1hw = outputs["overall_mask_bhw"].cuda().unsqueeze(1).float()
-
-                        overall_mask_b1hw = F.interpolate(
-                            overall_mask_b1hw,
-                            size=(depth_gt.shape[-2], depth_gt.shape[-1]),
-                            mode="nearest",
-                        ).bool()
 
                         upsampled_depth_pred_b1hw[~overall_mask_b1hw] = -1
 

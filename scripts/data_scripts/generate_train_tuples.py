@@ -23,7 +23,7 @@
         frame_tuple_type: default
         split: train
 
-    For val, use configs/data/scannet_default_val.yaml.
+    For val, use configs/data/scannet/scannet_default_val.yaml.
 
     It will output a tuples file with a tuple list at:
     {tuple_info_file_location}/{split}{mv_split_filesuffix}
