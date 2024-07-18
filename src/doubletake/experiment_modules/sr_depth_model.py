@@ -279,7 +279,6 @@ class DepthModel(pl.LightningModule):
         src_data,
         unbatched_matching_encoder_forward=False,
         return_mask=False,
-        null_plane_sweep=False,
     ):
         """
         Computes a forward pass through the depth model.

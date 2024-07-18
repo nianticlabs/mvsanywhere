@@ -26,6 +26,7 @@ Adapted from https://github.com/AljazBozic/TransformerFusion/blob/main/src/evalu
 
 """
 
+
 def main():
     #####################################################################################
     # Settings.
@@ -137,7 +138,9 @@ def main():
             continue
 
         # Load groundtruth mesh.
-        mesh_gt_path = os.path.join(groundtruth_dir, scene_id, f"{scene_id}_vh_clean.ply".format(scene_id))
+        mesh_gt_path = os.path.join(
+            groundtruth_dir, scene_id, f"{scene_id}_vh_clean.ply".format(scene_id)
+        )
         mesh_gt = o3d.io.read_triangle_mesh(mesh_gt_path)
         gt_pcd = o3d.geometry.PointCloud()
         gt_pcd.points = o3d.utility.Vector3dVector(np.asarray(mesh_gt.vertices))

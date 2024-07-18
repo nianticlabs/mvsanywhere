@@ -159,6 +159,8 @@ class Options:
     # paper for scores. 'open3d' allows color but not batching.
     depth_fuser: str = "ours"
 
+    # extends the negaive truncation band only. Leads to more complete geometry
+    # surfaces with less holes.
     extended_neg_truncation: bool = False
 
     # only run whatever it is this script is doing on a single frame.
@@ -170,11 +172,6 @@ class Options:
 
     # skip to a frame in the scan
     skip_to_frame: int = None
-
-    # point cloud fusion hyperparams.
-    pc_fusion_z_thresh: float = 0.04
-    n_consistent_thresh: int = 3
-    voxel_downsample: float = 0.02
 
     # mask the predicted depth map using the a mask from the cost volume where
     # true indicates available projected source view information. NOT used by
