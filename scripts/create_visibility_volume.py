@@ -26,6 +26,7 @@ The script doesn't render the GT meshes, it assumes that the rendered depth maps
 are already available. See `load_rendered_depth`.
 """
 
+
 class SimpleScanNetDataset(torch.utils.data.Dataset):
     """Simple Dataset for loading ScanNet frames and rendered mesh depths."""
 

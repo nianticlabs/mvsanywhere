@@ -52,6 +52,29 @@ mamba activate doubletake
 
 Download a pretrained model into the `weights/` folder.
 
+We provide the following models (scores are with online default keyframes):
+
+| `--config`  | Model  | Abs Diff↓| Sq Rel↓ | delta < 1.05↑| Chamfer↓ | F-Score↑ |
+|-------------|----------|--------------------|---------|---------|--------------|----------|
+| Online/Incremental using `test_incremental.py` | | | | | | |
+| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0754 | .0109 | 80.29 | 5.03 | 0.689 |
+| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.7 | 5.53 | 0.649 |
+| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | 0.0873 | 0.0128 | 74.1 | 5.29 | 0.668 |
+| Offline/Two Pass using `test_two_pass.py` | | | | | | |
+| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0624 | .0092 | 86.64 | 4.42 | 0.742 |
+| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.7 | 5.53 | 0.649 |
+| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | 0.0812 | 0.0118 | 77.0 | 5.05 | 0.687 |
+| No hint using `test_no_hint` | | | | | | |
+
+
+`hero_model` is the one we use in the paper as **Ours**
+
+## 🚀 Speed
+
+| `--config` |  Model | Inference Speed (`--batch_size 1`) | Inference GPU memory  | Approximate training time   |
+|------------|------------|------------|-------------------------|-----------------------------|
+| `hero_model` | Hero, Metadata + Resnet | 130ms / 70ms (speed optimized) | 2.6GB / 5.7GB (speed optimized)        | 36 hours                    |
+
 
 ## 🏃 Running out of the box!
 
@@ -375,14 +398,15 @@ This repo is geared towards ScanNet, so while its functionality should allow for
 
 
 ## 🔨💾 Training Data Preperation
-To train a DoubleTake model you'll need the ScanNetv2 dataset and renders of a mesh from an SR model. 
+To train a DoubleTake model you'll need the ScanNetv2 dataset and renders of a mesh from an SR model. We provide these
+renders.
 
 To generate mesh renders, you'll first need to run a SimpleRecon model and cache those depths to disk. You should
 use `scannet_default_train_inference_style.yaml` and `scannet_default_val_inference_style.yaml` for this. These conigs run the model on test-style keyframes 
 on both train and val splits. Something like this:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test 
+CUDA_VISIBLE_DEVICES=0 python -m doubletake.test_no_hint 
     --config_file configs/models/simplerecon_model.yaml
     --load_weights_from_checkpoint simplerecon_model_weights.ckpt
     --data_config configs/data/scannet_default_train_inference_style.yaml  
@@ -393,7 +417,7 @@ CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test
     --output_base_path YOUR_OUTPUT_DIR
     --dataset_path SCANNET_DIR;
 
-CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test 
+CUDA_VISIBLE_DEVICES=0 python -m doubletake.test_no_hint 
     --config_file configs/models/simplerecon_model.yaml
     --load_weights_from_checkpoint simplerecon_model_weights.ckpt
     --data_config configs/data/scannet_default_val_inference_style.yaml  
@@ -408,7 +432,7 @@ CUDA_VISIBLE_DEVICES=0 python -m geometryhints.test
 With these cached depths, you can generate mesh renders for training:
 ```bash
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
+--data_config configs/data/scannet/scannet_default_train.yaml 
 --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/partial_renders
 --dataset_path SCANNET_DIR
@@ -417,7 +441,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 --partial 1;
 
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train_inference_style.yaml 
+--data_config configs/data/scannet/scannet_default_train.yaml 
 --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/renders
 --dataset_path /mnt/scannet/ 
@@ -426,7 +450,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 --partial 0;
 
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
+--data_config configs/data/scannet/scannet_default_val.yaml 
 --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/partial_renders
 --dataset_path SCANNET_DIR
@@ -435,7 +459,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 --partial 1;
 
 CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_val_inference_style.yaml 
+--data_config configs/data/scannet/scannet_default_val.yaml 
 --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
 --output_root renders/renders
 --dataset_path /mnt/scannet/ 

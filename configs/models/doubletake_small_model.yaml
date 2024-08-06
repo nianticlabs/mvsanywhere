@@ -1,0 +1,23 @@
+!!python/object:doubletake.options.Options
+feature_volume_type: mlp_mesh_hint_feature_volume
+batch_size: 24
+cost_volume_aggregation: dot
+cv_encoder_type: multi_scale_encoder
+depth_decoder_name: skip
+gpus: 2
+image_encoder_name: resnet18d
+log_interval: 100
+loss_type: log_l1
+lr: 0.0001
+wd: 0.0001
+matching_encoder_type: resnet
+name: doubletake_model
+num_sanity_val_steps: 0
+num_workers: 12
+precision: 16
+random_seed: 0
+model_type: cv_hint_depth_model
+lr_steps: [70000, 80000]
+
+fill_depth_hints: True
+depth_hint_aug: 0.5

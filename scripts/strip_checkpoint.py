@@ -13,12 +13,16 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("--heavy_checkpoint_path")
 parser.add_argument("--output_checkpoint_path")
+parser.add_argument("--strip_hparams", action="store_true")
 
 args = parser.parse_args()
 
 checkpoint = torch.load(args.heavy_checkpoint_path)
 
-keys_to_store = ["state_dict", "hparams_name", "hyper_parameters"]
+if args.strip_hparams:
+    keys_to_store = ["state_dict"]
+else:
+    keys_to_store = ["state_dict", "hparams_name", "hyper_parameters"]
 
 new_checkpoint = {}
 for key in keys_to_store:

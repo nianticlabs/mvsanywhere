@@ -29,7 +29,7 @@ def incremental(checkpoint: str, output_dir: Path):
         [
             "python",
             "-m",
-            "doubletake.test_incremental_render",
+            "doubletake.test_incremental",
             "--config_file",
             "configs/models/doubletake_model.yaml",
             "--data_config",
