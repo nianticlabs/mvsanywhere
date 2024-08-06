@@ -196,7 +196,7 @@ def render_scene_meshes(
                 depth_1hw[depth_1hw == -1] = 0
                 mask_1hw = depth_1hw != 0
 
-                numpy_depth = (depth_1hw.cpu().numpy().squeeze() * 256).astype("uint16")
+                numpy_depth = (depth_1hw.cpu().numpy().squeeze() * 2048).astype("uint16")
                 Image.fromarray(numpy_depth).save(depth_path)
 
                 sampled_weights_1hw = None
@@ -221,7 +221,7 @@ def render_scene_meshes(
                         / f"sampled_weights_{batch['frame_id_str'][elem_ind]}.png"
                     )
 
-                    numpy_weights = (sampled_weights_1hw.cpu().numpy().squeeze() * 256).astype(
+                    numpy_weights = (sampled_weights_1hw.cpu().numpy().squeeze() * 8192).astype(
                         "uint16"
                     )
                     Image.fromarray(numpy_weights).save(weights_path)
