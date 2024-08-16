@@ -57,15 +57,17 @@ We provide the following models (scores are with online default keyframes):
 | `--config`  | Model  | Abs Diff↓| Sq Rel↓ | delta < 1.05↑| Chamfer↓ | F-Score↑ |
 |-------------|----------|--------------------|---------|---------|--------------|----------|
 | Online/Incremental using `test_incremental.py` | | | | | | |
-| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0754 | .0109 | 80.29 | 5.03 | 0.689 |
-| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.7 | 5.53 | 0.649 |
-| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | 0.0873 | 0.0128 | 74.1 | 5.29 | 0.668 |
+| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0754 | .0109 | 80.29 | 5.03 | .689 |
+| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.75 | 5.53 | .649 |
+| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
 | Offline/Two Pass using `test_two_pass.py` | | | | | | |
-| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0624 | .0092 | 86.64 | 4.42 | 0.742 |
-| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.7 | 5.53 | 0.649 |
-| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | 0.0812 | 0.0118 | 77.0 | 5.05 | 0.687 |
-| No hint using `test_no_hint` | | | | | | |
-
+| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0624 | .0092 | 86.64 | 4.42 | .742 |
+| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0631 | .0097 | 86.36 | 4.64 | .723 |
+| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0812 | .0118 | 77.02 | 5.05 | .687 |
+| No hint and online using `test_no_hint` | | | | | | |
+| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0863 | .0127 | 74.64 | 4.42 | .742 |
+| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0938 | .0148 | 72.02 | 5.50 | .650 |
+| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
 
 `hero_model` is the one we use in the paper as **Ours**
 
@@ -430,42 +432,43 @@ CUDA_VISIBLE_DEVICES=0 python -m doubletake.test_no_hint
 ```
 
 With these cached depths, you can generate mesh renders for training:
+
 ```bash
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train.yaml 
---cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
---output_root renders/partial_renders
---dataset_path SCANNET_DIR
---batch_size 4 
---data_to_render both 
---partial 1;
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_train.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/partial_renders \
+    --dataset_path SCANNET_DIR \
+    --batch_size 4 \
+    --data_to_render both \
+    --partial 1;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_train.yaml 
---cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
---output_root renders/renders
---dataset_path /mnt/scannet/ 
---batch_size 4 
---data_to_render both 
---partial 0;
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_train.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/renders \
+    --dataset_path /mnt/scannet/ \
+    --batch_size 4 \
+    --data_to_render both \
+    --partial 0;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_val.yaml 
---cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
---output_root renders/partial_renders
---dataset_path SCANNET_DIR
---batch_size 4 
---data_to_render both 
---partial 1;
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_val.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/partial_renders \
+    --dataset_path SCANNET_DIR \
+    --batch_size 4 \
+    --data_to_render both \
+    --partial 1;
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py 
---data_config configs/data/scannet/scannet_default_val.yaml 
---cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths 
---output_root renders/renders
---dataset_path /mnt/scannet/ 
---batch_size 4
---data_to_render both
---partial 0;
+CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py \
+    --data_config configs/data/scannet/scannet_default_val.yaml \
+    --cached_depth_path YOUR_OUTPUT_DIR/simplerecon_model/scannet/default/depths \
+    --output_root renders/renders \
+    --dataset_path /mnt/scannet/ \
+    --batch_size 4 \
+    --data_to_render both \
+    --partial 0;
 ```
 
 ## 🙏 Acknowledgements
