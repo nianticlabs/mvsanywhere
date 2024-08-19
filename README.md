@@ -52,24 +52,23 @@ mamba activate doubletake
 
 Download a pretrained model into the `weights/` folder.
 
-We provide the following models (scores are with online default keyframes):
+We provide three models. The standard DoubleTake model used for incremental, offline, and revisit evaluation on all datasets and figures in the paper, a slimmed down faster version of DoubleTake, and the vanilla SimpleRecon model we used for SimpleRecon scores. Use the links in the table to access the weights for each.
 
 | `--config`  | Model  | Abs Diff↓| Sq Rel↓ | delta < 1.05↑| Chamfer↓ | F-Score↑ |
 |-------------|----------|--------------------|---------|---------|--------------|----------|
 | Online/Incremental using `test_incremental.py` | | | | | | |
-| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0754 | .0109 | 80.29 | 5.03 | .689 |
-| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0825 | .0124 | 76.75 | 5.53 | .649 |
-| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
+| [`configs/models/doubletake_model.yaml`](https://storage.googleapis.com/niantic-lon-static/research/doubletake/doubletake_model.ckpt) | Ours from paper | .0754 | .0109 | 80.29 | 5.03 | .689 |
+| [`configs/models/doubletake_small_model.yaml`](https://storage.googleapis.com/niantic-lon-static/research/doubletake/doubletake_small_model.ckpt) | Ours fast from paper | .0825 | .0124 | 76.75 | 5.53 | .649 |
+| [`configs/models/simplerecon_model.yaml`](https://storage.googleapis.com/niantic-lon-static/research/doubletake/simplerecon_model) | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
 | Offline/Two Pass using `test_two_pass.py` | | | | | | |
-| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0624 | .0092 | 86.64 | 4.42 | .742 |
-| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0631 | .0097 | 86.36 | 4.64 | .723 |
-| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0812 | .0118 | 77.02 | 5.05 | .687 |
+| configs/models/doubletake_model.yaml | Ours from paper | .0624 | .0092 | 86.64 | 4.42 | .742 |
+| configs/models/doubletake_small_model.yaml | Ours fast from paper | .0631 | .0097 | 86.36 | 4.64 | .723 |
+| configs/models/simplerecon_model.yaml | SimpleRecon | .0812 | .0118 | 77.02 | 5.05 | .687 |
 | No hint and online using `test_no_hint` | | | | | | |
-| [`configs/models/doubletake_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours from paper | .0863 | .0127 | 74.64 | 4.42 | .742 |
-| [`configs/models/doubletake_small_model.yaml`](https://drive.google.com/file/d/1hCuKZjEq-AghrYAmFxJs_4eeixIlP488/view?usp=sharing) | Ours fast from paper | .0938 | .0148 | 72.02 | 5.50 | .650 |
-| [`simplerecon_model.yaml`](https://drive.google.com/file/d/13lW-VPgsl2eAo95E87RKWoK8KUZelkUK/view?usp=sharing) | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
+| configs/models/doubletake_model.yaml | Ours from paper | .0863 | .0127 | 74.64 | 5.22 | .672 |
+| configs/models/doubletake_small_model.yaml | Ours fast from paper | .0938 | .0148 | 72.02 | 5.50 | .650 |
+| configs/models/simplerecon_model.yaml | SimpleRecon | .0873 | .0128 | 74.12 | 5.29 | .668 |
 
-`hero_model` is the one we use in the paper as **Ours**
 
 ## 🚀 Speed
 
