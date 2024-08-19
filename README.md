@@ -71,10 +71,7 @@ We provide three models. The standard DoubleTake model used for incremental, off
 
 
 ## 🚀 Speed
-
-| `--config` |  Model | Inference Speed (`--batch_size 1`) | Inference GPU memory  | Approximate training time   |
-|------------|------------|------------|-------------------------|-----------------------------|
-| `hero_model` | Hero, Metadata + Resnet | 130ms / 70ms (speed optimized) | 2.6GB / 5.7GB (speed optimized)        | 36 hours                    |
+Please see the paper and supplemental material for details on runtime.
 
 
 ## 🏃 Running out of the box!
@@ -88,10 +85,10 @@ Steps:
 4. You should be able to run it! Something like this will work:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python test.py --name HERO_MODEL \
+CUDA_VISIBLE_DEVICES=0 python test_incremental.py --name doubletake \
             --output_base_path OUTPUT_PATH \
-            --config_file configs/models/hero_model.yaml \
-            --load_weights_from_checkpoint weights/hero_model.ckpt \
+            --config_file configs/models/doubletake_model.yaml \
+            --load_weights_from_checkpoint weights/doubletake_model.ckpt \
             --data_config configs/data/vdr_dense.yaml \
             --num_workers 8 \
             --batch_size 2 \
