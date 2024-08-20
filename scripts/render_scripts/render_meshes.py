@@ -51,6 +51,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/render_scripts/render_meshes.py
 You'll need the same for validation using configs/data/scannet/scannet_default_val_inference_style.yaml 
 """
 
+
 class SimpleScanNetDataset(torch.utils.data.Dataset):
     """Simple Dataset for loading ScanNet frames."""
 
