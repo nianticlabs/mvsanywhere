@@ -5,6 +5,7 @@ from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
 from doubletake.datasets.vdr_dataset import VDRDataset
+from doubletake.datasets.dtu_dataset import DTUDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -139,6 +140,22 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
         if verbose:
             print(f"".center(80, "#"))
             print(f" 3RScan Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "dtu":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = DTUDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" DTU Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
 

@@ -1,4 +1,5 @@
 import logging
+import re
 import os
 import pickle
 from pathlib import Path
@@ -266,6 +267,70 @@ def read_image_file(
 
     img = TF.to_tensor(img).float() * value_scale_factor
 
+    return img
+
+
+def read_pfm_file(
+    filename,
+    height=None, 
+    width=None, 
+    value_scale_factor=1.0, 
+    resampling_mode=Image.BILINEAR,
+    disable_warning=False,
+    target_aspect_ratio=None
+):
+
+    file = open(filename, 'rb')
+
+    header = file.readline().decode('utf-8').rstrip()
+    if header == 'PF':
+        color = True
+    elif header == 'Pf':
+        color = False
+    else:
+        raise Exception('Not a PFM file.')
+
+    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline().decode('utf-8'))
+    if dim_match:
+        w, h = map(int, dim_match.groups())
+    else:
+        raise Exception('Malformed PFM header.')
+
+    scale = float(file.readline().rstrip())
+    if scale < 0:  # little-endian
+        endian = '<'
+        scale = -scale
+    else:
+        endian = '>'  # big-endian
+
+    data = np.fromfile(file, endian + 'f')
+    shape = (h, w, 3) if color else (h, w)
+
+    data = np.reshape(data, shape)
+    data = np.flipud(data)
+    file.close()
+
+    img = Image.fromarray(data)
+    # Stuff from read_image_file
+    if target_aspect_ratio:
+        crop_image_to_target_ratio(img, target_aspect_ratio)
+
+    # resize if both width and height are not none.
+    if height is not None and width is not None:
+        img_width, img_height = img.size
+        # do we really need to resize? If not, skip.
+        if (img_width, img_height) != (width, height):
+            # warn if it doesn't make sense.
+            if ((width > img_width or height > img_height) and 
+                    not disable_warning):
+                logger.warning(
+                    f"WARNING: target size ({width}, {height}) has a "
+                    f"dimension larger than input size ({img_width}, "
+                    f"{img_height}).")
+            img = img.resize((width, height), resample=resampling_mode)
+
+    img = TF.to_tensor(img).float() * value_scale_factor
+    
     return img
 
 

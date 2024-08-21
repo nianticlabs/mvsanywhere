@@ -617,6 +617,7 @@ class DepthModel(pl.LightningModule):
                     sync_dist=True,
                     on_step=is_train,
                     on_epoch=not is_train,
+                    prog_bar=True
                 )
 
             # high_res_validation: it isn't always wise to load in high

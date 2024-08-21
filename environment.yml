@@ -1,4 +1,4 @@
-name: doubletake
+name: fmvs
 channels:
   - default
   - pytorch
@@ -41,6 +41,6 @@ dependencies:
     - pytest-timeout==2.1.0
     - pytest-fail-slow==0.3.0
     - loguru==0.7.2
-    - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes
+    # - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes
     - opencv-python==4.9.0.80
     - ninja==1.11.1.1
