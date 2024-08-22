@@ -60,9 +60,6 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
         image_width=opts.image_width,
         image_height=opts.image_height,
         shuffle_tuple=opts.shuffle_tuple,
-        fill_depth_hints=opts.fill_depth_hints,
-        depth_hint_aug=opts.depth_hint_aug,
-        depth_hint_dir=opts.depth_hint_dir,
     )
 
     train_dataloader = DataLoader(
@@ -76,133 +73,28 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
     )
 
     val_dataloaders = []
-    if opts.fill_depth_hints:
-        val_dataset = dataset_class(
-            opts.dataset_path,
-            split="val",
-            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-            num_images_in_tuple=opts.num_images_in_tuple,
-            tuple_info_file_location=opts.tuple_info_file_location,
-            image_width=opts.image_width,
-            image_height=opts.image_height,
-            include_full_res_depth=opts.high_res_validation,
-            fill_depth_hints=opts.fill_depth_hints,
-            depth_hint_aug=0.5,
-            depth_hint_dir=opts.depth_hint_dir,
-        )
+    val_dataset = dataset_class(
+        opts.dataset_path,
+        split="val",
+        mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
+        num_images_in_tuple=opts.num_images_in_tuple,
+        tuple_info_file_location=opts.tuple_info_file_location,
+        image_width=opts.image_width,
+        image_height=opts.image_height,
+        include_full_res_depth=opts.high_res_validation,
+    )
 
-        val_dataloaders.append(
-            DataLoader(
-                val_dataset,
-                batch_size=opts.val_batch_size,
-                shuffle=False,
-                num_workers=max(opts.num_workers // 2, 1),
-                pin_memory=True,
-                drop_last=True,
-                persistent_workers=False,
-            )
+    val_dataloaders.append(
+        DataLoader(
+            val_dataset,
+            batch_size=opts.val_batch_size,
+            shuffle=False,
+            num_workers=opts.num_workers,
+            pin_memory=True,
+            drop_last=True,
+            persistent_workers=True,
         )
-
-        val_dataset = dataset_class(
-            opts.dataset_path,
-            split="val",
-            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-            num_images_in_tuple=opts.num_images_in_tuple,
-            tuple_info_file_location=opts.tuple_info_file_location,
-            image_width=opts.image_width,
-            image_height=opts.image_height,
-            include_full_res_depth=opts.high_res_validation,
-            fill_depth_hints=opts.fill_depth_hints,
-            depth_hint_aug=1.0,
-            depth_hint_dir=opts.depth_hint_dir,
-        )
-
-        val_dataloaders.append(
-            DataLoader(
-                val_dataset,
-                batch_size=opts.val_batch_size,
-                shuffle=False,
-                num_workers=max(opts.num_workers // 2, 1),
-                pin_memory=True,
-                drop_last=True,
-                persistent_workers=False,
-            )
-        )
-
-        val_dataset = dataset_class(
-            opts.dataset_path,
-            split="val",
-            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-            num_images_in_tuple=opts.num_images_in_tuple,
-            tuple_info_file_location=opts.tuple_info_file_location,
-            image_width=opts.image_width,
-            image_height=opts.image_height,
-            include_full_res_depth=opts.high_res_validation,
-            fill_depth_hints=opts.fill_depth_hints,
-            depth_hint_aug=0.0,
-            depth_hint_dir=opts.depth_hint_dir,
-        )
-
-        val_dataloaders.append(
-            DataLoader(
-                val_dataset,
-                batch_size=opts.val_batch_size,
-                shuffle=False,
-                num_workers=max(opts.num_workers // 2, 1),
-                pin_memory=True,
-                drop_last=True,
-                persistent_workers=False,
-            )
-        )
-
-        val_dataset = dataset_class(
-            opts.dataset_path,
-            split="val",
-            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-            num_images_in_tuple=opts.num_images_in_tuple,
-            tuple_info_file_location=opts.tuple_info_file_location,
-            image_width=opts.image_width,
-            image_height=opts.image_height,
-            include_full_res_depth=opts.high_res_validation,
-            fill_depth_hints=opts.fill_depth_hints,
-            depth_hint_aug=0.0,
-            depth_hint_dir=opts.depth_hint_dir,
-        )
-
-        val_dataloaders.append(
-            DataLoader(
-                val_dataset,
-                batch_size=opts.val_batch_size,
-                shuffle=False,
-                num_workers=max(opts.num_workers // 2, 1),
-                pin_memory=True,
-                drop_last=True,
-                persistent_workers=False,
-            )
-        )
-    else:
-        val_dataset = dataset_class(
-            opts.dataset_path,
-            split="val",
-            mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-            num_images_in_tuple=opts.num_images_in_tuple,
-            tuple_info_file_location=opts.tuple_info_file_location,
-            image_width=opts.image_width,
-            image_height=opts.image_height,
-            include_full_res_depth=opts.high_res_validation,
-        )
-
-        val_dataloaders.append(
-            DataLoader(
-                val_dataset,
-                batch_size=opts.val_batch_size,
-                shuffle=False,
-                num_workers=opts.num_workers,
-                pin_memory=True,
-                drop_last=True,
-                persistent_workers=True,
-            )
-        )
+    )
     return train_dataloader, val_dataloaders
 
 
@@ -224,7 +116,7 @@ def prepare_callbacks(
         save_last=True,
         save_top_k=1,
         verbose=True,
-        monitor="val_0_metrics/a5" if opts.fill_depth_hints else "val_metrics/a5",
+        monitor="val_metrics/a5",
         mode="max",
         dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
     )

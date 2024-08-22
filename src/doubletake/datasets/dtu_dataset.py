@@ -47,12 +47,11 @@ class DTUDataset(GenericMVSDataset):
         verbose_init=True,
         min_valid_depth=1e-3,
         max_valid_depth=10,
-        fill_depth_hints=False,
-        load_empty_hints=False,
-        depth_hint_aug=0.0,
-        depth_hint_dir=None,
         disable_flip=False,
         rotate_images=False,
+        matching_scale=0.25,
+        prediction_scale=0.5,
+        prediction_num_scales=5,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -74,11 +73,10 @@ class DTUDataset(GenericMVSDataset):
             skip_frames=skip_frames,
             skip_to_frame=skip_to_frame,
             verbose_init=verbose_init,
-            fill_depth_hints=fill_depth_hints,
-            load_empty_hints=load_empty_hints,
-            depth_hint_dir=depth_hint_dir,
-            depth_hint_aug=depth_hint_aug,
             disable_flip=disable_flip,
+            matching_scale=matching_scale,
+            prediction_scale=prediction_scale,
+            prediction_num_scales=prediction_num_scales,
         )
 
         """
@@ -261,12 +259,18 @@ class DTUDataset(GenericMVSDataset):
             output_dict[f"K_full_depth_b44"] = K.clone()
             output_dict[f"invK_full_depth_b44"] = torch.tensor(np.linalg.inv(K))
 
+        K_matching = K.clone()
+        K_matching[0] *= self.matching_width / float(data['depthWidth'])
+        K_matching[1] *= self.matching_height / float(data["depthHeight"])
+        output_dict["K_matching_b44"] = K_matching
+        output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
+
         # scale intrinsics to the dataset's configured depth resolution.
         K[0] *= self.depth_width / float(data['depthWidth'])
         K[1] *= self.depth_height / float(data['depthHeight'])
 
         # Get the intrinsics of all scales at various resolutions.
-        for i in range(5):
+        for i in range(self.prediction_num_scales):
             K_scaled = K.clone()
             K_scaled[:2] /= 2 ** i
             invK_scaled = np.linalg.inv(K_scaled)

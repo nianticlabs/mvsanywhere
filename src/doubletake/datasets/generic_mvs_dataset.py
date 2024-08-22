@@ -76,6 +76,9 @@ class GenericMVSDataset(Dataset):
         depth_hint_dir=None,
         disable_flip=False,
         rotate_images=False,
+        matching_scale=0.25,
+        prediction_scale=0.5,
+        prediction_num_scales=5,
     ):
         """
         Args:
@@ -193,8 +196,11 @@ class GenericMVSDataset(Dataset):
         self.high_res_image_height = high_res_image_height
 
         # size up depth using ratio of RGB to depth
-        self.depth_height = self.image_height // image_depth_ratio
-        self.depth_width = self.image_width // image_depth_ratio
+        self.depth_height = int(self.image_height * prediction_scale)
+        self.depth_width = int(self.image_width * prediction_scale)
+
+        self.matching_height = int(self.image_height * matching_scale)
+        self.matching_width = int(self.image_width * matching_scale)
 
         self.native_depth_width = native_depth_width
         self.native_depth_height = native_depth_height
@@ -216,6 +222,10 @@ class GenericMVSDataset(Dataset):
         self.disable_flip = disable_flip
 
         self.rotate_images = rotate_images
+
+        self.matching_scale = matching_scale
+        self.prediction_scale = prediction_scale
+        self.prediction_num_scales = prediction_num_scales
 
     def __len__(self):
         return len(self.frame_tuples)

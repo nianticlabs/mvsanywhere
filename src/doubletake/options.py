@@ -126,9 +126,19 @@ class Options:
     # number of channels for matching features
     matching_feature_dims: int = 16
 
-    # scale to match features at. 1 means half the final depth output size, or a
-    # quarter of image resolution.
-    matching_scale: int = 1
+    # scale of predicted depth. 0.5 means half of image resolution.
+    prediction_scale: float = 0.5
+
+    # number of scales at which depth is predicted
+    # for prediction_num_scales = n, depth is predicted at scales:
+    #  0: prediction_scale / 2 ** 0
+    #  1: prediction_scale / 2 ** 1
+    #  ...
+    #  n-1: prediction_scale / 2 ** (n-1)
+    prediction_num_scales: int = 5
+
+    # scale to match features at. 0.25 means quarter of image resolution.
+    matching_scale: float = 0.25
     # number of depth bins to use in the cost volume.
     matching_num_depth_bins: int = 64
     # min and max depth planes in the cost volume
@@ -222,12 +232,6 @@ class Options:
     # for quick_viz_export, whether or not to use a fixed min and max at 0 and 5m
     # for visualization
     viz_fixed_min_max: bool = False
-
-    ############################### Depth Hints ##############################
-    fill_depth_hints: bool = False
-    depth_hint_aug: float = 0.0
-    depth_hint_dir: str = None
-    load_empty_hint: bool = False
 
 
 class OptionsHandler:

@@ -5,6 +5,7 @@ import timm
 import torch
 import torch.nn.functional as F
 from torch import nn
+import numpy as np
 
 from doubletake.losses import (
     MSGradientLoss,
@@ -142,11 +143,11 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             self.cost_volume_net = CVEncoder(
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_enc=self.encoder.num_ch_enc[self.run_opts.matching_scale :],
+                num_ch_enc=self.encoder.num_ch_enc[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
                 num_ch_outs=[64, 128, 256, 384],
             )
             dec_num_input_ch = (
-                self.encoder.num_ch_enc[: self.run_opts.matching_scale]
+                self.encoder.num_ch_enc[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))]
                 + self.cost_volume_net.num_ch_enc
             )
         else:
@@ -166,8 +167,8 @@ class DepthModel(pl.LightningModule):
         self.abs_loss = nn.L1Loss()
         self.normals_loss = NormalsLoss()
         self.mv_depth_loss = MVDepthLoss(
-            self.run_opts.image_height // 2,
-            self.run_opts.image_width // 2,
+            int(self.run_opts.image_height * self.run_opts.prediction_scale),
+            int(self.run_opts.image_width * self.run_opts.prediction_scale),
         )
 
         # Pick the multiscale loss
@@ -178,8 +179,8 @@ class DepthModel(pl.LightningModule):
 
         # used for normals loss
         self.compute_normals = NormalGenerator(
-            self.run_opts.image_height // 2,
-            self.run_opts.image_width // 2,
+            int(self.run_opts.image_height * self.run_opts.prediction_scale),
+            int(self.run_opts.image_width * self.run_opts.prediction_scale),
         )
 
         # what type of cost volume are we using?
@@ -194,8 +195,8 @@ class DepthModel(pl.LightningModule):
             )
 
         self.cost_volume = cost_volume_class(
-            matching_height=self.run_opts.image_height // (2 ** (self.run_opts.matching_scale + 1)),
-            matching_width=self.run_opts.image_width // (2 ** (self.run_opts.matching_scale + 1)),
+            matching_height=int(self.run_opts.image_height * self.run_opts.matching_scale),
+            matching_width=int(self.run_opts.image_width * self.run_opts.matching_scale),
             num_depth_bins=self.run_opts.matching_num_depth_bins,
             matching_dim_size=self.run_opts.matching_feature_dims,
             num_source_views=opts.model_num_views - 1,
@@ -340,8 +341,8 @@ class DepthModel(pl.LightningModule):
         # get all tensors from the batch dictioanries.
         cur_image = cur_data["image_b3hw"]
         src_image = src_data["image_b3hw"]
-        src_K = src_data[f"K_s{self.run_opts.matching_scale}_b44"]
-        cur_invK = cur_data[f"invK_s{self.run_opts.matching_scale}_b44"]
+        src_K = src_data[f"K_matching_b44"]
+        cur_invK = cur_data[f"invK_matching_b44"]
         src_cam_T_world = src_data["cam_T_world_b44"]
         src_world_T_cam = src_data["world_T_cam_b44"]
 
@@ -408,9 +409,9 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
                 cost_volume,
-                cur_feats[self.run_opts.matching_scale :],
+                cur_feats[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
             )
-            cur_feats = cur_feats[: self.run_opts.matching_scale] + cost_volume_features
+            cur_feats = cur_feats[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))] + cost_volume_features
 
         # Decode into depth at multiple resolutions.
         depth_outputs = self.depth_decoder(cur_feats)
