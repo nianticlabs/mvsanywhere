@@ -60,6 +60,9 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
         image_width=opts.image_width,
         image_height=opts.image_height,
         shuffle_tuple=opts.shuffle_tuple,
+        matching_scale=opts.matching_scale,
+        prediction_scale=opts.prediction_scale,
+        prediction_num_scales=opts.prediction_num_scales
     )
 
     train_dataloader = DataLoader(
@@ -82,6 +85,9 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
         image_width=opts.image_width,
         image_height=opts.image_height,
         include_full_res_depth=opts.high_res_validation,
+        matching_scale=opts.matching_scale,
+        prediction_scale=opts.prediction_scale,
+        prediction_num_scales=opts.prediction_num_scales
     )
 
     val_dataloaders.append(
@@ -178,7 +184,7 @@ def prepare_ddp_strategy(opts: options.Options) -> Strategy:
         data parallel strategy
     """
     # allowing the lightning DDPPlugin to ignore unused params.
-    find_unused_parameters = opts.matching_encoder_type == "unet_encoder"
+    find_unused_parameters = opts.matching_encoder_type == "unet_encoder" or "dinov2" in opts.image_encoder_name 
     return DDPStrategy(find_unused_parameters=find_unused_parameters)
 
 
