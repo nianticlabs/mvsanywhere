@@ -14,6 +14,7 @@ from doubletake.losses import (
     ScaleInvariantLoss,
 )
 from doubletake.modules.cost_volume import CostVolumeManager
+from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.feature_volume import FeatureVolumeManager
 from doubletake.modules.layers import TensorFormatter
 from doubletake.modules.networks import (
@@ -23,6 +24,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -135,6 +137,10 @@ class DepthModel(pl.LightningModule):
             self.encoder = timm.create_model("resnet18d", pretrained=True, features_only=True)
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
+        elif 'dinov2' in self.run_opts.image_encoder_name:
+            self.encoder = DINOv2(self.run_opts.image_encoder_name)
+            if self.run_opts.da_weights_path is not None:
+                self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for image encoder type!")
 
@@ -150,6 +156,20 @@ class DepthModel(pl.LightningModule):
                 self.encoder.num_ch_enc[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))]
                 + self.cost_volume_net.num_ch_enc
             )
+        elif self.run_opts.cv_encoder_type == 'vit_encoder':
+            self.cost_volume_net = ViTCVEncoder(
+                model_name=self.run_opts.image_encoder_name,
+                num_ch_cv=self.run_opts.matching_num_depth_bins,
+            )
+        elif self.run_opts.cv_encoder_type == "cnn_encoder":
+            self.cost_volume_net = CNNCVEncoder(
+                model_name=self.run_opts.image_encoder_name,
+                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                num_ch_outs=[64, 128, 256, 384]
+            )
+            dec_num_input_ch = [32, 64, 128, 256, 384]
+            if self.run_opts.da_weights_path is not None:
+                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for cost volume encoder type!")
 
@@ -158,6 +178,10 @@ class DepthModel(pl.LightningModule):
             self.depth_decoder = DepthDecoderPP(dec_num_input_ch)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
+        elif self.run_opts.depth_decoder_name == "dpt":
+            self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for depth decoder name!")
 
@@ -412,6 +436,16 @@ class DepthModel(pl.LightningModule):
                 cur_feats[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
             )
             cur_feats = cur_feats[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))] + cost_volume_features
+        elif self.run_opts.cv_encoder_type == "vit_encoder":
+            cur_feats = self.cost_volume_net(
+                        cost_volume, 
+                        cur_feats[:-1],
+                    )
+        elif self.run_opts.cv_encoder_type == "cnn_encoder":
+            cur_feats = self.cost_volume_net(
+                        cost_volume, 
+                        cur_feats,
+                    )     
 
         # Decode into depth at multiple resolutions.
         depth_outputs = self.depth_decoder(cur_feats)
