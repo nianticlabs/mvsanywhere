@@ -148,6 +148,9 @@ class Options:
     # type of cost volume encoder.
     cv_encoder_type: str = "multi_scale_encoder"
 
+    # path of Depth Anything weights to start from
+    da_weights_path: str = None
+
     # type of cost volume to use. SimpleRecon's metadata model uses the
     # 'mlp_feature_volume' model. Also available in this repo is a simple dot
     # reduction model 'simple_cost_volume'
