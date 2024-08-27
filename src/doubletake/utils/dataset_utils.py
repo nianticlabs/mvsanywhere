@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 
 from doubletake.datasets.scannet_dataset import ScannetDataset
@@ -6,6 +7,8 @@ from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
 from doubletake.datasets.vdr_dataset import VDRDataset
 from doubletake.datasets.dtu_dataset import DTUDataset
+from doubletake.datasets.hypersim import HypersimDataset
+from doubletake.datasets.tartanair import TartanAirDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -156,6 +159,36 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
         if verbose:
             print(f"".center(80, "#"))
             print(f" DTU Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "hypersim":
+        with open(split_filepath, "r") as file:
+            scans = json.load(file)
+            scans = [scan for scan in scans.keys()]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = HypersimDataset
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" Hypersim Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "tartanair":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = TartanAirDataset
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" TartanAir Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
 
