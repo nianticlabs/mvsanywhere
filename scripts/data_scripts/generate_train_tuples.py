@@ -47,7 +47,7 @@ from pathlib import Path
 
 import numpy as np
 import doubletake.options as options
-from doubletake.tools.keyframe_buffer import DVMVS_Config, is_valid_pair
+from doubletake.tools.keyframe_buffer import DVMVS_Config, DVMVS_TartanAir_Config, is_valid_pair
 from doubletake.utils.dataset_utils import get_dataset
 
 
@@ -175,6 +175,11 @@ def crawl_subprocess_short(opts_temp_filepath, scan, count, progress):
         verbose_init=False,
     )
 
+    if opts.dataset == "tartanair":
+        keyframe_config = DVMVS_TartanAir_Config
+    else:
+        keyframe_config = DVMVS_Config
+
     valid_frames = ds.get_valid_frame_ids(opts.split, scan)
 
     frame_ind_to_frame_id = {}
@@ -195,8 +200,8 @@ def crawl_subprocess_short(opts_temp_filepath, scan, count, progress):
             poses,
             used_pairs,
             is_backward=multiplier[1],
-            initial_pose_dist_min=(multiplier[0] * DVMVS_Config.train_minimum_pose_distance),
-            initial_pose_dist_max=(multiplier[0] * DVMVS_Config.train_maximum_pose_distance),
+            initial_pose_dist_min=(multiplier[0] * keyframe_config.train_minimum_pose_distance),
+            initial_pose_dist_max=(multiplier[0] * keyframe_config.train_maximum_pose_distance),
         )
 
         for pair in pairs:
@@ -265,6 +270,12 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
         verbose_init=False,
     )
 
+    if opts.dataset == "tartanair":
+        keyframe_config = DVMVS_TartanAir_Config
+    else:
+        keyframe_config = DVMVS_Config
+
+
     valid_frames = ds.get_valid_frame_ids(opts.split, scan)
 
     frame_ind_to_frame_id = {}
@@ -287,7 +298,7 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
     for i in range(sequence_length):
         used_nodes[i] = 0
 
-    calculated_step = DVMVS_Config.train_crawl_step
+    calculated_step = keyframe_config.train_crawl_step
     samples = []
     for offset, multiplier, is_backward in [
         (0 % calculated_step, 1.0, False),
@@ -336,10 +347,10 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
                     check3 = is_valid_pair(
                         poses[previous_index],
                         poses[current_index],
-                        (multiplier * DVMVS_Config.train_minimum_pose_distance),
-                        (multiplier * DVMVS_Config.train_maximum_pose_distance),
+                        (multiplier * keyframe_config.train_minimum_pose_distance),
+                        (multiplier * keyframe_config.train_maximum_pose_distance),
                         t_norm_threshold=(
-                            multiplier * DVMVS_Config.train_minimum_pose_distance * 0.5
+                            multiplier * keyframe_config.train_minimum_pose_distance * 0.5
                         ),
                     )
 
