@@ -18,7 +18,7 @@ import doubletake.options as options
 
 # When testing & developing with opened K8s port-forward, use "http://localhost:8265":
 #  $ kubectl port-forward services/ray-cluster-head-svc 8265:8265
-RAY_INSTANCE = "http://geometryhints.ray.masala.eng.nianticlabs.com"
+RAY_INSTANCE = "http://project1.ray.interns.eng.nianticlabs.com/"
 
 
 class RayRunner:
@@ -49,7 +49,8 @@ class RayRunner:
             runtime_env={
                 "working_dir": ".",
                 "py_modules": ["src/doubletake"],
-                "excludes": [".git", "media/*", "data_splits/*", "*.ckpt"],
+                "conda": "environment.yml",
+                "excludes": [".git", "media/*", "*.ckpt"],
             },
         )
         logger.info(f"Job submitted successfully! 🎉 Job ID: {submission_id}")
