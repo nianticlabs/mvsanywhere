@@ -1,0 +1,9 @@
+!!python/object:doubletake.options.Options
+dataset_path: /mnt/nas3/shared/datasets/tartanair/
+tuple_info_file_location: data_splits/tartanair/
+dataset_scan_split_file: data_splits/tartanair/val_scans.txt
+dataset: tartanair
+mv_tuple_file_suffix: _eight_view_deepvmvs_bd.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: val
