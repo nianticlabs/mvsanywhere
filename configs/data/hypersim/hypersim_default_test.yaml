@@ -1,4 +1,4 @@
-!!python/object:doubletake.options.Options
+!!python/object:doubletake.options.DataOptions
 dataset_path: /mnt/nas3/shared/datasets/hypersim/raw/
 tuple_info_file_location: data_splits/hypersim/standard_split/
 dataset_scan_split_file: data_splits/hypersim/standard_split/test_files_all.json

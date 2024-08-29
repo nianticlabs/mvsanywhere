@@ -1,4 +1,4 @@
-!!python/object:doubletake.options.Options
+!!python/object:doubletake.options.DataOptions
 dataset_path: /mnt/nas3/shared/datasets/tartanair/
 tuple_info_file_location: data_splits/tartanair/
 dataset_scan_split_file: data_splits/tartanair/val_scans.txt
