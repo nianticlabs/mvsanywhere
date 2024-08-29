@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from modules.layers import BasicBlock
+from doubletake.modules.layers import BasicBlock
 
 DINOV2_ARCHS = {
     'dinov2_vits14': 384,
