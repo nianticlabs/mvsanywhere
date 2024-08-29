@@ -608,6 +608,8 @@ class GenericMVSDataset(Dataset):
                     "depth_b1hw": depth,
                     "mask_b1hw": mask,
                     "mask_b_b1hw": mask_b,
+                    "max_depth": depth[torch.isfinite(depth)].max(),
+                    "min_depth": depth[torch.isfinite(depth)].min(),
                 }
             )
 

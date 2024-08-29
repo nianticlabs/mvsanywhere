@@ -175,7 +175,7 @@ class DepthModel(pl.LightningModule):
 
         # iniitalize the final depth decoder
         if self.run_opts.depth_decoder_name == "unet_pp":
-            self.depth_decoder = DepthDecoderPP(dec_num_input_ch)
+            self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
         elif self.run_opts.depth_decoder_name == "dpt":
@@ -412,8 +412,8 @@ class DepthModel(pl.LightningModule):
             matching_src_feats = torch.flip(matching_src_feats, (-1,))
 
         # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(self.run_opts.min_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-        max_depth = torch.tensor(self.run_opts.max_matching_depth).type_as(src_K).view(1, 1, 1, 1)
+        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
         # Compute the cost volume. Should be size bdhw.
         cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
@@ -461,6 +461,8 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
+            bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
+            log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
             if flip:
                 # now flip the depth map back after final prediction
