@@ -2,9 +2,37 @@ import argparse
 import dataclasses
 import os
 from dataclasses import dataclass
-
+from typing import List
 import yaml
 
+
+@dataclass
+class DataOptions:
+    ################################### data ###################################
+    # which dataset should we use?
+    dataset: str = "scannet"
+
+    # base dataset path.
+    dataset_path: str = "/datasets/scannetv2"
+
+    # where to look for a tuple file.
+    tuple_info_file_location: str = "data_splits/ScanNetv2/standard_split/"
+
+    # the suffix of a tuple filename, which is concatenated to the split to get
+    # the final tuple filename.
+    mv_tuple_file_suffix: str = "_eight_view_deepvmvs.txt"
+
+    # the type of frame tuple to use. default is DVMVS keyframes. dense yields
+    # an optimal online tuple for each frame in the scan. dense_offline will
+    # create a tuple for every frame using frames in the past and future.
+    frame_tuple_type: str = "default"
+
+    # file listing scans to use, since we use tuple files for dataloading, this
+    # is only relevant for generating tuple files and certain script guidance.
+    dataset_scan_split_file: str = "data_splits/ScanNetv2/standard_split/scannetv2_train.txt"
+
+    # the split to use, script dependant.
+    split: str = "train"
 
 @dataclass
 class Options:
@@ -30,26 +58,10 @@ class Options:
     val_batches: int = 100
 
     ################################### data ###################################
-    # which dataset should we use?
-    dataset: str = "scannet"
-
-    # base dataset path.
-    dataset_path: str = "/datasets/scannetv2"
-
+    # specific dataset options
+    datasets: List[DataOptions] = None
     # number of dataloader workers to use.
     num_workers: int = 12
-
-    # where to look for a tuple file.
-    tuple_info_file_location: str = "data_splits/ScanNetv2/standard_split/"
-
-    # the suffix of a tuple filename, which is concatenated to the split to get
-    # the final tuple filename.
-    mv_tuple_file_suffix: str = "_eight_view_deepvmvs.txt"
-
-    # the type of frame tuple to use. default is DVMVS keyframes. dense yields
-    # an optimal online tuple for each frame in the scan. dense_offline will
-    # create a tuple for every frame using frames in the past and future.
-    frame_tuple_type: str = "default"
 
     # number of views the model should expect in a tuple.
     model_num_views: int = 8
@@ -57,13 +69,6 @@ class Options:
     # similar to model_num_views, but used exclusively for data
     # loading/processing.
     num_images_in_tuple: int = None
-
-    # file listing scans to use, since we use tuple files for dataloading, this
-    # is only relevant for generating tuple files and certain script guidance.
-    dataset_scan_split_file: str = "data_splits/ScanNetv2/standard_split/scannetv2_train.txt"
-
-    # the split to use, script dependant.
-    split: str = "train"
 
     # image size input to the network. Used in dataloaders and projectors.
     image_width: int = 512
@@ -327,8 +332,10 @@ class OptionsHandler:
 
             # then merge from a data config
             if cl_args.data_config_file is not None:
-                config_options = OptionsHandler.load_options_from_yaml(cl_args.data_config_file)
-                self.merge_config_options(config_options)
+                self.options.datasets = [
+                    OptionsHandler.load_options_from_yaml(data_config)
+                    for data_config in cl_args.data_config_file.split(":")
+                ]
                 self.config_filepaths.append(cl_args.data_config_file)
         else:
             # no config has been supplied. Let's hope that we have required
