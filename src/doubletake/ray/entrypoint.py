@@ -13,6 +13,7 @@ from doubletake.train import (
     prepare_trainer,
 )
 
+RAY_OUTPUT_PATH = "/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/"
 
 def _get_ray_trainer(opts: options.Options, is_resume: bool = False) -> pl.Trainer:
     """Get the Ray trainer for training.
@@ -40,7 +41,10 @@ def _get_ray_trainer(opts: options.Options, is_resume: bool = False) -> pl.Train
     # fixed position, so that we can resume the weights, the optimiser etc.
 
     # set up a tensorboard logger through lightning
-    train_logger = TensorBoardLogger(save_dir=opts.log_dir, name=opts.name)
+    train_logger = TensorBoardLogger(
+        save_dir=str((Path(RAY_OUTPUT_PATH)).resolve()),
+        name=opts.name
+    )
 
     lightning_trainer = prepare_trainer(
         opts=opts,
@@ -71,7 +75,7 @@ def ray_train_func(opts: options.Options) -> None:
         # check if we are resuming a model
         resume_ckpt = None
         is_resume = False
-        ckpt_path_last = Path(opts.log_dir) / opts.name / "last.ckpt"
+        ckpt_path_last = Path(RAY_OUTPUT_PATH) / opts.name / "last.ckpt"
 
         if ckpt_path_last.exists():
             # in this case we have to resume but it is the first time
@@ -114,7 +118,7 @@ def main() -> None:
         scaling_config=scaling_config,
         run_config=ray.train.RunConfig(
             # name="ray",
-            storage_path=str((Path(opts.log_dir) / opts.name / "ray").resolve()),
+            storage_path=str((Path(RAY_OUTPUT_PATH) / opts.name).resolve()),
             failure_config=ray.train.FailureConfig(max_failures=10),
         ),
     )

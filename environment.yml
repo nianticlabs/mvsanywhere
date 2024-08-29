@@ -6,19 +6,20 @@ channels:
   - nvidia
   - pytorch3d
 dependencies:
+  - python=3.9.19
   - clang=15.0.7
   - llvm-openmp=15.0.7
-  - python=3.9.7
   - numpy=1.26.4
   - pytorch=2.0.1
   - torchvision
   - pytorch-cuda=11.7
-  - cudatoolkit-dev=11.7  # nvcc
+  # - cudatoolkit-dev=11.7  # nvcc
   - lightning=2.0.0
-  - pytorch3d=0.7.4 # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
+  - pytorch3d # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op
   - tensorboard # logging
   - matplotlib # plotting
+  - h5py
   - pip
   - pip:
     - black==23.1.0
@@ -44,3 +45,4 @@ dependencies:
     # - https://github.com/JamieWatson683/scikit-image/archive/single_mesh.zip # single mesh exporting for measure.marching_cubes
     - opencv-python==4.9.0.80
     - ninja==1.11.1.1
+    - ray[train]
