@@ -26,7 +26,7 @@ import torch
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.strategies import DDPStrategy, Strategy
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 
 import doubletake.options as options
 from doubletake.utils.dataset_utils import get_dataset
@@ -34,7 +34,7 @@ from doubletake.utils.generic_utils import copy_code_state
 from doubletake.utils.model_utils import get_model_class
 
 
-def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoader]]:
+def prepare_dataloaders(opts: options.Options) -> Tuple[List[DataLoader], List[DataLoader]]:
     """
     Prepare training and validation dataloaders/
     Training loader is one, while we might have multiple dataloaders for validations.
@@ -47,26 +47,44 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
         a train dataloader, a list of dataloaders for validation
     """
     # load dataset and dataloaders
-    dataset_class, _ = get_dataset(
-        opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id
-    )
+    train_datasets, val_datasets = [], []
+    for dataset in opts.datasets:
+        dataset_class, _ = get_dataset(
+            dataset.dataset, dataset.dataset_scan_split_file, opts.single_debug_scan_id
+        )
 
-    train_dataset = dataset_class(
-        opts.dataset_path,
-        split="train",
-        mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-        num_images_in_tuple=opts.num_images_in_tuple,
-        tuple_info_file_location=opts.tuple_info_file_location,
-        image_width=opts.image_width,
-        image_height=opts.image_height,
-        shuffle_tuple=opts.shuffle_tuple,
-        matching_scale=opts.matching_scale,
-        prediction_scale=opts.prediction_scale,
-        prediction_num_scales=opts.prediction_num_scales
-    )
+        train_dataset = dataset_class(
+            dataset.dataset_path,
+            split="train",
+            mv_tuple_file_suffix=dataset.mv_tuple_file_suffix,
+            num_images_in_tuple=opts.num_images_in_tuple,
+            tuple_info_file_location=dataset.tuple_info_file_location,
+            image_width=opts.image_width,
+            image_height=opts.image_height,
+            shuffle_tuple=opts.shuffle_tuple,
+            matching_scale=opts.matching_scale,
+            prediction_scale=opts.prediction_scale,
+            prediction_num_scales=opts.prediction_num_scales
+        )
+        train_datasets.append(train_dataset)
+
+        val_dataset = dataset_class(
+            dataset.dataset_path,
+            split="val",
+            mv_tuple_file_suffix=dataset.mv_tuple_file_suffix,
+            num_images_in_tuple=opts.num_images_in_tuple,
+            tuple_info_file_location=dataset.tuple_info_file_location,
+            image_width=opts.image_width,
+            image_height=opts.image_height,
+            include_full_res_depth=opts.high_res_validation,
+            matching_scale=opts.matching_scale,
+            prediction_scale=opts.prediction_scale,
+            prediction_num_scales=opts.prediction_num_scales
+        )
+        val_datasets.append(val_dataset)
 
     train_dataloader = DataLoader(
-        train_dataset,
+        ConcatDataset(train_datasets),
         batch_size=opts.batch_size,
         shuffle=True,
         num_workers=opts.num_workers,
@@ -75,33 +93,17 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[DataLoader, List[DataLoa
         persistent_workers=True,
     )
 
-    val_dataloaders = []
-    val_dataset = dataset_class(
-        opts.dataset_path,
-        split="val",
-        mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
-        num_images_in_tuple=opts.num_images_in_tuple,
-        tuple_info_file_location=opts.tuple_info_file_location,
-        image_width=opts.image_width,
-        image_height=opts.image_height,
-        include_full_res_depth=opts.high_res_validation,
-        matching_scale=opts.matching_scale,
-        prediction_scale=opts.prediction_scale,
-        prediction_num_scales=opts.prediction_num_scales
+    val_dataloader = DataLoader(
+        ConcatDataset(val_datasets),
+        batch_size=opts.val_batch_size,
+        shuffle=False,
+        num_workers=opts.num_workers,
+        pin_memory=True,
+        drop_last=True,
+        persistent_workers=True,
     )
 
-    val_dataloaders.append(
-        DataLoader(
-            val_dataset,
-            batch_size=opts.val_batch_size,
-            shuffle=False,
-            num_workers=opts.num_workers,
-            pin_memory=True,
-            drop_last=True,
-            persistent_workers=True,
-        )
-    )
-    return train_dataloader, val_dataloaders
+    return train_dataloader, val_dataloader
 
 
 def prepare_callbacks(
