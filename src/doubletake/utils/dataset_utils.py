@@ -2,6 +2,7 @@ import os
 import json
 from pathlib import Path
 
+from doubletake.datasets.blendedmvg import BlendedMVGDataset
 from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
@@ -189,6 +190,22 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
         if verbose:
             print(f"".center(80, "#"))
             print(f" TartanAir Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "blendedmvg":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = BlendedMVGDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" BlendedMVG Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
 
