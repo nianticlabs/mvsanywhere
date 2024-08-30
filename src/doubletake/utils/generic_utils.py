@@ -23,15 +23,17 @@ def copy_code_state(path):
     # create dir
     Path(os.path.join(path)).mkdir(parents=True, exist_ok=True)
 
+    code_path = Path(__file__).parent.parent.parent
+
     if os.path.exists("./.gitignore"):
         # use .gitignore to remove junk
-        rsync_command = f"rsync -art --exclude-from='./.gitignore' --exclude '.git' . {path}"
+        rsync_command = f"rsync -art --exclude-from='./.gitignore' --exclude '.git' {code_path} {path}"
     else:
         print(
             "WARNING: no .gitignore found so can't use that to exlcude large "
             "files when making a back up of files in copy_code_state."
         )
-        rsync_command = f"rsync -art --exclude '.git' . {path}"
+        rsync_command = f"rsync -art --exclude '.git' {code_path} {path}"
     os.system(rsync_command)
 
 

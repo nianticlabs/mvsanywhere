@@ -6,6 +6,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from ray.train.torch import TorchTrainer
 
 import doubletake.options as options
+from doubletake.utils.generic_utils import copy_code_state
 from doubletake.train import (
     prepare_callbacks,
     prepare_dataloaders,
@@ -31,7 +32,7 @@ def _get_ray_trainer(opts: options.Options, is_resume: bool = False) -> pl.Train
     callbacks.append(ray.train.lightning.RayTrainReportCallback())
 
     ddp_strategy = ray.train.lightning.RayDDPStrategy(
-        find_unused_parameters=opts.matching_encoder_type == "unet_encoder"
+        find_unused_parameters=True
     )
 
     # NOTE: check if we have to resume a checkpoint from the log dir.
@@ -66,6 +67,10 @@ def ray_train_func(opts: options.Options) -> None:
     from loguru import logger  # Lazy loading logger to avoid global logger state in Ray
 
     with logger.catch(reraise=True):
+
+        # save code state
+        copy_code_state(path=str((Path(RAY_OUTPUT_PATH) / opts.name / "code").resolve()))
+
         # prepare the model.
         model = prepare_model(opts=opts)
 
@@ -112,16 +117,23 @@ def main() -> None:
         resources_per_worker={"a100": 1},
     )
 
-    trainer = TorchTrainer(
-        train_loop_per_worker=ray_train_func,
-        train_loop_config=opts,
-        scaling_config=scaling_config,
-        run_config=ray.train.RunConfig(
-            # name="ray",
-            storage_path=str((Path(RAY_OUTPUT_PATH) / opts.name).resolve()),
-            failure_config=ray.train.FailureConfig(max_failures=10),
-        ),
-    )
+    # [3] Launch distributed training job.
+    experiment_path = str(Path(RAY_OUTPUT_PATH) / opts.name)
+    if TorchTrainer.can_restore(experiment_path):
+        print("INFO: restoring from ", experiment_path)
+        trainer = TorchTrainer.restore(experiment_path)
+    else:
+        print("INFO: no restoring")
+        trainer = TorchTrainer(
+            train_loop_per_worker=ray_train_func,
+            train_loop_config=opts,
+            scaling_config=scaling_config,
+            run_config=ray.train.RunConfig(
+                name=opts.name,
+                storage_path=str((Path(RAY_OUTPUT_PATH)).resolve()),
+                failure_config=ray.train.FailureConfig(max_failures=10),
+            ),
+        )
     trainer.fit()
 
 
