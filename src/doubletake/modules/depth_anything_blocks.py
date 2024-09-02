@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from doubletake.modules.networks import double_basic_block
+
 
 model_configs = {
     'dinov2_vits14': {'in_channels': 384, 'features': 64, 'out_channels': [48, 96, 192, 384]},
@@ -175,7 +177,14 @@ class FeatureFusionBlock(nn.Module):
     
 
 class DPTHead(nn.Module):
-    def __init__(self, model_name='dinov2_vits14', nclass=1, use_clstoken=False, use_bn=False):
+    def __init__(
+            self,
+            cv_encoder_feat_channels,
+            model_name='dinov2_vits14',
+            nclass=1,
+            use_clstoken=False,
+            use_bn=False
+        ):
         super(DPTHead, self).__init__()
         
         self.nclass = nclass
@@ -215,6 +224,11 @@ class DPTHead(nn.Module):
                 kernel_size=3,
                 stride=2,
                 padding=1)
+        ])
+
+        self.cv_feat_fusers = nn.ModuleList([
+            double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
+            for i in range(len(out_channels))
         ])
         
         if self.use_clstoken:
@@ -265,7 +279,7 @@ class DPTHead(nn.Module):
             )
 
             
-    def forward(self, out_features, patch_h, patch_w):
+    def forward(self, cv_features, out_features, patch_h, patch_w):
         out = []
         for i, x in enumerate(out_features):
             if self.use_clstoken:
@@ -279,6 +293,12 @@ class DPTHead(nn.Module):
             
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
+
+            x = torch.cat([
+                x,
+                F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
+            ], dim=1)
+            x = self.cv_feat_fusers[i](x)
             
             out.append(x)
         

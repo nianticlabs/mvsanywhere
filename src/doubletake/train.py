@@ -166,6 +166,7 @@ def prepare_model(opts: options.Options) -> torch.nn.Module:
                         param = state_dict[param_key]
 
                     model.state_dict()[param_key].copy_(param)
+                    print('Param copied: ', param_key)
                 except:
                     print(f"WARNING: could not load weights for {param_key}")
     else:
@@ -184,7 +185,7 @@ def prepare_ddp_strategy(opts: options.Options) -> Strategy:
         data parallel strategy
     """
     # allowing the lightning DDPPlugin to ignore unused params.
-    find_unused_parameters = opts.matching_encoder_type == "unet_encoder" or "dinov2" in opts.image_encoder_name 
+    find_unused_parameters = (opts.matching_encoder_type == "unet_encoder") or ("dinov2" in opts.image_encoder_name) or ("depth_anything" in opts.depth_decoder_name)
     return DDPStrategy(find_unused_parameters=find_unused_parameters)
 
 

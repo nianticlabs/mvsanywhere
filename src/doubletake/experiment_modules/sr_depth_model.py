@@ -24,7 +24,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, ViTCVEncoder
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -149,11 +149,11 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             self.cost_volume_net = CVEncoder(
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_enc=self.encoder.num_ch_enc[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
+                num_ch_enc=self.encoder.num_ch_enc[1:],
                 num_ch_outs=[64, 128, 256, 384],
             )
             dec_num_input_ch = (
-                self.encoder.num_ch_enc[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))]
+                self.encoder.num_ch_enc[:1]
                 + self.cost_volume_net.num_ch_enc
             )
         elif self.run_opts.cv_encoder_type == 'vit_encoder':
@@ -180,6 +180,10 @@ class DepthModel(pl.LightningModule):
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
         elif self.run_opts.depth_decoder_name == "dpt":
             self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
+        elif "depth_anything" in self.run_opts.depth_decoder_name:
+            self.depth_decoder = DepthAnything(dec_num_input_ch[1:], model_name=self.run_opts.depth_decoder_name.split(".")[1])
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:
@@ -433,9 +437,9 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
                 cost_volume,
-                cur_feats[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
+                cur_feats[1:],
             )
-            cur_feats = cur_feats[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))] + cost_volume_features
+            cur_feats = cur_feats[:1] + cost_volume_features
         elif self.run_opts.cv_encoder_type == "vit_encoder":
             cur_feats = self.cost_volume_net(
                         cost_volume, 
@@ -448,7 +452,10 @@ class DepthModel(pl.LightningModule):
                     )     
 
         # Decode into depth at multiple resolutions.
-        depth_outputs = self.depth_decoder(cur_feats)
+        if "depth_anything" in self.run_opts.depth_decoder_name:
+            depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
+        else:
+            depth_outputs = self.depth_decoder(cur_feats)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.

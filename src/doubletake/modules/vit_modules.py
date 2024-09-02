@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.layers import BasicBlock
 
 DINOV2_ARCHS = {
@@ -203,3 +204,27 @@ class DINOv2(nn.Module):
         self.load_state_dict(
             {k.replace('pretrained', 'model'): v for k, v in da_state_dict.items() if 'pretrained' in k},
         )
+
+
+class DepthAnything(nn.Module):
+
+    def __init__(
+            self,
+            cv_encoder_feat_channel,
+            model_name="dinov2_vitb14",
+    ):
+        super().__init__()
+        self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=4)
+        self.depth_head = DPTHead(cv_encoder_feat_channel, model_name=model_name)
+
+    def forward(self, img, cv_feats):
+        h, w = img.shape[-2:]
+        vit_feats = self.dinov2(img)
+
+        patch_h, patch_w = h // 14, w // 14
+        return self.depth_head(cv_feats, vit_feats, patch_h, patch_w)
+    
+    def load_da_weights(self, weights_path):
+        self.dinov2.load_da_weights(weights_path)
+        self.depth_head.load_da_weights(weights_path)
+
