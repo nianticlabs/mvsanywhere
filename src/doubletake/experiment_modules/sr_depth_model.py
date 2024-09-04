@@ -138,7 +138,7 @@ class DepthModel(pl.LightningModule):
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
         elif 'dinov2' in self.run_opts.image_encoder_name:
-            self.encoder = DINOv2(self.run_opts.image_encoder_name)
+            self.encoder = DINOv2(self.run_opts.image_encoder_name, 5)
             if self.run_opts.da_weights_path is not None:
                 self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:
