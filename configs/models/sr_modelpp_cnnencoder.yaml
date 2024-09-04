@@ -16,7 +16,7 @@ num_sanity_val_steps: 0
 num_workers: 12
 precision: 16
 random_seed: 0
-matching_scale: 0.25
+matching_scale: 0.5
 prediction_scale: 0.5714285714285714
 image_width: 448
 image_height: 336

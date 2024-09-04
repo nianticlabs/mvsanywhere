@@ -138,7 +138,7 @@ class DepthModel(pl.LightningModule):
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
         elif 'dinov2' in self.run_opts.image_encoder_name:
-            self.encoder = DINOv2(self.run_opts.image_encoder_name)
+            self.encoder = DINOv2(self.run_opts.image_encoder_name, 5)
             if self.run_opts.da_weights_path is not None:
                 self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:
@@ -165,7 +165,7 @@ class DepthModel(pl.LightningModule):
             self.cost_volume_net = CNNCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_outs=[64, 128, 256, 384]
+                num_ch_outs=[32, 64, 128, 256, 384]
             )
             dec_num_input_ch = [32, 64, 128, 256, 384]
             if self.run_opts.da_weights_path is not None:

@@ -88,7 +88,7 @@ class CNNCVEncoder(nn.Module):
             )
 
             self.convs[f"conv_{i}"] = nn.Sequential(
-                BasicBlock(model_configs["out_channels"][i+1] + num_ch_out, num_ch_out, stride=1),
+                BasicBlock(model_configs["out_channels"][i] + num_ch_out, num_ch_out, stride=1),
                 BasicBlock(num_ch_out, num_ch_out, stride=1),
             )
             self.num_ch_enc.append(num_ch_out)
@@ -96,21 +96,18 @@ class CNNCVEncoder(nn.Module):
     def forward(self, x, img_feats):
 
         # Reshape feat and project
-        f = img_feats[0][0]
-        f = f.permute(0, 2, 1).reshape((f.shape[0], f.shape[-1], 24, 32))
-        f = self.projects[0](f)
-        f = self.resize_layers[0](f)
 
-        outputs = [f]
-        x = F.interpolate(x, [96, 128], mode="nearest")
+        x = F.interpolate(x, [192, 256], mode="nearest")
+
+        outputs = []
         for i in range(self.num_blocks):
             x = self.convs[f"ds_conv_{i}"](x)
             
             # Reshape feat and project
-            f = img_feats[i + 1][0]
+            f = img_feats[i][0]
             f = f.permute(0, 2, 1).reshape((f.shape[0], f.shape[-1], 24, 32))
-            f = self.projects[i + 1](f)
-            f = self.resize_layers[i + 1](f)
+            f = self.projects[i](f)
+            f = self.resize_layers[i](f)
 
             x = torch.cat([x, f], dim=1)
             x = self.convs[f"conv_{i}"](x)
