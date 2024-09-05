@@ -138,7 +138,13 @@ class DepthModel(pl.LightningModule):
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
         elif 'dinov2' in self.run_opts.image_encoder_name:
-            self.encoder = DINOv2(self.run_opts.image_encoder_name, 5)
+            intermediate_layer_idx = {
+                'dinov2_vits14': [2, 5, 8, 11],
+                'dinov2_vitb14': [2, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.image_encoder_name]
+            self.encoder = DINOv2(self.run_opts.image_encoder_name, [1] + intermediate_layer_idx)
             if self.run_opts.da_weights_path is not None:
                 self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:

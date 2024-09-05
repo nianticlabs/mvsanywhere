@@ -1,5 +1,5 @@
 !!python/object:doubletake.options.Options
-feature_volume_type: simple_cost_volume
+feature_volume_type: mlp_feature_volume
 batch_size: 16
 cost_volume_aggregation: dot
 cv_encoder_type: cnn_encoder

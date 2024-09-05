@@ -102,7 +102,7 @@ class Options:
     precision: int = 16
 
     # stepped learning rate schedule. LR will drop by 10 at both steps
-    lr_steps: list = dataclasses.field(default_factory=lambda: [70000, 80000])
+    lr_steps: list = dataclasses.field(default_factory=lambda: [100000, 110000])
 
     ################################## models ##################################
     # resumes with training state
