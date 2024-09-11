@@ -248,7 +248,7 @@ def read_image_file(
         img: tensor with (optionally) scaled and resized image data.
 
     """
-    img = Image.open(filepath)
+    img = Image.open(filepath).convert("RGB")
 
     if target_aspect_ratio:
         crop_image_to_target_ratio(img, target_aspect_ratio)
