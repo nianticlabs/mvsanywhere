@@ -38,6 +38,21 @@ class ChangeOfBasis:
         ]
     )
 
+    MATRIX_TO_VISION = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.0, -1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]        
+    )
+
+    @classmethod
+    def convert_matrix_to_vision_convention(cls, pose: np.ndarray) -> np.ndarray:
+        """Converts pose from the arkit coordinate system to openCV."""
+        change_of_basis = cls.MATRIX_TO_VISION
+        return change_of_basis.dot(pose).dot(change_of_basis.T)
+
     @classmethod
     def convert_arkit_to_vision_convention(cls, pose: np.ndarray) -> np.ndarray:
         """Converts pose from the arkit coordinate system to openCV."""
