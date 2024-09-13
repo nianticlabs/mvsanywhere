@@ -472,6 +472,9 @@ class GenericMVSDataset(Dataset):
         except:
             image = torch.zeros((3, self.image_height, self.image_width)).float()
 
+        # Remove alpha channel for PNGs
+        image = image[:3]
+
         return image
 
     def load_high_res_color(self, scan_id, frame_id):
@@ -496,6 +499,9 @@ class GenericMVSDataset(Dataset):
             resampling_mode=self.image_resampling_mode,
             disable_warning=self.disable_resize_warning,
         )
+
+        # Remove alpha channel for PNGs
+        image = image[:3]
 
         return high_res_color
 
