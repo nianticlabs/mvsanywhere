@@ -70,6 +70,9 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[List[DataLoader], List[D
 
 
     for dataset in opts.val_datasets:
+        dataset_class, _ = get_dataset(
+            dataset.dataset, dataset.dataset_scan_split_file, opts.single_debug_scan_id
+        )
         val_dataset = dataset_class(
             dataset.dataset_path,
             split="val",
