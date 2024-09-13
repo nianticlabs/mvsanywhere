@@ -21,3 +21,18 @@ prediction_scale: 0.5714285714285714
 image_width: 448
 image_height: 336
 model_type: depth_model
+
+curl -C - 'https://my.microsoftpersonalcontent.com/personal/4665a411d5537b63/_layouts/15/download.aspx?UniqueId=d5537b63-a411-2065-8046-e40700000000&Translate=false&tempauth=v1e.eyJzaXRlaWQiOiJhNjM2NTA4MS1iM2Y0LTQxMDctOGEzYi0yNmZmZTdmMjgxY2YiLCJhdWQiOiIwMDAwMDAwMy0wMDAwLTBmZjEtY2UwMC0wMDAwMDAwMDAwMDAvbXkubWljcm9zb2Z0cGVyc29uYWxjb250ZW50LmNvbUA5MTg4MDQwZC02YzY3LTRjNWItYjExMi0zNmEzMDRiNjZkYWQiLCJleHAiOiIxNzI2MTMyMjQyIn0.Auveigpq7cUCAZ8nNYAJpbAkShIavfdGh2o44L_S43jE5B4EHwaVje55SZcYN1sP8XFzSXh7YvZEECZ5FzGNac61UHai9Yosn4mbyFc30O0FjUAGnLGalpmp-nuwnOBgU7hlIJ271N3a76rRlftxb_RiSbuHr4mlivc5Qo5xuXY_nkn85KQOBzlsR-ElsHgctWtj9AJekjEIqfVsnMCzn23Gt5hglE49n-ooi3IH0yDPeouhk-hvZt_8UP7vVM169Pd8sl_ICUfbEKJA5f2uVy-7QKOZQWm-ZzRqyVu8DUu9jx1S258hzldDeTh6Aws_2U5mDFfFMM6WvBn-Ug5C4Ixgp2WpyBMkAd6y20RkPHRXFKvEr1acscPd9YA-qDMaFd-Uqy7eWCsmWHaVj0Cqi_O2TMb4Wy9HlPJeqNWErz3LJA6K9FlKx8lH9qaeA68t-ne7ZrI_a9WoKLHLaI0tpA-_IsEw_gUC-IeIwfLBC9475xHA_CILDHBKX9hrfFPyKDxhlKJKt27I9SecKOkv7g.o-W5tYS6f18zLRfkUCd-XFo2KsY2BRpva8hVaI7WAD8&ApiVersion=2.0' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://onedrive.live.com/' \
+  -H 'sec-ch-ua: "Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' --output Office-1.tar.gz

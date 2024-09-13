@@ -392,6 +392,19 @@ class DepthModel(pl.LightningModule):
         flip_threshold = 0.5 if phase == "train" else 0.0
         flip = torch.rand(1).item() < flip_threshold
 
+        # uid = np.random.randint(1e7)
+        # for idx in range(7):
+        #     self.mv_depth_loss._check_warped_image(
+        #         f"debug/debug_{uid}_{idx}",
+        #         cur_data["depth_b1hw"],
+        #         cur_image,
+        #         src_image[:, idx],
+        #         cur_data[f"invK_s0_b44"],
+        #         src_data[f"K_s0_b44"][:, idx],
+        #         cur_world_T_cam,
+        #         src_cam_T_world[:, idx]
+        #     )
+
         if flip:
             # flip all images.
             cur_image = torch.flip(cur_image, (-1,))
@@ -554,7 +567,7 @@ class DepthModel(pl.LightningModule):
             src_cam_T_world_bk44=src_data["cam_T_world_b44"],
         )
 
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss + 0.2 * mv_loss
+        loss = ms_loss # + 1.0 * grad_loss + 1.0 * normals_loss + 0.2 * mv_loss
 
         losses = {
             "loss": loss,
@@ -586,6 +599,11 @@ class DepthModel(pl.LightningModule):
                 src_data["image_b3hw"][:, src_ind] = self.color_aug(
                     src_data["image_b3hw"][:, src_ind], denormalize_first=True
                 )
+
+        a = (cur_data["image_b3hw"].sum(dim=(1, 2, 3)) == 0).any().item()
+        b = (src_data["image_b3hw"].sum(dim=(2, 3, 4)) == 0).any().item()
+        if a or b:
+            return 0.0
 
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)

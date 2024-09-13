@@ -4,6 +4,7 @@ from pathlib import Path
 
 from doubletake.datasets.blendedmvg import BlendedMVGDataset
 from doubletake.datasets.dynamic_replica import DynamicReplicaDataset
+from doubletake.datasets.matrix_city import MatrixCityDataset
 from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
@@ -11,6 +12,7 @@ from doubletake.datasets.vdr_dataset import VDRDataset
 from doubletake.datasets.dtu_dataset import DTUDataset
 from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.tartanair import TartanAirDataset
+from doubletake.datasets.vkitti import VirtualKITTIDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -223,6 +225,38 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
         if verbose:
             print(f"".center(80, "#"))
             print(f" DynamicReplica Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "matrix_city":
+        with open(split_filepath) as file:
+            scans = json.load(file)
+            scans = scans.keys()
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = MatrixCityDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" MatrixCity Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "vkitti":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = VirtualKITTIDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" VirtualKITTI Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
 
