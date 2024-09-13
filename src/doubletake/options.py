@@ -60,6 +60,7 @@ class Options:
     ################################### data ###################################
     # specific dataset options
     datasets: List[DataOptions] = None
+    val_datasets: List[DataOptions] = None
     # number of dataloader workers to use.
     num_workers: int = 12
 
@@ -290,6 +291,7 @@ class OptionsHandler:
         self.parser = argparse.ArgumentParser(description="SimpleRecon Options")
         self.parser.add_argument("--config_file", type=str, default=None)
         self.parser.add_argument("--data_config_file", type=str, default=None)
+        self.parser.add_argument("--val_data_config_file", type=str, default=None)
 
         self.populate_argparse()
 
@@ -340,6 +342,12 @@ class OptionsHandler:
                     for data_config in cl_args.data_config_file.split(":")
                 ]
                 self.config_filepaths.append(cl_args.data_config_file)
+            if cl_args.val_data_config_file is not None:
+                self.options.val_datasets = [
+                    OptionsHandler.load_options_from_yaml(data_config)
+                    for data_config in cl_args.val_data_config_file.split(":")
+                ]
+                self.config_filepaths.append(cl_args.val_data_config_file)                
         else:
             # no config has been supplied. Let's hope that we have required
             # arguments through command line.

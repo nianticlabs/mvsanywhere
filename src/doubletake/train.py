@@ -68,6 +68,8 @@ def prepare_dataloaders(opts: options.Options) -> Tuple[List[DataLoader], List[D
         )
         train_datasets.append(train_dataset)
 
+
+    for dataset in opts.val_datasets:
         val_dataset = dataset_class(
             dataset.dataset_path,
             split="val",

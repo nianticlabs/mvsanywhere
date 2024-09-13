@@ -407,27 +407,27 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
 
     # get dataset
     dataset_class, _ = get_dataset(
-        opts.dataset,
-        opts.dataset_scan_split_file,
+        opts.datasets[0].dataset,
+        opts.datasets[0].dataset_scan_split_file,
         opts.single_debug_scan_id,
         verbose=False,
     )
 
     ds = dataset_class(
-        dataset_path=opts.dataset_path,
+        dataset_path=opts.datasets[0].dataset_path,
         mv_tuple_file_suffix=None,
-        split=opts.split,
-        tuple_info_file_location=opts.tuple_info_file_location,
+        split=opts.datasets[0].split,
+        tuple_info_file_location=opts.datasets[0].tuple_info_file_location,
         pass_frame_id=True,
         verbose_init=False,
     )
 
-    valid_frames = ds.get_valid_frame_ids(opts.split, scan)
+    valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
 
     try:
         check_valid_dist = int(valid_frames[0].strip().split(" ")[2])
     except:
-        if opts.frame_tuple_type == "default":
+        if opts.datasets[0].frame_tuple_type == "default":
             print(
                 f"\nWARNING: Couldn't find max valid distances in the valid_frames "
                 f"file for scan {scan}. Please delete existing valid_frames.txt "
@@ -456,16 +456,16 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
     subsequence_length = opts.num_images_in_tuple
     n_measurement_frames = subsequence_length - 1
 
-    if opts.frame_tuple_type == "default":
+    if opts.datasets[0].frame_tuple_type == "default":
         samples = default_dvmvs_tuples(scan, poses, dists_to_last_valid, n_measurement_frames)
-    elif opts.frame_tuple_type == "offline":
+    elif opts.datasets[0].frame_tuple_type == "offline":
         samples = offline_dvmvs_tuples(scan, poses, n_measurement_frames)
-    elif opts.frame_tuple_type == "dense":
+    elif opts.datasets[0].frame_tuple_type == "dense":
         samples = dense_dvmvs_tuples(scan, poses, n_measurement_frames)
-    elif opts.frame_tuple_type == "dense_offline":
+    elif opts.datasets[0].frame_tuple_type == "dense_offline":
         samples = offline_dense_dvmvs_tuples(scan, poses, n_measurement_frames)
     else:
-        ValueError(f"Not a recognized tuple frame type: " f"{opts.frame_tuple_type}")
+        ValueError(f"Not a recognized tuple frame type: " f"{opts.datasets[0].frame_tuple_type}")
 
     num_repeats = 0
     for sample in samples:
@@ -574,16 +574,16 @@ if __name__ == "__main__":
 
     # get dataset
     dataset_class, scan_names = get_dataset(
-        opts.dataset,
-        opts.dataset_scan_split_file,
+        opts.datasets[0].dataset,
+        opts.datasets[0].dataset_scan_split_file,
         opts.single_debug_scan_id,
     )
 
     item_list = []
 
-    Path(opts.tuple_info_file_location).mkdir(exist_ok=True, parents=True)
-    split_filename = f"{opts.split}{opts.mv_tuple_file_suffix}"
-    split_filepath = os.path.join(opts.tuple_info_file_location, split_filename)
+    Path(opts.datasets[0].tuple_info_file_location).mkdir(exist_ok=True, parents=True)
+    split_filename = f"{opts.datasets[0].split}{opts.datasets[0].mv_tuple_file_suffix}"
+    split_filepath = os.path.join(opts.datasets[0].tuple_info_file_location, split_filename)
     print(f"Saving to {split_filepath}\n")
 
     if opts.single_debug_scan_id is not None:

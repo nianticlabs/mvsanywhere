@@ -459,13 +459,18 @@ class GenericMVSDataset(Dataset):
         """
 
         color_filepath = self.get_color_filepath(scan_id, frame_id)
-        image = read_image_file(
-            color_filepath,
-            height=self.image_height,
-            width=self.image_width,
-            resampling_mode=self.image_resampling_mode,
-            disable_warning=self.disable_resize_warning,
-        )
+        try:
+            image = read_image_file(
+                color_filepath,
+                height=self.image_height,
+                width=self.image_width,
+                resampling_mode=self.image_resampling_mode,
+                disable_warning=True,
+                # disable_warning=True,
+                # target_aspect_ratio=4.0 / 3.0
+            )
+        except:
+            image = torch.zeros((3, self.image_height, self.image_width)).float()
 
         return image
 
@@ -603,13 +608,18 @@ class GenericMVSDataset(Dataset):
                 mask = torch.flip(mask, (-1,))
                 mask_b = torch.flip(mask_b, (-1,))
 
+            # try:
+            #     depth[torch.isfinite(depth)].max()
+            # except:
+            #     pass
+
             output_dict.update(
                 {
                     "depth_b1hw": depth,
                     "mask_b1hw": mask,
                     "mask_b_b1hw": mask_b,
-                    "max_depth": depth[torch.isfinite(depth)].max(),
-                    "min_depth": depth[torch.isfinite(depth)].min(),
+                    "max_depth": depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
+                    "min_depth": depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
                 }
             )
 
