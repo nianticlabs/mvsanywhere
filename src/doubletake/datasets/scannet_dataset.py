@@ -482,9 +482,9 @@ class ScannetDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, None
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -515,6 +515,7 @@ class ScannetDataset(GenericMVSDataset):
             width=self.depth_width,
             value_scale_factor=1e-3,
             resampling_mode=pil.NEAREST,
+            crop=crop,
         )
 
         # Get the float valid mask

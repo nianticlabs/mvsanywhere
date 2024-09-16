@@ -333,11 +333,11 @@ class CostVolumeManager(nn.Module):
         return_mask=False,
     ):
         """Runs the cost volume and gets the lowest cost result"""
-        self.matching_width = cur_feats.shape[-1]
-        self.matching_height = cur_feats.shape[-2]
 
         # change to portrait if we need to.
-        if self.matching_height > self.matching_width:
+        if self.matching_height != cur_feats.shape[-2] or self.matching_height != cur_feats.shape[-2]:
+            self.matching_width = cur_feats.shape[-1]
+            self.matching_height = cur_feats.shape[-2]
             self.initialise_for_projection(device=cur_feats.device)
 
         cost_volume, depth_planes_bdhw, overall_mask_bhw = self.build_cost_volume(
