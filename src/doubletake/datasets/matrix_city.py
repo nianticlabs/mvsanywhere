@@ -384,6 +384,16 @@ class MatrixCityDataset(GenericMVSDataset):
         K[0, 2] = width_pixels / 2
         K[1, 2] = height_pixels / 2
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((height_pixels, width_pixels)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
+
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
 
@@ -412,14 +422,14 @@ class MatrixCityDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+width_pixels, top+height_pixels)
     
     @staticmethod
     def _load_depth(depth_path):
         image = cv2.imread(depth_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)[...,0] #(H, W)
         return image
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -441,7 +451,11 @@ class MatrixCityDataset(GenericMVSDataset):
         depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         
         depth = self._load_depth(depth_filepath)
-
+        if crop:
+            distance = distance[
+                crop[1]:crop[3],
+                crop[0]:crop[2]
+            ]
 
         depth = cv2.resize(
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST

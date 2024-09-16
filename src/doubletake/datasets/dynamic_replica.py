@@ -420,7 +420,16 @@ class DynamicReplicaDataset(GenericMVSDataset):
 
         K = torch.eye(4, dtype=torch.float32)
         K[:3, :3] = K_33
-
+        
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((height_pixels, width_pixels)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
 
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
@@ -450,9 +459,9 @@ class DynamicReplicaDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+width_pixels, top+height_pixels)
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -475,6 +484,7 @@ class DynamicReplicaDataset(GenericMVSDataset):
         with Image.open(depth_filepath) as depth_pil:
             # the image is stored with 16-bit depth but PIL reads it as I (32 bit).
             # we cast it to uint16, then reinterpret as float16, then cast to float32
+            depth_pil = depth_pil.crop(crop)
             depth = np.frombuffer(
                 np.array(depth_pil, dtype=np.uint16), dtype=np.float16
             ).astype(np.float32).reshape((depth_pil.size[1], depth_pil.size[0]))

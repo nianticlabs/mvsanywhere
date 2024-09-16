@@ -579,7 +579,7 @@ class DepthModel(pl.LightningModule):
             src_cam_T_world_bk44=src_data["cam_T_world_b44"],
         )
 
-        loss = ms_loss # + 1.0 * grad_loss + 1.0 * normals_loss + 0.2 * mv_loss
+        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
 
         losses = {
             "loss": loss,
@@ -619,6 +619,11 @@ class DepthModel(pl.LightningModule):
 
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)
+
+        pred_H, pred_W = outputs["depth_pred_s0_b1hw"].shape[-2:]
+        if pred_H != self.compute_normals.height or pred_W != self.compute_normals.width:
+            self.compute_normals = NormalGenerator(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
+            self.mv_depth_loss = MVDepthLoss(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
 
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]

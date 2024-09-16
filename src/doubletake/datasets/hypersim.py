@@ -492,6 +492,16 @@ class HypersimDataset(GenericMVSDataset):
         K[0, 2] = float(cx)
         K[1, 2] = float(cy)
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((height_pixels, width_pixels)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
+
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
 
@@ -518,9 +528,9 @@ class HypersimDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+width_pixels, top+height_pixels)
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -544,6 +554,11 @@ class HypersimDataset(GenericMVSDataset):
         # Load depth, resize
         depth_path = Path(depth_filepath)
         distance = np.array(h5py.File(depth_path)["dataset"]).astype(np.float32)
+        if crop:
+            distance = distance[
+                crop[1]:crop[3],
+                crop[0]:crop[2]
+            ]
 
         depth = distance
 

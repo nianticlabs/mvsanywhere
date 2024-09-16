@@ -195,6 +195,9 @@ class GenericMVSDataset(Dataset):
         self.high_res_image_width = high_res_image_width
         self.high_res_image_height = high_res_image_height
 
+        # Random resize crop
+        self.random_resize_crop = transforms.RandomResizedCrop((self.image_height, self.image_width), scale=(0.5, 1.0), ratio=(16/9, 16/9))
+
         # size up depth using ratio of RGB to depth
         self.depth_height = int(self.image_height * prediction_scale)
         self.depth_width = int(self.image_width * prediction_scale)
@@ -445,7 +448,7 @@ class GenericMVSDataset(Dataset):
         """
         raise NotImplementedError()
 
-    def load_color(self, scan_id, frame_id):
+    def load_color(self, scan_id, frame_id, crop=None):
         """Loads a frame's RGB file, resizes it to configured RGB size.
 
         Args:
@@ -465,11 +468,11 @@ class GenericMVSDataset(Dataset):
                 height=self.image_height,
                 width=self.image_width,
                 resampling_mode=self.image_resampling_mode,
-                disable_warning=True,
-                # disable_warning=True,
-                # target_aspect_ratio=4.0 / 3.0
+                disable_warning=False,
+                crop=crop,
             )
         except:
+            print("Failed to load: ", scan_id, frame_id)
             image = torch.zeros((3, self.image_height, self.image_width)).float()
 
         # Remove alpha channel for PNGs
@@ -563,6 +566,9 @@ class GenericMVSDataset(Dataset):
         # load pose
         world_T_cam, cam_T_world = self.load_pose(scan_id, frame_id)
 
+        # load intrinsics
+        intrinsics, crop = self.load_intrinsics(scan_id, frame_id, flip=flip)
+
         if self.rotate_images:
             T = np.eye(4)
             T[:3, :3] = rotz(-np.pi / 2)
@@ -576,7 +582,7 @@ class GenericMVSDataset(Dataset):
             cam_T_world = np.linalg.inv(world_T_cam)
 
         # Load image
-        image = self.load_color(scan_id, frame_id)
+        image = self.load_color(scan_id, frame_id, crop)
 
         if self.rotate_images:
             image = torch.rot90(image, 3, [1, 2])
@@ -595,14 +601,11 @@ class GenericMVSDataset(Dataset):
             }
         )
 
-        # load intrinsics
-        intrinsics = self.load_intrinsics(scan_id, frame_id, flip=flip)
-
         output_dict.update(intrinsics)
 
         if load_depth:
             # get depth
-            depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id)
+            depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id, crop)
 
             if self.rotate_images:
                 depth = torch.rot90(depth, 3, [1, 2])
