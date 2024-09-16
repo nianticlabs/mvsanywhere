@@ -238,11 +238,6 @@ class BlendedMVGDataset(GenericMVSDataset):
         """
         output_dict = {}
 
-        data = {
-            'depthWidth': 768,
-            'depthHeight': 576,
-        }
-
         intrinsics_filepath = self.get_pose_filepath(scan_id, frame_id)
         with open(intrinsics_filepath) as f:
             lines = f.readlines()
@@ -250,6 +245,17 @@ class BlendedMVGDataset(GenericMVSDataset):
         K = torch.eye(4, dtype=torch.float32)
         K[:3, :3] = torch.tensor(np.fromstring(' '.join(lines[7:10]), dtype=np.float32, sep=' ').reshape((3, 3)))
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((576, 768)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        data = {
+            'depthWidth': w,
+            'depthHeight': h,
+        }
 
         if flip:
             K[0, 2] = float(data['depthWidth']) - K[0, 2]
@@ -277,9 +283,9 @@ class BlendedMVGDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+data['depthWidth'], top+data["depthHeight"])
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """ Loads a depth map at the resolution the dataset is configured for.
 
             Internally, if the loaded depth map isn't at the target resolution,
@@ -310,6 +316,7 @@ class BlendedMVGDataset(GenericMVSDataset):
             width=self.depth_width,
             value_scale_factor=1,
             resampling_mode=pil.NEAREST,
+            crop=crop
         )
 
         # Get the float valid mask
