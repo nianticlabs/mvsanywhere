@@ -131,7 +131,7 @@ class MatrixCityDataset(GenericMVSDataset):
                 transforms = json.load(f)
             self.transforms["/".join(transform_file.split("/")[-5:-1])] = transforms
 
-        with open(Path(tuple_info_file_location) / "matrix_city_train.json") as f:
+        with open("/mnt/nas3/shared/projects/fmvs/fmvs/data_splits/matrix_city/matrix_city_train.json") as f:
             self.scans_frames = json.load(f)
 
     def get_frame_id_string(self, frame_id):
@@ -452,7 +452,7 @@ class MatrixCityDataset(GenericMVSDataset):
         
         depth = self._load_depth(depth_filepath)
         if crop:
-            distance = distance[
+            depth = depth[
                 crop[1]:crop[3],
                 crop[0]:crop[2]
             ]
