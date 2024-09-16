@@ -72,11 +72,11 @@ class Options:
     num_images_in_tuple: int = None
 
     # image size input to the network. Used in dataloaders and projectors.
-    image_width: int = 512
-    image_height: int = 288
+    image_width: int = 448
+    image_height: int = 336
 
-    val_image_width: int = 512
-    val_image_height: int = 384
+    val_image_width: int = 448
+    val_image_height: int = 336
 
     # used to shuffle tuple order for ablation.
     shuffle_tuple: bool = False
