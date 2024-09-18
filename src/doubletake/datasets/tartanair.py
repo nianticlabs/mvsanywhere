@@ -433,7 +433,7 @@ class TartanAirDataset(GenericMVSDataset):
         depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         depth = np.load(depth_filepath)
         if crop:
-            distance = distance[
+            depth = depth[
                 crop[1]:crop[3],
                 crop[0]:crop[2]
             ]

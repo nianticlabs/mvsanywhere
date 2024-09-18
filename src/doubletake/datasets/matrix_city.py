@@ -131,8 +131,8 @@ class MatrixCityDataset(GenericMVSDataset):
                 transforms = json.load(f)
             self.transforms["/".join(transform_file.split("/")[-5:-1])] = transforms
 
-        with open(Path(tuple_info_file_location) / "matrix_city_train.json") as f:
-            self.scans_frames = json.load(f)
+
+        self.tuple_info_file_location = tuple_info_file_location
 
     def get_frame_id_string(self, frame_id):
         """Returns an id string for this frame_id that's unique to this frame
@@ -174,6 +174,9 @@ class MatrixCityDataset(GenericMVSDataset):
         return self.transforms[scan.split(":")[0]]
 
     def _get_frame_ids(self, split, scan):
+        if not hasattr(self, "scans_frames"):
+            with open(Path(self.tuple_info_file_location) / "matrix_city_train.json") as f:
+                self.scans_frames = json.load(f)
         return self.scans_frames[scan]
 
     def get_valid_frame_ids(self, split, scan, store_computed=True):
@@ -452,7 +455,7 @@ class MatrixCityDataset(GenericMVSDataset):
         
         depth = self._load_depth(depth_filepath)
         if crop:
-            distance = distance[
+            depth = depth[
                 crop[1]:crop[3],
                 crop[0]:crop[2]
             ]
