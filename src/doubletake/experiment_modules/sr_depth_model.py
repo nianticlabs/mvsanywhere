@@ -404,6 +404,9 @@ class DepthModel(pl.LightningModule):
         flip_threshold = 0.5 if phase == "train" else 0.0
         flip = torch.rand(1).item() < flip_threshold
 
+        # src_cam_T_world = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
+        # cur_world_T_cam = torch.stack([torch.eye(4) for _ in range(len(cur_world_T_cam))]).cuda()
+
         # uid = np.random.randint(1e7)
         # for idx in range(7):
         #     self.mv_depth_loss._check_warped_image(
@@ -690,9 +693,17 @@ class DepthModel(pl.LightningModule):
 
                         image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
 
+                        import torchvision
+                        grid = torchvision.utils.make_grid(
+                            src_data["image_b3hw"][i], nrow=3
+                        )
+                        grid = F.interpolate(grid[None], image_i.shape[-2:], mode="bilinear")[0]
+                        grid = reverse_imagenet_normalize(grid)
+
                         self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
+                        self.logger.experiment.add_image(f"src_images/{i}", grid, self.global_step)
                         self.logger.experiment.add_image(
-                            f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                                f"depth_gt/{i}", depth_gt_viz_i, self.global_step
                         )
                         self.logger.experiment.add_image(
                             f"depth_pred/{i}", depth_pred_viz_i, self.global_step
