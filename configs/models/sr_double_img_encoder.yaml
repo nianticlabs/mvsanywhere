@@ -4,7 +4,7 @@ batch_size: 16
 val_batch_size: 4
 cost_volume_aggregation: dot
 cv_encoder_type: multi_scale_encoder
-depth_decoder_name: depth_anything.dinov2_vits14
+depth_decoder_name: depth_anything.dinov2_vitb14
 gpus: 2
 image_encoder_name: efficientnet
 log_interval: 100

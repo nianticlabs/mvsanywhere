@@ -183,7 +183,17 @@ class DepthModel(pl.LightningModule):
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         elif "depth_anything" in self.run_opts.depth_decoder_name:
-            self.depth_decoder = DepthAnything(dec_num_input_ch[1:], model_name=self.run_opts.depth_decoder_name.split(".")[1])
+            intermediate_layer_idx = {
+                'dinov2_vits14': [2, 5, 8, 11],
+                'dinov2_vitb14': [2, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            self.depth_decoder = DepthAnything(
+                dec_num_input_ch[1:],
+                model_name=self.run_opts.depth_decoder_name.split(".")[1],
+                intermediate_layers=intermediate_layer_idx
+            )
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:
@@ -245,6 +255,8 @@ class DepthModel(pl.LightningModule):
         self.tensor_formatter = TensorFormatter()
 
         self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
+
+        self.automatic_optimization = False
 
     def compute_matching_feats(
         self,
@@ -607,6 +619,26 @@ class DepthModel(pl.LightningModule):
         # compute losses
         losses = self.compute_losses(cur_data, src_data, outputs)
 
+        if phase == "train":
+            self.manual_backward(losses["loss"])
+
+            if (batch_idx + 1) % 2 == 0:
+                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
+            
+                optimizer_sr.step()
+                optimizer_da_enc.step()
+                optimizer_da_dec.step()
+
+                optimizer_sr.zero_grad()
+                optimizer_da_enc.zero_grad()
+                optimizer_da_dec.zero_grad()
+
+                # multiple schedulers
+                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
+                scheduler_sr.step()
+                scheduler_da_enc.step()
+                scheduler_da_dec.step()
+
         #
         is_train = phase == "train"
 
@@ -696,7 +728,7 @@ class DepthModel(pl.LightningModule):
                     on_epoch=not is_train,
                 )
 
-        return losses["loss"]
+        # return losses["loss"]
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""
@@ -713,8 +745,18 @@ class DepthModel(pl.LightningModule):
         70000 and 80000.
 
         """
-        optimizer = torch.optim.AdamW(
-            self.parameters(), lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        optimizer_sr = torch.optim.AdamW(
+            list(self.cost_volume_net.parameters()) + 
+            list(self.encoder.parameters()) +
+            list(self.cost_volume.parameters()) + 
+            list(self.matching_model.parameters()),
+            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_encoder = torch.optim.AdamW(
+            self.depth_decoder.dinov2.parameters(), lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_decoder = torch.optim.AdamW(
+            self.depth_decoder.depth_head.parameters(), lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
         def lr_lambda(step):
@@ -725,8 +767,7 @@ class DepthModel(pl.LightningModule):
             else:
                 return 0.01
 
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": lr_scheduler, "interval": "step"},
-        }
+        lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_encoder, lr_lambda)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_decoder, lr_lambda)
+        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]

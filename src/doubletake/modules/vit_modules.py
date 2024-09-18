@@ -212,9 +212,10 @@ class DepthAnything(nn.Module):
             self,
             cv_encoder_feat_channel,
             model_name="dinov2_vitb14",
+            intermediate_layers=4,
     ):
         super().__init__()
-        self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=4)
+        self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=intermediate_layers)
         self.depth_head = DPTHead(cv_encoder_feat_channel, model_name=model_name)
 
     def forward(self, img, cv_feats):

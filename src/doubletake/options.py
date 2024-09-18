@@ -81,6 +81,8 @@ class Options:
     ############################## hyperparameters #############################
     # learning rate
     lr: float = 1e-4
+    lr_da_encoder = 5e-6
+    lr_da_decoder = 5e-5
     # weight decay
     wd: float = 1e-4
 
