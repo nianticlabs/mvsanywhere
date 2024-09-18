@@ -377,7 +377,10 @@ class MatrixCityDataset(GenericMVSDataset):
                 Only provided when include_full_res_depth is true.
 
         """
-        height_pixels, width_pixels = 1000, 1000
+        if "street" in scan_id:
+            height_pixels, width_pixels = 1000, 1000
+        else:
+            height_pixels, width_pixels = 1080, 1920
         transforms = self._load_transforms_file(scan_id)
         angle_x = transforms["camera_angle_x"]
 
