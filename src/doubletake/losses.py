@@ -22,15 +22,12 @@ class MSGradientLoss(nn.Module):
         grad_loss = torch.tensor(0, dtype=depth_gt.dtype, device=depth_gt.device)
         for depth_pred_down, depth_gtn_down in zip(depth_pred_pyr, depth_gtn_pyr):
             depth_gtn_grad = kornia.filters.spatial_gradient(depth_gtn_down)
-
+            depth_pred_grad = kornia.filters.spatial_gradient(depth_pred_down)
             mask_down_b = depth_gtn_grad.isfinite().all(dim=1, keepdim=True)
 
-            depth_pred_grad = kornia.filters.spatial_gradient(depth_pred_down).masked_select(
-                mask_down_b
-            )
 
-            grad_error = torch.abs(depth_pred_grad - depth_gtn_grad.masked_select(mask_down_b))
-            grad_loss += torch.mean(grad_error)
+            grad_error = torch.abs((depth_pred_grad - depth_gtn_grad) / depth_pred_down.unsqueeze(2))
+            grad_loss += torch.mean(grad_error[mask_down_b])
 
         return grad_loss
 
