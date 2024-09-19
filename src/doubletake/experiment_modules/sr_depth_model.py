@@ -620,7 +620,7 @@ class DepthModel(pl.LightningModule):
         losses = self.compute_losses(cur_data, src_data, outputs)
 
         if phase == "train":
-            self.manual_backward(losses["loss"])
+            self.manual_backward(losses["loss"] / 2.0)
 
             if (batch_idx + 1) % 2 == 0:
                 optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
@@ -642,91 +642,93 @@ class DepthModel(pl.LightningModule):
         #
         is_train = phase == "train"
 
-        # logging and validation
-        with torch.inference_mode():
-            # log images for train.
-            if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
-                for i in range(4):
-                    mask_i = mask[i].float().cpu()
-                    depth_gt_viz_i, vmin, vmax = colormap_image(
-                        depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
-                    )
-                    depth_pred_viz_i = colormap_image(
-                        depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
-                    )
-                    cv_min_viz_i = colormap_image(
-                        cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
-                    )
-                    depth_pred_lr_viz_i = colormap_image(
-                        depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
+        if (batch_idx + 1) % 2 == 0:
+
+            # logging and validation
+            with torch.inference_mode():
+                # log images for train.
+                if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
+                    for i in range(4):
+                        mask_i = mask[i].float().cpu()
+                        depth_gt_viz_i, vmin, vmax = colormap_image(
+                            depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
+                        )
+                        depth_pred_viz_i = colormap_image(
+                            depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        cv_min_viz_i = colormap_image(
+                            cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        depth_pred_lr_viz_i = colormap_image(
+                            depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+
+                        image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
+
+                        self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
+                        self.logger.experiment.add_image(
+                            f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                        )
+                        self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
+
+                    self.logger.experiment.flush()
+
+                # log losses
+                for loss_name, loss_val in losses.items():
+                    self.log(
+                        f"{phase}/{loss_name}",
+                        loss_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
+                        prog_bar=True
                     )
 
-                    image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
-
-                    self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
-                    self.logger.experiment.add_image(
-                        f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                # high_res_validation: it isn't always wise to load in high
+                # resolution depth maps so this is an optional flag.
+                if phase == "train" or not self.run_opts.high_res_validation:
+                    # compute metrics at low res depth resolution for train or if
+                    # validation isn't set to use high res depth
+                    metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
+                else:
+                    # if we are validating or testing, we want to upscale our
+                    # predictions to full-size and compare against the GT depth map,
+                    # so that metrics are comparable across resolutions
+                    full_size_depth_gt = cur_data["full_res_depth_b1hw"]
+                    full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
+                    # this should be nearest to reflect test, but keeping it for
+                    # backwards comparison reasons.
+                    full_size_pred = F.interpolate(
+                        depth_pred,
+                        full_size_depth_gt.size()[-2:],
+                        mode="bilinear",
+                        align_corners=False,
                     )
-                    self.logger.experiment.add_image(
-                        f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                    metrics = compute_depth_metrics(
+                        full_size_depth_gt[full_size_mask_b],
+                        full_size_pred[full_size_mask_b],
                     )
-                    self.logger.experiment.add_image(
-                        f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+
+                for metric_name, metric_val in metrics.items():
+                    self.log(
+                        f"{phase}_metrics/{metric_name}",
+                        metric_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
                     )
-                    self.logger.experiment.add_image(
-                        f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
-                    )
-                    self.logger.experiment.add_image(
-                        f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
-                    )
-                    self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
-
-                self.logger.experiment.flush()
-
-            # log losses
-            for loss_name, loss_val in losses.items():
-                self.log(
-                    f"{phase}/{loss_name}",
-                    loss_val,
-                    sync_dist=True,
-                    on_step=is_train,
-                    on_epoch=not is_train,
-                    prog_bar=True
-                )
-
-            # high_res_validation: it isn't always wise to load in high
-            # resolution depth maps so this is an optional flag.
-            if phase == "train" or not self.run_opts.high_res_validation:
-                # compute metrics at low res depth resolution for train or if
-                # validation isn't set to use high res depth
-                metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
-            else:
-                # if we are validating or testing, we want to upscale our
-                # predictions to full-size and compare against the GT depth map,
-                # so that metrics are comparable across resolutions
-                full_size_depth_gt = cur_data["full_res_depth_b1hw"]
-                full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
-                # this should be nearest to reflect test, but keeping it for
-                # backwards comparison reasons.
-                full_size_pred = F.interpolate(
-                    depth_pred,
-                    full_size_depth_gt.size()[-2:],
-                    mode="bilinear",
-                    align_corners=False,
-                )
-                metrics = compute_depth_metrics(
-                    full_size_depth_gt[full_size_mask_b],
-                    full_size_pred[full_size_mask_b],
-                )
-
-            for metric_name, metric_val in metrics.items():
-                self.log(
-                    f"{phase}_metrics/{metric_name}",
-                    metric_val,
-                    sync_dist=True,
-                    on_step=is_train,
-                    on_epoch=not is_train,
-                )
 
         # return losses["loss"]
 
@@ -753,7 +755,7 @@ class DepthModel(pl.LightningModule):
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
-            self.depth_decoder.dinov2.parameters(), lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
+            self.depth_decoder.dinov2.parameters(), lr=self.run_opts.lr_da_encoder / 50.0, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
             self.depth_decoder.depth_head.parameters(), lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
@@ -768,6 +770,6 @@ class DepthModel(pl.LightningModule):
                 return 0.01
 
         lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
-        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_encoder, lr_lambda)
-        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_decoder, lr_lambda)
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
         return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]

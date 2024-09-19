@@ -81,8 +81,8 @@ class Options:
     ############################## hyperparameters #############################
     # learning rate
     lr: float = 1e-4
-    lr_da_encoder = 5e-6
-    lr_da_decoder = 5e-5
+    lr_da_encoder: float  = 5e-6
+    lr_da_decoder: float = 5e-5
     # weight decay
     wd: float = 1e-4
 
@@ -90,7 +90,7 @@ class Options:
     num_sanity_val_steps: int = 0
 
     # max number of iterations for training
-    max_steps: int = 110000
+    max_steps: int = 220000
 
     # batch size
     batch_size: int = 16
