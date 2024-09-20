@@ -4,6 +4,7 @@ from pathlib import Path
 
 from doubletake.datasets.blendedmvg import BlendedMVGDataset
 from doubletake.datasets.dynamic_replica import DynamicReplicaDataset
+from doubletake.datasets.kitti import KITTIDataset
 from doubletake.datasets.matrix_city import MatrixCityDataset
 from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
@@ -257,6 +258,19 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
         if verbose:
             print(f"".center(80, "#"))
             print(f" VirtualKITTI Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
+    elif dataset_name == "kitti":
+        scans = KITTIDataset.SEQUENCES
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = KITTIDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" KITTI Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
 
