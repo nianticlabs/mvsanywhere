@@ -467,15 +467,12 @@ class MatrixCityDataset(GenericMVSDataset):
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
 
-        if "aerial" in scan_id:
-            # Float32 depth
-            mask_b = torch.tensor(depth < np.quantile(depth, 0.95)).bool().unsqueeze(0)
+        if "street" in scan_id and (depth < 65000).any():
+            mask_b = depth < np.quantile(depth[depth < 65000], 0.95)
         else:
-            mask_b = torch.tensor(depth < 65000).bool().unsqueeze(0)
-            if mask_b.sum() > 0:
-                mask_b = torch.tensor(depth < np.quantile(depth[depth < 65000], 0.95)).bool().unsqueeze(0)
-            else:
-                mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
+            mask_b = depth > 0
+        
+        mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
         
         depth = torch.tensor(depth / 100).float().unsqueeze(0)
 
@@ -509,7 +506,12 @@ class MatrixCityDataset(GenericMVSDataset):
         full_res_depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         full_res_depth = self._load_depth(full_res_depth_filepath)
 
-        full_res_mask_b = torch.tensor(full_res_depth != 65504).bool().unsqueeze(0)
+        if "street" in scan_id and (full_res_depth < 65000).any():
+            full_res_mask_b = full_res_depth < np.quantile(full_res_depth[full_res_depth < 65000], 0.95)
+        else:
+            full_res_mask_b = full_res_depth > 0
+        full_res_mask_b = torch.tensor(full_res_mask_b).bool().unsqueeze(0)
+
         full_res_depth = torch.tensor(full_res_depth / 100).float().unsqueeze(0)
 
         # # Get the float valid mask
