@@ -349,7 +349,7 @@ class MatrixCityDataset(GenericMVSDataset):
         city, mode, split, block = scan_id.split(":")[0].split("/")
         path = (
             Path(self.dataset_path)
-            / f"{city}_depth"
+            / (f"{city}_depth" if mode == "street" else f"{city}_depth_float32")
             / mode
             / split
             / f"{block}_depth"
@@ -467,12 +467,16 @@ class MatrixCityDataset(GenericMVSDataset):
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
 
-        # mask_b = torch.tensor(depth < 65000).bool().unsqueeze(0)
-        mask_b = depth < 65000
-        if mask_b.sum() > 0:
-            mask_b = torch.tensor(depth < np.quantile(depth[depth < 65000], 0.95)).bool().unsqueeze(0)
+        if "aerial" in scan_id:
+            # Float32 depth
+            mask_b = torch.tensor(depth < np.quantile(depth, 0.95)).bool().unsqueeze(0)
         else:
-            mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
+            mask_b = torch.tensor(depth < 65000).bool().unsqueeze(0)
+            if mask_b.sum() > 0:
+                mask_b = torch.tensor(depth < np.quantile(depth[depth < 65000], 0.95)).bool().unsqueeze(0)
+            else:
+                mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
+        
         depth = torch.tensor(depth / 100).float().unsqueeze(0)
 
         # # Get the float valid mask
