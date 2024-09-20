@@ -196,7 +196,7 @@ class GenericMVSDataset(Dataset):
         self.high_res_image_height = high_res_image_height
 
         # Random resize crop
-        self.random_resize_crop = transforms.RandomResizedCrop((self.image_height, self.image_width), scale=(0.5, 1.0), ratio=(16/9, 16/9))
+        self.random_resize_crop = transforms.RandomResizedCrop((self.image_height, self.image_width), scale=(0.75, 1.0), ratio=(4/3, 4/3))
 
         # size up depth using ratio of RGB to depth
         self.depth_height = int(self.image_height * prediction_scale)
@@ -468,7 +468,7 @@ class GenericMVSDataset(Dataset):
                 height=self.image_height,
                 width=self.image_width,
                 resampling_mode=self.image_resampling_mode,
-                disable_warning=False,
+                disable_warning=True,
                 crop=crop,
             )
         except:
