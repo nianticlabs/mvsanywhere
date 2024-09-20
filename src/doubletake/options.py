@@ -73,7 +73,7 @@ class Options:
 
     # image size input to the network. Used in dataloaders and projectors.
     image_width: int = 512
-    image_height: int = 288
+    image_height: int = 384
 
     val_image_width: int = 512
     val_image_height: int = 384
