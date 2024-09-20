@@ -81,12 +81,15 @@ def ray_train_func(opts: options.Options) -> None:
         resume_ckpt = None
         is_resume = False
         ckpt_path_last = Path(RAY_OUTPUT_PATH) / opts.name / "last.ckpt"
-
-        if ckpt_path_last.exists():
-            # in this case we have to resume but it is the first time
-            logger.info(f"Found a checkpoint to resume: {ckpt_path_last}")
-            resume_ckpt = ckpt_path_last
-            is_resume = True
+        checkpoint = ray.train.get_checkpoint()
+        if checkpoint:
+            with checkpoint.as_directory() as ckpt_dir:
+                ckpt_path_last = str(Path(ckpt_dir) / "checkpoint.ckpt")
+                resume_ckpt = ckpt_path_last
+                is_resume = True
+                logger.info(f"Found a checkpoint to resume: {ckpt_path_last}")
+        else:
+            logger.info("No checkpoint to load found")
 
         # prepare the trainer
         ray_trainer = _get_ray_trainer(opts=opts, is_resume=is_resume)
