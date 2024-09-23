@@ -25,6 +25,8 @@ def load_model_inference(opts, model_class_to_use):
 
     if opts.fast_cost_volume and isinstance(model.cost_volume, feature_volume.FeatureVolumeManager):
         model.cost_volume = model.cost_volume.to_fast()
+
+    model = torch.nn.DataParallel(model)
     return model
 
 

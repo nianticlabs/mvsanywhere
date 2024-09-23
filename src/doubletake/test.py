@@ -116,7 +116,6 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 import doubletake.options as options
-from doubletake.tools import fusers_helper
 from doubletake.utils.dataset_utils import get_dataset
 from doubletake.utils.generic_utils import cache_model_outputs, to_gpu
 from doubletake.utils.metrics_utils import (
@@ -215,6 +214,7 @@ def main(opts):
         for scan in tqdm(scans):
             # initialize fuser if we need to fuse
             if opts.run_fusion:
+                from doubletake.tools import fusers_helper
                 fuser = fusers_helper.get_fuser(opts, scan)
 
             # set up dataset with current scan
@@ -236,12 +236,11 @@ def main(opts):
                 image_width=opts.image_width,
                 image_height=opts.image_height,
                 pass_frame_id=True,
-                fill_depth_hints=opts.fill_depth_hints,
-                depth_hint_aug=opts.depth_hint_aug,
-                depth_hint_dir=opts.depth_hint_dir,
-                load_empty_hints=opts.load_empty_hint,
                 disable_flip=True,
                 rotate_images=opts.rotate_images,
+                matching_scale=opts.matching_scale,
+                prediction_scale=opts.prediction_scale,
+                prediction_num_scales=opts.prediction_num_scales
             )
 
             assert len(dataset) > 0, f"Dataset {scan} is empty."
@@ -271,9 +270,9 @@ def main(opts):
                 # for numerically stable testing. If opts.fast_cost_volume, then
                 # batch.
                 outputs = model(
-                    "test",
-                    cur_data,
-                    src_data,
+                    phase="test",
+                    cur_data=cur_data,
+                    src_data=src_data,
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
                 )

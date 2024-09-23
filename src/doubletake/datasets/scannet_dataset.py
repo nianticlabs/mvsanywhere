@@ -324,7 +324,7 @@ class ScannetDataset(GenericMVSDataset):
         sensor_data_dir = os.path.join(scene_path, "sensor_data")
 
         cached_resized_path = os.path.join(
-            sensor_data_dir, f"frame-{frame_id}.color.{self.image_width}.png"
+            sensor_data_dir, f"frame-{frame_id}.color.{640}.png"
         )
         # check if we have cached resized images on disk first
         if os.path.exists(cached_resized_path):
