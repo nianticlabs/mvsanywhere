@@ -216,7 +216,7 @@ class DepthAnything(nn.Module):
     ):
         super().__init__()
         self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=intermediate_layers)
-        self.depth_head = DPTHead(cv_encoder_feat_channel, model_name=model_name)
+        self.depth_head = DPTHead(cv_encoder_feat_channel, model_name=model_name, nclass=64)
 
     def forward(self, img, cv_feats):
         h, w = img.shape[-2:]

@@ -256,27 +256,19 @@ class DPTHead(nn.Module):
         head_features_1 = features
         head_features_2 = 32
         
-        if nclass > 1:
-            self.scratch.output_conv = nn.Sequential(
-                nn.Conv2d(head_features_1, head_features_1, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(True),
-                nn.Conv2d(head_features_1, nclass, kernel_size=1, stride=1, padding=0),
-            )
-        else:
-
-            self.output_convs = nn.ModuleList(
-                [
-                    nn.Sequential(
-                        nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                        nn.Upsample(size=(int(336 // 2 ** i), int(448 // 2 ** i)), mode='bilinear', align_corners=True),
-                        nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
-                        nn.ReLU(True),
-                        nn.Conv2d(head_features_2, 1, kernel_size=1, stride=1, padding=0),
-                        # nn.ReLU(True),
-                        nn.Identity(),
-                    ) for i in range(4)
-                ]
-            )
+        self.output_convs = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
+                    nn.Upsample(size=(int(336 // 2 ** i), int(448 // 2 ** i)), mode='bilinear', align_corners=True),
+                    nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
+                    nn.ReLU(True),
+                    nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),
+                    # nn.ReLU(True),
+                    nn.Identity(),
+                ) for i in range(4)
+            ]
+        )
 
             
     def forward(self, cv_features, out_features, patch_h, patch_w):
