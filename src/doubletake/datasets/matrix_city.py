@@ -432,7 +432,10 @@ class MatrixCityDataset(GenericMVSDataset):
     
     @staticmethod
     def _load_depth(depth_path):
-        image = cv2.imread(depth_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)[...,0] #(H, W)
+        try:
+            image = cv2.imread(depth_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)[...,0] #(H, W)
+        except:
+            image = np.zeros((1000, 1000))
         return image
 
     def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
@@ -468,7 +471,7 @@ class MatrixCityDataset(GenericMVSDataset):
         )
 
         if "street" in scan_id and (depth < 65000).any():
-            mask_b = depth < np.quantile(depth[depth < 65000], 0.95)
+            mask_b = np.logical_and(depth < np.quantile(depth[depth < 65000], 0.95), depth > 0)
         else:
             mask_b = depth > 0
         

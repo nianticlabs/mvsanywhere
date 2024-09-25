@@ -627,8 +627,8 @@ class GenericMVSDataset(Dataset):
                     "depth_b1hw": depth,
                     "mask_b1hw": mask,
                     "mask_b_b1hw": mask_b,
-                    "max_depth": depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
-                    "min_depth": depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
+                    "max_depth": torch.tensor(20.0), # depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
+                    "min_depth": torch.tensor(0.25), # depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
                 }
             )
 
@@ -652,7 +652,7 @@ class GenericMVSDataset(Dataset):
         if self.include_full_res_depth:
             # get high res depth
             full_res_depth, full_res_mask, full_res_mask_b = self.load_full_res_depth_and_mask(
-                scan_id, frame_id
+                scan_id, frame_id, crop
             )
 
             if self.rotate_images:

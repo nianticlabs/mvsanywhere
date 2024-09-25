@@ -489,8 +489,9 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
-            log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
+            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
+            # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
             if flip:
                 # now flip the depth map back after final prediction
@@ -669,13 +670,15 @@ class DepthModel(pl.LightningModule):
 
         #
         is_train = phase == "train"
+        global_step = self.global_step // 3
 
-        if (batch_idx + 1) % 2 == 0:
-
+        if batch_idx % 2 == 0:
             # logging and validation
             with torch.inference_mode():
                 # log images for train.
-                if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
+                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
+
+                    prefix = "train" if is_train else "val"
                     for i in range(4):
                         mask_i = mask[i].float().cpu()
                         depth_gt_viz_i, vmin, vmax = colormap_image(
@@ -700,24 +703,24 @@ class DepthModel(pl.LightningModule):
                         grid = F.interpolate(grid[None], image_i.shape[-2:], mode="bilinear")[0]
                         grid = reverse_imagenet_normalize(grid)
 
-                        self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
-                        self.logger.experiment.add_image(f"src_images/{i}", grid, self.global_step)
+                        self.logger.experiment.add_image(f"{prefix}_image/{i}", image_i, global_step)
+                        self.logger.experiment.add_image(f"{prefix}_src_images/{i}", grid, global_step)
                         self.logger.experiment.add_image(
-                                f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                                f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
                         )
                         self.logger.experiment.add_image(
-                            f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                            f"{prefix}_depth_pred/{i}", depth_pred_viz_i, global_step
                         )
                         self.logger.experiment.add_image(
-                            f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+                            f"{prefix}_depth_pred_lr/{i}", depth_pred_lr_viz_i, global_step
                         )
                         self.logger.experiment.add_image(
-                            f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
+                            f"{prefix}_normals_gt/{i}", 0.5 * (1 + normals_gt[i]), global_step
                         )
                         self.logger.experiment.add_image(
-                            f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
+                            f"{prefix}_normals_pred/{i}", 0.5 * (1 + normals_pred[i]), global_step
                         )
-                        self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
+                        self.logger.experiment.add_image(f"{prefix}_cv_min/{i}", cv_min_viz_i, global_step)
 
                     self.logger.experiment.flush()
 
