@@ -260,7 +260,7 @@ class DPTHead(nn.Module):
             [
                 nn.Sequential(
                     nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                    nn.Upsample(size=(int(336 // 2 ** i), int(448 // 2 ** i)), mode='bilinear', align_corners=True),
+                    nn.Upsample(size=(int(336 // 2 ** i), int(784 // 2 ** i)), mode='bilinear', align_corners=True),
                     nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
                     nn.ReLU(True),
                     nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),
