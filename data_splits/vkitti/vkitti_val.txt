@@ -1,0 +1,10 @@
+Scene02/morning
+Scene02/30-deg-right
+Scene02/rain
+Scene02/sunset
+Scene02/fog
+Scene02/15-deg-right
+Scene02/15-deg-left
+Scene02/overcast
+Scene02/30-deg-left
+Scene02/clone
