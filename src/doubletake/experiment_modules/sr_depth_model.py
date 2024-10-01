@@ -24,7 +24,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, MosaicEncoder, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -126,78 +126,24 @@ class DepthModel(pl.LightningModule):
 
         self.run_opts = opts
 
-        # iniitalize the encoder for strong image priors
-        if "efficientnet" in self.run_opts.image_encoder_name:
-            self.encoder = timm.create_model(
-                "tf_efficientnetv2_s_in21ft1k", pretrained=True, features_only=True
-            )
+        intermediate_layer_idx = {
+            'dinov2_vits14': [2, 5, 8, 11],
+            'dinov2_vitb14': [2, 5, 8, 11], 
+            'dinov2_vitl14': [4, 11, 17, 23], 
+            'dinov2_vitg14': [9, 19, 29, 39]
+        }[self.run_opts.depth_decoder_name.split(".")[1]]
+        self.depth_decoder = DepthAnything(
+            model_name=self.run_opts.depth_decoder_name.split(".")[1],
+            intermediate_layers=intermediate_layer_idx
+        )
+        if self.run_opts.da_weights_path is not None:
+            self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
 
-            self.encoder.num_ch_enc = self.encoder.feature_info.channels()
-        elif "resnet18d" in self.run_opts.image_encoder_name:
-            self.encoder = timm.create_model("resnet18d", pretrained=True, features_only=True)
+        self.mosaic_encoder = MosaicEncoder(
+            model_name=self.run_opts.depth_decoder_name.split(".")[1],
+            intermediate_layers=intermediate_layer_idx
+        )
 
-            self.encoder.num_ch_enc = self.encoder.feature_info.channels()
-        elif 'dinov2' in self.run_opts.image_encoder_name:
-            self.encoder = DINOv2(self.run_opts.image_encoder_name)
-            if self.run_opts.da_weights_path is not None:
-                self.encoder.load_da_weights(self.run_opts.da_weights_path)
-        else:
-            raise ValueError("Unrecognized option for image encoder type!")
-
-        # iniitalize the first half of the U-Net, encoding the cost volume
-        # and image prior image feautres
-        if self.run_opts.cv_encoder_type == "multi_scale_encoder":
-            self.cost_volume_net = CVEncoder(
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_enc=self.encoder.num_ch_enc[1:],
-                num_ch_outs=[64, 128, 256, 384],
-            )
-            dec_num_input_ch = (
-                self.encoder.num_ch_enc[:1]
-                + self.cost_volume_net.num_ch_enc
-            )
-        elif self.run_opts.cv_encoder_type == 'vit_encoder':
-            self.cost_volume_net = ViTCVEncoder(
-                model_name=self.run_opts.image_encoder_name,
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
-            )
-        elif self.run_opts.cv_encoder_type == "cnn_encoder":
-            self.cost_volume_net = CNNCVEncoder(
-                model_name=self.run_opts.image_encoder_name,
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_outs=[64, 128, 256, 384]
-            )
-            dec_num_input_ch = [32, 64, 128, 256, 384]
-            if self.run_opts.da_weights_path is not None:
-                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
-        else:
-            raise ValueError("Unrecognized option for cost volume encoder type!")
-
-        # iniitalize the final depth decoder
-        if self.run_opts.depth_decoder_name == "unet_pp":
-            self.depth_decoder = DepthDecoderPP(dec_num_input_ch)
-        elif self.run_opts.depth_decoder_name == "skip":
-            self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
-        elif self.run_opts.depth_decoder_name == "dpt":
-            self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
-            if self.run_opts.da_weights_path is not None:
-                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
-        elif "depth_anything" in self.run_opts.depth_decoder_name:
-            intermediate_layer_idx = {
-                'dinov2_vits14': [2, 5, 8, 11],
-                'dinov2_vitb14': [2, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
-                'dinov2_vitg14': [9, 19, 29, 39]
-            }[self.run_opts.depth_decoder_name.split(".")[1]]
-            self.depth_decoder = DepthAnything(
-                dec_num_input_ch[1:],
-                model_name=self.run_opts.depth_decoder_name.split(".")[1],
-                intermediate_layers=intermediate_layer_idx
-            )
-            if self.run_opts.da_weights_path is not None:
-                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
-        else:
-            raise ValueError("Unrecognized option for depth decoder name!")
 
         # all the losses
         self.si_loss = ScaleInvariantLoss()
@@ -221,36 +167,6 @@ class DepthModel(pl.LightningModule):
             int(self.run_opts.image_width * self.run_opts.prediction_scale),
         )
 
-        # what type of cost volume are we using?
-        if self.run_opts.feature_volume_type == "simple_cost_volume":
-            cost_volume_class = CostVolumeManager
-        elif self.run_opts.feature_volume_type == "mlp_feature_volume":
-            cost_volume_class = FeatureVolumeManager
-        else:
-            raise ValueError(
-                f"Unrecognized option {self.run_opts.feature_volume_type} "
-                f"for feature volume type!"
-            )
-
-        self.cost_volume = cost_volume_class(
-            matching_height=int(self.run_opts.image_height * self.run_opts.matching_scale),
-            matching_width=int(self.run_opts.image_width * self.run_opts.matching_scale),
-            num_depth_bins=self.run_opts.matching_num_depth_bins,
-            matching_dim_size=self.run_opts.matching_feature_dims,
-            num_source_views=opts.model_num_views - 1,
-        )
-
-        # init the matching encoder. resnet is fast and is the default for
-        # results in the paper, fpn is more accurate but much slower.
-        if "resnet" == self.run_opts.matching_encoder_type:
-            self.matching_model = ResnetMatchingEncoder(18, self.run_opts.matching_feature_dims)
-        elif "unet_encoder" == self.run_opts.matching_encoder_type:
-            self.matching_model = UNetMatchingEncoder()
-        else:
-            raise ValueError(
-                f"Unrecognized option {self.run_opts.matching_encoder_type} "
-                f"for matching encoder type!"
-            )
 
         self.tensor_formatter = TensorFormatter()
 
@@ -389,102 +305,25 @@ class DepthModel(pl.LightningModule):
         cur_cam_T_world = cur_data["cam_T_world_b44"]
         cur_world_T_cam = cur_data["world_T_cam_b44"]
 
-        with torch.cuda.amp.autocast(False):
-            # Compute src_cam_T_cur_cam, a transformation for going from 3D
-            # coords in current view coordinate frame to source view coords
-            # coordinate frames.
-            src_cam_T_cur_cam = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
-
-            # Compute cur_cam_T_src_cam the opposite of src_cam_T_cur_cam. From
-            # source view to current view.
-            cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(1) @ src_world_T_cam
-
-        # flip transformation! Figure out if we're flipping. Should be true if
-        # we are training and a coin flip says we should.
-        flip_threshold = 0.5 if phase == "train" else 0.0
-        flip = torch.rand(1).item() < flip_threshold
-
-        if flip:
-            # flip all images.
-            cur_image = torch.flip(cur_image, (-1,))
-            src_image = torch.flip(src_image, (-1,))
-
-        # Compute image features for the current view. Used for a strong image
-        # prior.
-        cur_feats = self.encoder(cur_image)
-
-        # Compute matching features
-        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
-            cur_image, src_image, unbatched_matching_encoder_forward
+        cost_features = self.mosaic_encoder(
+            cur_image, src_image
         )
 
-        if flip:
-            # now (carefully) flip matching features back for correct MVS.
-            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
-            matching_src_feats = torch.flip(matching_src_feats, (-1,))
+        depth_outputs = self.depth_decoder(cur_image, cost_features)
 
-        # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(self.run_opts.min_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-        max_depth = torch.tensor(self.run_opts.max_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-
-        # Compute the cost volume. Should be size bdhw.
-        cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
-            cur_feats=matching_cur_feats,
-            src_feats=matching_src_feats,
-            src_extrinsics=src_cam_T_cur_cam,
-            src_poses=cur_cam_T_src_cam,
-            src_Ks=src_K,
-            cur_invK=cur_invK,
-            min_depth=min_depth,
-            max_depth=max_depth,
-            return_mask=return_mask,
-        )
-
-        if flip:
-            # OK, we've computed the cost volume, now we need to flip the cost
-            # volume to have it aligned with flipped image prior features
-            cost_volume = torch.flip(cost_volume, (-1,))
-
-        # Encode the cost volume and current image features
-        if self.run_opts.cv_encoder_type == "multi_scale_encoder":
-            cost_volume_features = self.cost_volume_net(
-                cost_volume,
-                cur_feats[1:],
-            )
-            cur_feats = cur_feats[:1] + cost_volume_features
-        elif self.run_opts.cv_encoder_type == "vit_encoder":
-            cur_feats = self.cost_volume_net(
-                        cost_volume, 
-                        cur_feats[:-1],
-                    )
-        elif self.run_opts.cv_encoder_type == "cnn_encoder":
-            cur_feats = self.cost_volume_net(
-                        cost_volume, 
-                        cur_feats,
-                    )     
-
-        # Decode into depth at multiple resolutions.
-        if "depth_anything" in self.run_opts.depth_decoder_name:
-            depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
-        else:
-            depth_outputs = self.depth_decoder(cur_feats)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
 
-            if flip:
-                # now flip the depth map back after final prediction
-                log_depth = torch.flip(log_depth, (-1,))
-
             depth_outputs[k] = log_depth
             depth_outputs[k.replace("log_", "")] = torch.exp(log_depth)
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
-        depth_outputs["lowest_cost_bhw"] = lowest_cost
-        depth_outputs["overall_mask_bhw"] = overall_mask_bhw
+        depth_outputs["lowest_cost_bhw"] = torch.zeros_like(log_depth)
+        depth_outputs["overall_mask_bhw"] = torch.zeros_like(log_depth)
 
         return depth_outputs
 
@@ -620,29 +459,27 @@ class DepthModel(pl.LightningModule):
         losses = self.compute_losses(cur_data, src_data, outputs)
 
         if phase == "train":
-            self.manual_backward(losses["loss"] / 2.0)
+            self.manual_backward(losses["loss"])
+            optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
+        
+            optimizer_sr.step()
+            optimizer_da_enc.step()
+            optimizer_da_dec.step()
 
-            if (batch_idx + 1) % 2 == 0:
-                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
-            
-                optimizer_sr.step()
-                optimizer_da_enc.step()
-                optimizer_da_dec.step()
+            optimizer_sr.zero_grad()
+            optimizer_da_enc.zero_grad()
+            optimizer_da_dec.zero_grad()
 
-                optimizer_sr.zero_grad()
-                optimizer_da_enc.zero_grad()
-                optimizer_da_dec.zero_grad()
-
-                # multiple schedulers
-                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
-                scheduler_sr.step()
-                scheduler_da_enc.step()
-                scheduler_da_dec.step()
+            # multiple schedulers
+            scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
+            scheduler_sr.step()
+            scheduler_da_enc.step()
+            scheduler_da_dec.step()
 
         #
         is_train = phase == "train"
 
-        if (batch_idx + 1) % 2 == 0:
+        if True:
 
             # logging and validation
             with torch.inference_mode():
@@ -748,11 +585,8 @@ class DepthModel(pl.LightningModule):
 
         """
         optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume_net.parameters()) + 
-            list(self.encoder.parameters()) +
-            list(self.cost_volume.parameters()) + 
-            list(self.matching_model.parameters()),
-            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+            self.mosaic_encoder.parameters(),
+            lr=self.run_opts.lr_da_encoder / 10.0, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
             self.depth_decoder.dinov2.parameters(), lr=self.run_opts.lr_da_encoder / 50.0, weight_decay=self.run_opts.wd

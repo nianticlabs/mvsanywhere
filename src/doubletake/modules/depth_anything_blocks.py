@@ -179,7 +179,6 @@ class FeatureFusionBlock(nn.Module):
 class DPTHead(nn.Module):
     def __init__(
             self,
-            cv_encoder_feat_channels,
             model_name='dinov2_vits14',
             nclass=1,
             use_clstoken=False,
@@ -196,7 +195,7 @@ class DPTHead(nn.Module):
         
         self.projects = nn.ModuleList([
             nn.Conv2d(
-                in_channels=in_channels,
+                in_channels=in_channels * 2,
                 out_channels=out_channel,
                 kernel_size=1,
                 stride=1,
@@ -224,11 +223,6 @@ class DPTHead(nn.Module):
                 kernel_size=3,
                 stride=2,
                 padding=1)
-        ])
-
-        self.cv_feat_fusers = nn.ModuleList([
-            double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
-            for i in range(len(out_channels))
         ])
         
         if self.use_clstoken:
@@ -291,14 +285,9 @@ class DPTHead(nn.Module):
             
             x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
             
+            x = torch.cat([x, cv_features[i]], dim=1)
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
-
-            x = torch.cat([
-                x,
-                F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
-            ], dim=1)
-            x = self.cv_feat_fusers[i](x)
             
             out.append(x)
         

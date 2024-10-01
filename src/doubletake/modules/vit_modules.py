@@ -210,13 +210,12 @@ class DepthAnything(nn.Module):
 
     def __init__(
             self,
-            cv_encoder_feat_channel,
             model_name="dinov2_vitb14",
             intermediate_layers=4,
     ):
         super().__init__()
         self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=intermediate_layers)
-        self.depth_head = DPTHead(cv_encoder_feat_channel, model_name=model_name)
+        self.depth_head = DPTHead(model_name=model_name)
 
     def forward(self, img, cv_feats):
         h, w = img.shape[-2:]
@@ -228,4 +227,45 @@ class DepthAnything(nn.Module):
     def load_da_weights(self, weights_path):
         self.dinov2.load_da_weights(weights_path)
         self.depth_head.load_da_weights(weights_path)
+
+
+class MosaicEncoder(nn.Module):
+
+    def __init__(
+        self,
+        model_name="dinov2_vitb14",
+        intermediate_layers=4,
+    ):
+        super().__init__()
+        self.dinov2 = DINOv2(model_name=model_name, num_intermediate_layers=intermediate_layers)
+        
+    def forward(self, cur_img, src_img):
+        
+        h, w = cur_img.shape[-2:]
+        patch_h, patch_w = h // 14, w // 14
+
+        cur_img = F.interpolate(cur_img, scale_factor=0.5, mode="bilinear")
+        src_img = torch.stack([
+            F.interpolate(src_img[:, i], scale_factor=0.5, mode="bilinear")
+            for i in range(3)
+        ], dim=1)
+
+        mosaic = torch.cat(
+            [
+                torch.cat([cur_img, src_img[:, 0]], dim=3),
+                torch.cat([src_img[:, 1], src_img[:, 2]], dim=3)
+            ], dim=2
+        )
+
+        mosaic = self.dinov2(mosaic)
+
+        feats = []
+        for i, x in enumerate(mosaic):
+            x = x[0]
+            x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
+            x = x[:, :, :patch_h // 2, :patch_w // 2]
+            x = F.interpolate(x, scale_factor=2, mode="bilinear")
+            feats.append(x)
+
+        return feats
 
