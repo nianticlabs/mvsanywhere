@@ -489,7 +489,7 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
             # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
