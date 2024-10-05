@@ -179,7 +179,6 @@ class FeatureFusionBlock(nn.Module):
 class DPTHead(nn.Module):
     def __init__(
             self,
-            cv_encoder_feat_channels,
             model_name='dinov2_vits14',
             nclass=1,
             use_clstoken=False,
@@ -225,11 +224,6 @@ class DPTHead(nn.Module):
                 stride=2,
                 padding=1)
         ])
-
-        self.cv_feat_fusers = nn.ModuleList([
-            double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
-            for i in range(len(out_channels))
-        ])
         
         if self.use_clstoken:
             self.readout_projects = nn.ModuleList()
@@ -268,7 +262,7 @@ class DPTHead(nn.Module):
                 [
                     nn.Sequential(
                         nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                        nn.Upsample(size=(int(336 // 2 ** i), int(448 // 2 ** i)), mode='bilinear', align_corners=True),
+                        nn.Upsample(size=(int(420 // 2 ** i), int(560 // 2 ** i)), mode='bilinear', align_corners=True),
                         nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
                         nn.ReLU(True),
                         nn.Conv2d(head_features_2, 1, kernel_size=1, stride=1, padding=0),
@@ -279,26 +273,20 @@ class DPTHead(nn.Module):
             )
 
             
-    def forward(self, cv_features, out_features, patch_h, patch_w):
+    def forward(self, out_features, patch_h, patch_w):
         out = []
         for i, x in enumerate(out_features):
             if self.use_clstoken:
-                x, cls_token = x[0], x[1]
+                x, cls_token = x[:, 0], x[:, 1:]
                 readout = cls_token.unsqueeze(1).expand_as(x)
                 x = self.readout_projects[i](torch.cat((x, readout), -1))
             else:
-                x = x[0]
+                x = x[:, 1:]
             
             x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
             
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
-
-            x = torch.cat([
-                x,
-                F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
-            ], dim=1)
-            x = self.cv_feat_fusers[i](x)
             
             out.append(x)
         
@@ -322,11 +310,3 @@ class DPTHead(nn.Module):
         }
   
         return depth_outputs
-    
-
-    def load_da_weights(self, weights_path):
-        da_state_dict = torch.load(weights_path)
-        self.load_state_dict(
-            {k.replace('depth_head.', ''): v for k, v in da_state_dict.items() if ('depth_head' in k) and ('output_conv' not in k)},
-            strict=False
-        )

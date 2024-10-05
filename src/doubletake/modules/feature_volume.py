@@ -213,9 +213,9 @@ class FeatureVolumeManager(CostVolumeManager):
 
             # pad with zeros to bake in bounds protection when matching.
             src_feat_warped = F.grid_sample(
-                input=src_feats.view(
+                input=src_feats.reshape((
                     -1, num_feat_channels, self.matching_height, self.matching_width
-                ),
+                )),
                 grid=uv_coords.type_as(src_feats),
                 padding_mode="zeros",
                 mode="bilinear",
