@@ -148,9 +148,9 @@ class DepthModel(pl.LightningModule):
         # and image prior image feautres
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             self.cost_volume_net = CVEncoder(
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                num_ch_cv=self.run_opts.matching_num_depth_bins * 2,
                 num_ch_enc=self.encoder.num_ch_enc[1:],
-                num_ch_outs=[64, 128, 256, 384],
+                num_ch_outs=[128, 128, 256, 384],
             )
             dec_num_input_ch = (
                 self.encoder.num_ch_enc[:1]
@@ -461,6 +461,10 @@ class DepthModel(pl.LightningModule):
             # volume to have it aligned with flipped image prior features
             cost_volume = torch.flip(cost_volume, (-1,))
 
+        bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
+        depth_info = torch.ones_like(cost_volume) * bins
+        cost_volume = torch.cat((depth_info, cost_volume), dim=1)
+
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
@@ -489,7 +493,7 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
             # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 

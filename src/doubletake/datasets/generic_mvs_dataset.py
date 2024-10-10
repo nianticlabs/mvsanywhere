@@ -627,8 +627,6 @@ class GenericMVSDataset(Dataset):
                     "depth_b1hw": depth,
                     "mask_b1hw": mask,
                     "mask_b_b1hw": mask_b,
-                    "max_depth": torch.tensor(20.0), # depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
-                    "min_depth": torch.tensor(0.25), # depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
                 }
             )
 
@@ -748,16 +746,23 @@ class GenericMVSDataset(Dataset):
         # src_data contains data for all source frames
         src_data = self.stack_src_data(src_data_list)
 
+        src_world_T_cam = torch.tensor(src_data["world_T_cam_b44"])
+        cur_cam_T_world = torch.tensor(cur_data["cam_T_world_b44"])
+
+        # Compute cur_cam_T_src_cam
+        cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(0) @ src_world_T_cam
+
+        cur_to_src_dist = torch.linalg.norm(cur_cam_T_src_cam[..., :3, 3], dim=1)
+
+        focal_length = cur_data["K_s0_b44"][0, 0]
+        image_width = self.depth_width
+        cur_data["max_depth"] = torch.median(cur_to_src_dist) * focal_length / (0.01 * image_width)
+        cur_data["min_depth"] = torch.min(cur_to_src_dist) * focal_length / (2.0 * image_width)
+
         # now sort all source frames (src_data) according to pose penalty w.r.t
         # to the refernce frame (cur_data)
         if not self.shuffle_tuple:
             # order source images based on pose penalty
-            src_world_T_cam = torch.tensor(src_data["world_T_cam_b44"])
-            cur_cam_T_world = torch.tensor(cur_data["cam_T_world_b44"])
-
-            # Compute cur_cam_T_src_cam
-            cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(0) @ src_world_T_cam
-
             # get penalties.
             frame_penalty_k, _, _ = pose_distance(cur_cam_T_src_cam)
 

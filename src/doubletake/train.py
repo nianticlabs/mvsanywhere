@@ -232,7 +232,7 @@ def prepare_trainer(
         num_sanity_val_steps=opts.num_sanity_val_steps,
         strategy=ddp_strategy,
         plugins=plugins,
-        # limit_train_batches=20000,
+        limit_train_batches=10000,
         profiler="simple",
     )
     return trainer
