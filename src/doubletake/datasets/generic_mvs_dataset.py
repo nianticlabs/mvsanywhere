@@ -757,7 +757,11 @@ class GenericMVSDataset(Dataset):
         focal_length = cur_data["K_s0_b44"][0, 0]
         image_width = self.depth_width
         cur_data["max_depth"] = torch.median(cur_to_src_dist) * focal_length / (0.01 * image_width)
-        cur_data["min_depth"] = torch.min(cur_to_src_dist) * focal_length / (2.0 * image_width)
+        cur_data["min_depth"] = torch.min(cur_to_src_dist) * focal_length / (0.5 * image_width)
+
+        # Numeric stability
+        cur_data["min_depth"] += 1e-4
+        cur_data["max_depth"] += 1e-4
 
         # now sort all source frames (src_data) according to pose penalty w.r.t
         # to the refernce frame (cur_data)

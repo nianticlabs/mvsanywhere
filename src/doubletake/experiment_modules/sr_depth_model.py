@@ -493,7 +493,11 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+
+            # Don't trust the name, it's not log depth here
+            log_depth = F.softplus(min_depth + (max_depth - min_depth) * log_depth) + 1e-4
+
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
             # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
@@ -501,8 +505,8 @@ class DepthModel(pl.LightningModule):
                 # now flip the depth map back after final prediction
                 log_depth = torch.flip(log_depth, (-1,))
 
-            depth_outputs[k] = log_depth
-            depth_outputs[k.replace("log_", "")] = torch.exp(log_depth)
+            depth_outputs[k] = torch.log(log_depth)
+            depth_outputs[k.replace("log_", "")] = log_depth
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
