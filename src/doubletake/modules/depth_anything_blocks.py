@@ -179,7 +179,6 @@ class FeatureFusionBlock(nn.Module):
 class DPTHead(nn.Module):
     def __init__(
             self,
-            cv_encoder_feat_channels,
             model_name='dinov2_vits14',
             nclass=1,
             use_clstoken=False,
@@ -226,10 +225,10 @@ class DPTHead(nn.Module):
                 padding=1)
         ])
 
-        self.cv_feat_fusers = nn.ModuleList([
-            double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
-            for i in range(len(out_channels))
-        ])
+        # self.cv_feat_fusers = nn.ModuleList([
+        #     double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
+        #     for i in range(len(out_channels))
+        # ])
         
         if self.use_clstoken:
             self.readout_projects = nn.ModuleList()
@@ -271,7 +270,7 @@ class DPTHead(nn.Module):
         )
 
             
-    def forward(self, cv_features, out_features, patch_h, patch_w):
+    def forward(self, out_features, patch_h, patch_w):
         out = []
         for i, x in enumerate(out_features):
             if self.use_clstoken:
@@ -286,11 +285,11 @@ class DPTHead(nn.Module):
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
 
-            x = torch.cat([
-                x,
-                F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
-            ], dim=1)
-            x = self.cv_feat_fusers[i](x)
+            # x = torch.cat([
+            #     x,
+            #     F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
+            # ], dim=1)
+            # x = self.cv_feat_fusers[i](x)
             
             out.append(x)
         

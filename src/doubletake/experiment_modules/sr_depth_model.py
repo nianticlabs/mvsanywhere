@@ -138,7 +138,16 @@ class DepthModel(pl.LightningModule):
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
         elif 'dinov2' in self.run_opts.image_encoder_name:
-            self.encoder = DINOv2(self.run_opts.image_encoder_name)
+            intermediate_layers_idx = {
+                'dinov2_vits14': [0, 2, 4, 5, 8, 11],
+                'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            self.encoder = DINOv2(
+                self.run_opts.image_encoder_name,
+                num_intermediate_layers=intermediate_layers_idx
+            )
             if self.run_opts.da_weights_path is not None:
                 self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:
@@ -157,9 +166,17 @@ class DepthModel(pl.LightningModule):
                 + self.cost_volume_net.num_ch_enc
             )
         elif self.run_opts.cv_encoder_type == 'vit_encoder':
+            intermediate_layers_idx = {
+                'dinov2_vits14': [2, 5, 8, 11],
+                'dinov2_vitb14': [2, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
+                feat_fuser_layers_idx=intermediate_layers_idx,
+                intermediate_layers_idx=intermediate_layers_idx
             )
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             self.cost_volume_net = CNNCVEncoder(
@@ -193,6 +210,12 @@ class DepthModel(pl.LightningModule):
                 dec_num_input_ch[1:],
                 model_name=self.run_opts.depth_decoder_name.split(".")[1],
                 intermediate_layers=intermediate_layer_idx
+            )
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
+        elif "dpt" in self.run_opts.depth_decoder_name:
+            self.depth_decoder = DPTHead(
+                model_name=self.run_opts.depth_decoder_name.split(".")[1],
             )
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
@@ -404,22 +427,6 @@ class DepthModel(pl.LightningModule):
         flip_threshold = 0.5 if phase == "train" else 0.0
         flip = torch.rand(1).item() < flip_threshold
 
-        # src_cam_T_world = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
-        # cur_world_T_cam = torch.stack([torch.eye(4) for _ in range(len(cur_world_T_cam))]).cuda()
-
-        # uid = np.random.randint(1e7)
-        # for idx in range(7):
-        #     self.mv_depth_loss._check_warped_image(
-        #         f"debug/debug_{uid}_{idx}",
-        #         cur_data["depth_b1hw"],
-        #         cur_image,
-        #         src_image[:, idx],
-        #         cur_data[f"invK_s0_b44"],
-        #         src_data[f"K_s0_b44"][:, idx],
-        #         cur_world_T_cam,
-        #         src_cam_T_world[:, idx]
-        #     )
-
         if flip:
             # flip all images.
             cur_image = torch.flip(cur_image, (-1,))
@@ -471,7 +478,7 @@ class DepthModel(pl.LightningModule):
         elif self.run_opts.cv_encoder_type == "vit_encoder":
             cur_feats = self.cost_volume_net(
                         cost_volume, 
-                        cur_feats[:-1],
+                        cur_feats,
                     )
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             cur_feats = self.cost_volume_net(
@@ -483,7 +490,8 @@ class DepthModel(pl.LightningModule):
         if "depth_anything" in self.run_opts.depth_decoder_name:
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
-            depth_outputs = self.depth_decoder(cur_feats)
+            B, C, H, W = cur_image.shape
+            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
@@ -787,17 +795,17 @@ class DepthModel(pl.LightningModule):
 
         """
         optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume_net.parameters()) + 
-            list(self.encoder.parameters()) +
             list(self.cost_volume.parameters()) + 
             list(self.matching_model.parameters()),
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
-            self.depth_decoder.dinov2.parameters(), lr=self.run_opts.lr_da_encoder / 50.0, weight_decay=self.run_opts.wd
+            self.depth_decoder.parameters(),
+            lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
-            self.depth_decoder.depth_head.parameters(), lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
+            list(self.encoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
         def lr_lambda(step):

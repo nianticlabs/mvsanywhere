@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.layers import BasicBlock
+from doubletake.modules.networks import double_basic_block
 
 DINOV2_ARCHS = {
     'dinov2_vits14': 384,
@@ -201,7 +202,7 @@ class CostVolumePatchEmbed(nn.Module):
         self,
         num_ch_cv,
         num_feats,
-        num_ch_outs = [128, 256, 512],
+        num_ch_outs = [128, 256],
         num_ch_proj = [96, 192],
         patch_size = [14, 14],
     ):
@@ -210,10 +211,12 @@ class CostVolumePatchEmbed(nn.Module):
         self.num_ch_outs = num_ch_outs
         self.num_ch_cv = num_ch_cv
         self.patch_size = patch_size
+        self.num_feats = num_feats
+        self.convs = nn.ModuleDict()
 
         for i in range(3):
             num_ch_in = num_ch_cv if i == 0 else num_ch_outs[i - 1]
-            num_ch_out = num_ch_outs[i]
+            num_ch_out = (num_ch_outs + [self.num_feats])[i]
             self.convs[f"ds_conv_{i}"] = BasicBlock(
                 num_ch_in, num_ch_out, stride=1 if i == 0 else 2
             )
@@ -251,17 +254,23 @@ class CostVolumePatchEmbed(nn.Module):
         
     def forward(self, x, img_feats):
         # resize such that 2 downsamples will give 1/14th resolution 
-        scale_factor = 4 / 14 
+        B, C, H, W = x.shape
+
+        scale_factor = 16 / 14 
         x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
 
-        for i in range(self.num_blocks):
-            
-            img_feat = self.projects[i](img_feats[i])
-            img_feat = self.resize_layers[i](img_feat)
+        for i in range(3):
+
 
             x = self.convs[f"ds_conv_{i}"](x)
-            x = torch.cat([x, img_feat], dim=1)
-            x = self.convs[f"conv_{i}"](x)
+
+            if i < 2:
+                img_feat = img_feats[i][0].reshape((B, H * 4 // 14, W * 4 // 14, self.num_feats))
+                img_feat = img_feat.permute(0, 3, 1, 2)
+                img_feat = self.projects[i](img_feat)
+                img_feat = self.resize_layers[i](img_feat)
+                x = torch.cat([x, img_feat], dim=1)
+                x = self.convs[f"conv_{i}"](x)
 
         x = self.patch_embed(x)  # B HW C
 
@@ -269,11 +278,6 @@ class CostVolumePatchEmbed(nn.Module):
 
     def patch_embed(self, x):
         _, _, H, W = x.shape
-        patch_H, patch_W = self.patch_size
-
-        assert H % patch_H == 0, f"Input image height {H} is not a multiple of patch height {patch_H}"
-        assert W % patch_W == 0, f"Input image width {W} is not a multiple of patch width: {patch_W}"
-
         x = x.flatten(2).transpose(1, 2)  # B HW C
         return x
 
@@ -284,8 +288,8 @@ class ViTCVEncoder(nn.Module):
             self,
             model_name='dinov2_vitb14',
             num_ch_cv=64,
-            image_height=336,
-            image_width=448,
+            feat_fuser_layers_idx=[2, 5, 8, 11],
+            intermediate_layers_idx=[2, 5, 8, 11]
     ):
         super().__init__()
         assert model_name in DINOV2_ARCHS.keys(), f'Unknown model name {model_name}'
@@ -293,41 +297,61 @@ class ViTCVEncoder(nn.Module):
         self.num_ch_cv = num_ch_cv
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
 
-        # TODO: make this a bigger MLP?
-        self.feat_fuser = nn.ModuleList(
-            [nn.Linear(self.num_channels * 2, self.num_channels) for _ in range(DINOV2_NUM_BLOCKS[model_name] - 1)]
-        )
+        self.feat_fuser_layers_idx = feat_fuser_layers_idx
+        self.intermediate_layers_idx = intermediate_layers_idx
+
+        self.cv_feat_fusers = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(self.num_channels * 2, self.num_channels),
+                nn.ReLU(True),
+                nn.Linear(self.num_channels, self.num_channels)
+            )
+            for i in range(len(feat_fuser_layers_idx))
+        ])
 
         self.patch_embed = CostVolumePatchEmbed(
             num_ch_cv,
-            self.model.num_channels,
+            self.num_channels,
         )
 
     def forward(self, x, img_feats):
         # TODO: make this work
-        x = self.model.prepare_tokens_with_masks(x)
-        x = self.model.blocks[0](x)
-        feats = []
-        for blk_i in range(len(self.model.blocks[1:])):
-            x = torch.cat([
-                x,
-                torch.cat([img_feats[blk_i][1].unsqueeze(1), img_feats[blk_i][0]], dim=1)
-            ], dim=2)
-            x = self.feat_fuser[blk_i](x)
-            x = self.model.blocks[1 + blk_i](x)
 
-            if len(self.model.blocks[1:]) - blk_i <= 4:
+        cv_embed_layers = img_feats[:2]
+        fuser_layers = img_feats[2:]
+
+        x = self.prepare_tokens_with_masks(x, cv_embed_layers)
+
+        feats = []
+        for i, blk in enumerate(self.model.blocks):
+
+            # Fuse with mono branch ViT layer
+            if i in self.feat_fuser_layers_idx:
+                fuse_layer_i = self.feat_fuser_layers_idx.index(i)
+                fuse_layer = fuser_layers[fuse_layer_i]
+                x = torch.cat([
+                    x,
+                    torch.cat([fuse_layer[1].unsqueeze(1), fuse_layer[0]], dim=1)
+                ], dim=2)
+                x = self.cv_feat_fusers[fuse_layer_i](x)
+            
+            # Run CV branch ViT block
+            x = blk(x)
+
+            # Save intermediate feat
+            if i in self.intermediate_layers_idx:
                 feats.append((x[:, 1:], x[:, 0]))
+                
         return feats
 
-    def prepare_tokens_with_masks(self, x, masks=None):
+    def prepare_tokens_with_masks(self, x, img_features, masks=None):
         B, nc, w, h = x.shape
-        x = self.patch_embed(x)
+        x = self.patch_embed(x, img_features)
         if masks is not None:
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 
         x = torch.cat((self.model.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + self.model.interpolate_pos_encoding(x, w, h)
+        x = x + self.model.interpolate_pos_encoding(x, w * 4, h * 4)
 
         if self.model.register_tokens is not None:
             x = torch.cat(
