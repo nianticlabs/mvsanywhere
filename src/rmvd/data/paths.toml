@@ -1,0 +1,28 @@
+[eth3d]
+    root = '/mnt/nas3/shared/datasets/eth3d'
+
+[kitti]
+    root = '/mnt/nas3/shared/datasets/kitti/'
+
+[dtu]
+    root = '/mnt/nas3/shared/datasets/dtu'
+
+[scannet]
+    root = '/mnt/nas3/shared/datasets/scannet/'
+
+[tanks_and_temples]
+    root = '/mnt/nas3/shared/datasets/tanks_and_temples'
+
+[blendedmvs]
+    root = '/tmp/blendedmvs/'
+
+[flyingthings3d]
+    [flyingthings3d.train]
+        root = '/tmp/flyingthings3d_converted/TRAIN/'
+    [flyingthings3d.test]
+        root = '/tmp/flyingthings3d_converted/TEST/'
+
+[staticthings3d]
+    [staticthings3d.train]
+        root = '/tmp/staticthings3d_converted/TRAIN/'
+
