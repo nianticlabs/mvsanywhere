@@ -172,8 +172,6 @@ class DepthModel(pl.LightningModule):
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
                 intermediate_layers_idx=intermediate_layers_idx
             )
-            if self.run_opts.da_weights_path is not None:
-                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             self.cost_volume_net = CNNCVEncoder(
                 model_name=self.run_opts.image_encoder_name,

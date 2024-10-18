@@ -354,4 +354,5 @@ class ViTCVEncoder(nn.Module):
         da_state_dict = torch.load(weights_path)
         self.load_state_dict(
             {k.replace('pretrained', 'model'): v for k, v in da_state_dict.items() if 'pretrained' in k},
+            strict=False
         )
