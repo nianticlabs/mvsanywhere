@@ -1,3 +1,7 @@
+from functools import partial
+from itertools import repeat
+import collections.abc
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,108 +30,122 @@ DINOV2_NUM_BLOCKS = {
     'dinov2_vitl14': 24,
 }
 
+def _ntuple(n):
+    def parse(x):
+        if isinstance(x, collections.abc.Iterable) and not isinstance(x, str):
+            return x
+        return tuple(repeat(x, n))
+    return parse
+to_2tuple = _ntuple(2)
 
-class CNNCVEncoder(nn.Module):
-    def __init__(
-            self, 
-            model_name,
-            num_ch_cv,
-            num_ch_outs
-        ):
+def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
+    """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
+    """
+    if drop_prob == 0. or not training:
+        return x
+    keep_prob = 1 - drop_prob
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
+    random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
+    if keep_prob > 0.0 and scale_by_keep:
+        random_tensor.div_(keep_prob)
+    return x * random_tensor
+
+class DropPath(nn.Module):
+    """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
+    """
+    def __init__(self, drop_prob: float = 0., scale_by_keep: bool = True):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
+        self.scale_by_keep = scale_by_keep
+
+    def forward(self, x):
+        return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
+
+    def extra_repr(self):
+        return f'drop_prob={round(self.drop_prob,3):0.3f}'
+
+class Mlp(nn.Module):
+    """ MLP as used in Vision Transformer, MLP-Mixer and related networks"""
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, bias=True, drop=0.):
         super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        bias = to_2tuple(bias)
+        drop_probs = to_2tuple(drop)
 
-        assert model_name in DINOV2_ARCHS.keys(), f'Unknown model name {model_name}'
-        model_configs = MODEL_CONFIGS[model_name]
+        self.fc1 = nn.Linear(in_features, hidden_features, bias=bias[0])
+        self.act = act_layer()
+        self.drop1 = nn.Dropout(drop_probs[0])
+        self.fc2 = nn.Linear(hidden_features, out_features, bias=bias[1])
+        self.drop2 = nn.Dropout(drop_probs[1])
 
-        self.convs = nn.ModuleDict()
-        self.num_ch_enc = []
+        # Start from zero
+        nn.init.zeros_(self.fc2.weight)
+        nn.init.zeros_(self.fc2.bias)
 
-        self.num_blocks = len(num_ch_outs)
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop1(x)
+        x = self.fc2(x)
+        x = self.drop2(x)
+        return x
 
-        self.projects = nn.ModuleList([
-            nn.Conv2d(
-                in_channels=model_configs["in_channels"],
-                out_channels=out_channel,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-            ) for out_channel in model_configs["out_channels"]
-        ])
+class CrossAttention(nn.Module):
+    
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        self.projq = nn.Linear(dim, dim, bias=qkv_bias)
+        self.projk = nn.Linear(dim, dim, bias=qkv_bias)
+        self.projv = nn.Linear(dim, dim, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        # Start from zero
+        nn.init.zeros_(self.proj.weight)
+        nn.init.zeros_(self.proj.bias)
         
-        self.resize_layers = nn.ModuleList([
-            nn.ConvTranspose2d(
-                in_channels=model_configs["out_channels"][0],
-                out_channels=model_configs["out_channels"][0],
-                kernel_size=8,
-                stride=8,
-                padding=0),
-            nn.ConvTranspose2d(
-                in_channels=model_configs["out_channels"][1],
-                out_channels=model_configs["out_channels"][1],
-                kernel_size=4,
-                stride=4,
-                padding=0),
-            nn.ConvTranspose2d(
-                in_channels=model_configs["out_channels"][2],
-                out_channels=model_configs["out_channels"][2],
-                kernel_size=2,
-                stride=2,
-                padding=0),
-            nn.Identity(),
-            nn.Conv2d(
-                in_channels=model_configs["out_channels"][4],
-                out_channels=model_configs["out_channels"][4],
-                kernel_size=3,
-                stride=2,
-                padding=1)
-        ])
-
-        for i in range(self.num_blocks):
-            num_ch_in = num_ch_cv if i == 0 else num_ch_outs[i - 1]
-            num_ch_out = num_ch_outs[i]
-            self.convs[f"ds_conv_{i}"] = BasicBlock(
-                num_ch_in, num_ch_out, stride=1 if i == 0 else 2
-            )
-
-            self.convs[f"conv_{i}"] = nn.Sequential(
-                BasicBlock(model_configs["out_channels"][i+1] + num_ch_out, num_ch_out, stride=1),
-                BasicBlock(num_ch_out, num_ch_out, stride=1),
-            )
-            self.num_ch_enc.append(num_ch_out)
-
-    def forward(self, x, img_feats):
-
-        # Reshape feat and project
-        f = img_feats[0][0]
-        f = f.permute(0, 2, 1).reshape((f.shape[0], f.shape[-1], 24, 32))
-        f = self.projects[0](f)
-        f = self.resize_layers[0](f)
-
-        outputs = [f]
-        x = F.interpolate(x, [96, 128], mode="nearest")
-        for i in range(self.num_blocks):
-            x = self.convs[f"ds_conv_{i}"](x)
+    def forward(self, query, key, value):
+        B, Nq, C = query.shape
+        Nk = key.shape[1]
+        Nv = value.shape[1]
+        
+        q = self.projq(query).reshape(B,Nq,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
+        k = self.projk(key).reshape(B,Nk,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
+        v = self.projv(value).reshape(B,Nv,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
             
-            # Reshape feat and project
-            f = img_feats[i + 1][0]
-            f = f.permute(0, 2, 1).reshape((f.shape[0], f.shape[-1], 24, 32))
-            f = self.projects[i + 1](f)
-            f = self.resize_layers[i + 1](f)
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
 
-            x = torch.cat([x, f], dim=1)
-            x = self.convs[f"conv_{i}"](x)
-            outputs.append(x)
-        return outputs
+        x = (attn @ v).transpose(1, 2).reshape(B, Nq, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
 
-    def load_da_weights(self, weights_path):
-        da_state_dict = torch.load(weights_path)
-        for i in range(4):
-            self.projects[i+1].load_state_dict(
-                {k.replace(f'depth_head.projects.{i}.', ''): v for k, v in da_state_dict.items() if f'depth_head.projects.{i}' in k},
-            )
-            self.resize_layers[i+1].load_state_dict(
-                {k.replace(f'depth_head.resize_layers.{i}.', ''): v for k, v in da_state_dict.items() if f'depth_head.resize_layers.{i}' in k},
-            )
+class CrossBlock(nn.Module):
+
+    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, norm_mem=True):
+        super().__init__()
+        self.cross_attn = CrossAttention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.norm2 = norm_layer(dim)
+        self.norm3 = norm_layer(dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
+        self.norm_y = norm_layer(dim) if norm_mem else nn.Identity()
+
+    def forward(self, x, y):
+        y_ = self.norm_y(y)
+        x = x + self.drop_path(self.cross_attn(self.norm2(x), y_, y_))
+        x = x + self.drop_path(self.mlp(self.norm3(x)))
+        return x, y
 
 
 class DINOv2(nn.Module):
@@ -203,7 +221,7 @@ class CostVolumePatchEmbed(nn.Module):
         num_ch_cv,
         num_feats,
         num_ch_outs = [128, 256],
-        num_ch_proj = [96, 192],
+        num_ch_proj = [16],
         patch_size = [14, 14],
     ):
 
@@ -221,59 +239,23 @@ class CostVolumePatchEmbed(nn.Module):
                 num_ch_in, num_ch_out, stride=1 if i == 0 else 2
             )
 
-            if i < 2:
+            if i < 1:
                 self.convs[f"conv_{i}"] = nn.Sequential(
                     BasicBlock(num_ch_proj[i] + num_ch_out, num_ch_out, stride=1),
                     BasicBlock(num_ch_out, num_ch_out, stride=1),
                 )
-
-        self.projects = nn.ModuleList([
-            nn.Conv2d(
-                in_channels=num_feats,
-                out_channels=chns,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-            ) for chns in num_ch_proj
-        ])
-        
-        self.resize_layers = nn.ModuleList([
-            nn.ConvTranspose2d(
-                in_channels=num_ch_proj[0],
-                out_channels=num_ch_proj[0],
-                kernel_size=4,
-                stride=4,
-                padding=0),
-            nn.ConvTranspose2d(
-                in_channels=num_ch_proj[1],
-                out_channels=num_ch_proj[1],
-                kernel_size=2,
-                stride=2,
-                padding=0),
-        ])
         
     def forward(self, x, img_feats):
         # resize such that 2 downsamples will give 1/14th resolution 
         B, C, H, W = x.shape
 
-        scale_factor = 16 / 14 
-        x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
-
         for i in range(3):
-
-
             x = self.convs[f"ds_conv_{i}"](x)
-
-            if i < 2:
-                img_feat = img_feats[i][0].reshape((B, H * 4 // 14, W * 4 // 14, self.num_feats))
-                img_feat = img_feat.permute(0, 3, 1, 2)
-                img_feat = self.projects[i](img_feat)
-                img_feat = self.resize_layers[i](img_feat)
-                x = torch.cat([x, img_feat], dim=1)
+            if i < 1:
+                x = torch.cat([x, img_feats], dim=1)
                 x = self.convs[f"conv_{i}"](x)
 
         x = self.patch_embed(x)  # B HW C
-
         return x 
 
     def patch_embed(self, x):
@@ -288,7 +270,7 @@ class ViTCVEncoder(nn.Module):
             self,
             model_name='dinov2_vitb14',
             num_ch_cv=64,
-            feat_fuser_layers_idx=[2, 5, 8, 11],
+            feat_fuser_layers_idx=[1, 4, 7],
             intermediate_layers_idx=[2, 5, 8, 11]
     ):
         super().__init__()
@@ -301,11 +283,7 @@ class ViTCVEncoder(nn.Module):
         self.intermediate_layers_idx = intermediate_layers_idx
 
         self.cv_feat_fusers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(self.num_channels * 2, self.num_channels),
-                nn.ReLU(True),
-                nn.Linear(self.num_channels, self.num_channels)
-            )
+            CrossBlock(self.num_channels, 12, 4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6))
             for i in range(len(feat_fuser_layers_idx))
         ])
 
@@ -314,28 +292,25 @@ class ViTCVEncoder(nn.Module):
             self.num_channels,
         )
 
-    def forward(self, x, img_feats):
+    def forward(self, cv, img, img_features):
         # TODO: make this work
 
-        cv_embed_layers = img_feats[:2]
-        fuser_layers = img_feats[2:]
+        # Monocular branch
+        img = F.interpolate(img, scale_factor=14/16, mode='bilinear')
+        x = self.model.prepare_tokens_with_masks(img)
 
-        x = self.prepare_tokens_with_masks(x, cv_embed_layers)
+        # Cost volume branch
+        cv = self.prepare_tokens_with_masks(cv, img_features)
 
         feats = []
         for i, blk in enumerate(self.model.blocks):
 
-            # Fuse with mono branch ViT layer
+            # Cross attention between mono feats and cv feats
             if i in self.feat_fuser_layers_idx:
                 fuse_layer_i = self.feat_fuser_layers_idx.index(i)
-                fuse_layer = fuser_layers[fuse_layer_i]
-                x = torch.cat([
-                    x,
-                    torch.cat([fuse_layer[1].unsqueeze(1), fuse_layer[0]], dim=1)
-                ], dim=2)
-                x = self.cv_feat_fusers[fuse_layer_i](x)
+                x, _ = self.cv_feat_fusers[fuse_layer_i](x, cv)
             
-            # Run CV branch ViT block
+            # Run mono branch ViT block
             x = blk(x)
 
             # Save intermediate feat
@@ -351,7 +326,7 @@ class ViTCVEncoder(nn.Module):
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 
         x = torch.cat((self.model.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + self.model.interpolate_pos_encoding(x, w * 4, h * 4)
+        x = x + self.model.interpolate_pos_encoding(x, w * 4 * 14 / 16, h * 4 * 14 / 16)
 
         if self.model.register_tokens is not None:
             x = torch.cat(
@@ -364,3 +339,9 @@ class ViTCVEncoder(nn.Module):
             )
 
         return x
+
+    def load_da_weights(self, weights_path):
+        da_state_dict = torch.load(weights_path)
+        self.load_state_dict(
+            {k.replace('pretrained', 'model'): v for k, v in da_state_dict.items() if 'pretrained' in k},
+        )
