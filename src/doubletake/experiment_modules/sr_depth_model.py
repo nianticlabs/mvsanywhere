@@ -800,11 +800,11 @@ class DepthModel(pl.LightningModule):
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
-            self.depth_decoder.parameters(),
+            self.encoder.parameters(),
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
-            list(self.encoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
             lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
