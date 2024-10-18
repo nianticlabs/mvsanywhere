@@ -71,8 +71,12 @@ def get_depth_range(
             P1, P2[i:i+1], src_pts[mask[0]][None], dst_pts[mask[0]][None]
         )[..., 2]
 
-        pts_min_depth = torch.quantile(depths, 0.05).item()
-        pts_max_depth = torch.quantile(depths, 0.95).item()
+        mask = (depths > 0.0)
+        if mask.sum() == 0:
+            continue
+        pts_min_depth = torch.quantile(depths[mask], 0.05).item()
+        pts_max_depth = torch.quantile(depths[mask], 0.95).item()
+        
         if 0.0 < pts_min_depth:
             min_depth.append(pts_min_depth * 0.25)
             max_depth.append(pts_max_depth * 2.0)
@@ -115,9 +119,11 @@ class FMVS_Wrapped(nn.Module):
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-        
+        self.min_depth_cache = {}
+        self.max_depth_cache = {}
 
-    def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
+        
+    def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None, indices=None):
         device = get_torch_model_device(self)
 
         # Input transform
@@ -173,6 +179,8 @@ class FMVS_Wrapped(nn.Module):
             'poses': poses_list,
             'min_depth': min_depth,
             'max_depth': max_depth,
+            'indices': indices,
+            
         }
         return sample
 
@@ -184,9 +192,10 @@ class FMVS_Wrapped(nn.Module):
         min_depth,
         max_depth,
         keyview_idx,
+        indices,
         **_
     ):
-        
+
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
         images_source = exclude_index(images, keyview_idx)
@@ -205,20 +214,53 @@ class FMVS_Wrapped(nn.Module):
 
         self.model.depth_decoder.depth_head.output_convs[0][1].size = tuple(image_key.shape[-2:])
 
-
         # Use sift max_depth
-        min_depth, max_depth = get_depth_range(
-            len(images) - 1, image_key, images_source,
-            poses_key, poses_source, intrinsics_key, intrinsics_source
+        if len(indices) == 1:
+            # Build the cache
+            min_depth, max_depth = get_depth_range(
+                len(images) - 1, image_key, images_source,
+                poses_key, poses_source, intrinsics_key, intrinsics_source,
         )
+
+            self.min_depth_cache[indices[0]] = min_depth
+            self.max_depth_cache[indices[0]] = max_depth
+
+        else:
+            # use the cache
+            min_depths, max_depths = [], []
+            for idx in indices:
+                min_depth = self.min_depth_cache.get(idx, None)
+                max_depth = self.max_depth_cache.get(idx, None)
+                if min_depth is not None:
+                    min_depths.append(min_depth)
+                if max_depth is not None:
+                    max_depths.append(max_depth)
+
+            if len(min_depths) == 0:
+                min_depth = None
+            else:
+                min_depth = np.median(min_depths)
+            if len(max_depths) == 0:
+                max_depth = None
+            else:
+                max_depth = np.median(max_depths)
 
         # If sift didn't work, use simple heuristic
         cam_dists = torch.stack([torch.linalg.norm((poses_key.float() @ ps)[..., :3, 3], dim=1) for ps in poses_source])
+        baseline_min_depth = (torch.min(cam_dists) * intrinsics_key[:, 0, 0]) * 4 / (1.0 * image_key.shape[-1])
+        baseline_max_depth = (torch.max(cam_dists) * intrinsics_key[:, 0, 0] * 4 ) / (0.01 * image_key.shape[-1])
         if min_depth is None:
-            min_depth = (torch.min(cam_dists) * intrinsics_key[:, 0, 0]) / (0.5 * image_key.shape[-1])
+            min_depth = baseline_min_depth
+        else:
+            min_depth = max(min_depth, baseline_min_depth)
         if max_depth is None:
-            max_depth = (torch.median(cam_dists) * intrinsics_key[:, 0, 0] ) / (0.01 * image_key.shape[-1])
+            max_depth = baseline_max_depth
+        else:
+            max_depth = min(max_depth, baseline_max_depth)
 
+        print(min_depth, max_depth)
+        
+        # print(f"min_depth: {min_depth}, max_depth: {max_depth}", intrinsics_key[:, 0, 0] * 4, image_key.shape[-1])
 
         cur_data = {
             "image_b3hw": image_key.float(),
