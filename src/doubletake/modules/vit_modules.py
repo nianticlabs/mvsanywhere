@@ -79,16 +79,40 @@ class Mlp(nn.Module):
         self.fc2 = nn.Linear(hidden_features, out_features, bias=bias[1])
         self.drop2 = nn.Dropout(drop_probs[1])
 
-        # Start from zero
-        nn.init.zeros_(self.fc2.weight)
-        nn.init.zeros_(self.fc2.bias)
-
     def forward(self, x):
         x = self.fc1(x)
         x = self.act(x)
         x = self.drop1(x)
         x = self.fc2(x)
         x = self.drop2(x)
+        return x
+
+class Attention(nn.Module):
+
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, N, C = x.shape
+
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).transpose(1,3)
+        q, k, v = [qkv[:,:,i] for i in range(3)]
+        # q,k,v = qkv.unbind(2)  # make torchscript happy (cannot use tensor as tuple)
+               
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
         return x
 
 class CrossAttention(nn.Module):
@@ -105,10 +129,6 @@ class CrossAttention(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
-
-        # Start from zero
-        nn.init.zeros_(self.proj.weight)
-        nn.init.zeros_(self.proj.bias)
         
     def forward(self, query, key, value):
         B, Nq, C = query.shape
@@ -133,6 +153,8 @@ class CrossBlock(nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, norm_mem=True):
         super().__init__()
+        self.norm1 = norm_layer(dim)
+        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
         self.cross_attn = CrossAttention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -142,6 +164,7 @@ class CrossBlock(nn.Module):
         self.norm_y = norm_layer(dim) if norm_mem else nn.Identity()
 
     def forward(self, x, y):
+        x = x + self.drop_path(self.attn(self.norm1(x)))
         y_ = self.norm_y(y)
         x = x + self.drop_path(self.cross_attn(self.norm2(x), y_, y_))
         x = x + self.drop_path(self.mlp(self.norm3(x)))
@@ -180,6 +203,7 @@ class DINOv2(nn.Module):
             f (torch.Tensor): The feature map [B, C, H // 14, W // 14].
             t (torch.Tensor): The token [B, C]. This is only returned if return_token is True.
         """
+        x = F.interpolate(x, scale_factor=14/16, mode='bilinear')
         return self.model.get_intermediate_layers(x, self.num_intermediate_layers, return_class_token=True)
 
 
@@ -239,21 +263,18 @@ class CostVolumePatchEmbed(nn.Module):
                 num_ch_in, num_ch_out, stride=1 if i == 0 else 2
             )
 
-            if i < 1:
-                self.convs[f"conv_{i}"] = nn.Sequential(
-                    BasicBlock(num_ch_proj[i] + num_ch_out, num_ch_out, stride=1),
-                    BasicBlock(num_ch_out, num_ch_out, stride=1),
-                )
+            self.convs[f"conv_{i}"] = nn.Sequential(
+                BasicBlock(num_ch_out, num_ch_out, stride=1),
+                BasicBlock(num_ch_out, num_ch_out, stride=1),
+            )
         
-    def forward(self, x, img_feats):
+    def forward(self, x):
         # resize such that 2 downsamples will give 1/14th resolution 
         B, C, H, W = x.shape
 
         for i in range(3):
             x = self.convs[f"ds_conv_{i}"](x)
-            if i < 1:
-                x = torch.cat([x, img_feats], dim=1)
-                x = self.convs[f"conv_{i}"](x)
+            x = self.convs[f"conv_{i}"](x)
 
         x = self.patch_embed(x)  # B HW C
         return x 
@@ -270,21 +291,19 @@ class ViTCVEncoder(nn.Module):
             self,
             model_name='dinov2_vitb14',
             num_ch_cv=64,
-            feat_fuser_layers_idx=[1, 4, 7],
             intermediate_layers_idx=[2, 5, 8, 11]
     ):
         super().__init__()
         assert model_name in DINOV2_ARCHS.keys(), f'Unknown model name {model_name}'
         self.num_channels = DINOV2_ARCHS[model_name]
         self.num_ch_cv = num_ch_cv
-        self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+        self.model = torch.hub.load('facebookresearch/dinov2', model_name, pretrained=False)
 
-        self.feat_fuser_layers_idx = feat_fuser_layers_idx
         self.intermediate_layers_idx = intermediate_layers_idx
 
-        self.cv_feat_fusers = nn.ModuleList([
+        self.model.blocks = nn.ModuleList([
             CrossBlock(self.num_channels, 12, 4, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6))
-            for i in range(len(feat_fuser_layers_idx))
+            for i in range(DINOV2_NUM_BLOCKS[model_name])
         ])
 
         self.patch_embed = CostVolumePatchEmbed(
@@ -292,26 +311,17 @@ class ViTCVEncoder(nn.Module):
             self.num_channels,
         )
 
-    def forward(self, cv, img, img_features):
+    def forward(self, cv, img_features):
         # TODO: make this work
 
-        # Monocular branch
-        img = F.interpolate(img, scale_factor=14/16, mode='bilinear')
-        x = self.model.prepare_tokens_with_masks(img)
-
         # Cost volume branch
-        cv = self.prepare_tokens_with_masks(cv, img_features)
+        x = self.prepare_tokens_with_masks(cv)
 
         feats = []
         for i, blk in enumerate(self.model.blocks):
 
             # Cross attention between mono feats and cv feats
-            if i in self.feat_fuser_layers_idx:
-                fuse_layer_i = self.feat_fuser_layers_idx.index(i)
-                x, _ = self.cv_feat_fusers[fuse_layer_i](x, cv)
-            
-            # Run mono branch ViT block
-            x = blk(x)
+            x, _ = blk(x, torch.cat([img_features[i][1].unsqueeze(1), img_features[i][0]], dim=1))
 
             # Save intermediate feat
             if i in self.intermediate_layers_idx:
@@ -319,9 +329,9 @@ class ViTCVEncoder(nn.Module):
                 
         return feats
 
-    def prepare_tokens_with_masks(self, x, img_features, masks=None):
+    def prepare_tokens_with_masks(self, x, masks=None):
         B, nc, w, h = x.shape
-        x = self.patch_embed(x, img_features)
+        x = self.patch_embed(x)
         if masks is not None:
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 

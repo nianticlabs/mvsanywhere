@@ -126,32 +126,27 @@ class DepthModel(pl.LightningModule):
 
         self.run_opts = opts
 
-        # # iniitalize the encoder for strong image priors
-        # if "efficientnet" in self.run_opts.image_encoder_name:
-        #     self.encoder = timm.create_model(
-        #         "tf_efficientnetv2_s_in21ft1k", pretrained=True, features_only=True
-        #     )
+        # iniitalize the encoder for strong image priors
+        if "efficientnet" in self.run_opts.image_encoder_name:
+            self.encoder = timm.create_model(
+                "tf_efficientnetv2_s_in21ft1k", pretrained=True, features_only=True
+            )
 
-        #     self.encoder.num_ch_enc = self.encoder.feature_info.channels()
-        # elif "resnet18d" in self.run_opts.image_encoder_name:
-        #     self.encoder = timm.create_model("resnet18d", pretrained=True, features_only=True)
+            self.encoder.num_ch_enc = self.encoder.feature_info.channels()
+        elif "resnet18d" in self.run_opts.image_encoder_name:
+            self.encoder = timm.create_model("resnet18d", pretrained=True, features_only=True)
 
-        #     self.encoder.num_ch_enc = self.encoder.feature_info.channels()
-        # elif 'dinov2' in self.run_opts.image_encoder_name:
-        #     intermediate_layers_idx = {
-        #         'dinov2_vits14': [0, 2, 4, 5, 8, 11],
-        #         'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
-        #         'dinov2_vitl14': [4, 11, 17, 23], 
-        #         'dinov2_vitg14': [9, 19, 29, 39]
-        #     }[self.run_opts.depth_decoder_name.split(".")[1]]
-        #     self.encoder = DINOv2(
-        #         self.run_opts.image_encoder_name,
-        #         num_intermediate_layers=intermediate_layers_idx
-        #     )
-        #     if self.run_opts.da_weights_path is not None:
-        #         self.encoder.load_da_weights(self.run_opts.da_weights_path)
-        # else:
-        #     raise ValueError("Unrecognized option for image encoder type!")
+            self.encoder.num_ch_enc = self.encoder.feature_info.channels()
+        elif 'dinov2' in self.run_opts.image_encoder_name:
+            intermediate_layers_idx = list(range(12))
+            self.encoder = DINOv2(
+                self.run_opts.image_encoder_name,
+                num_intermediate_layers=intermediate_layers_idx
+            )
+            if self.run_opts.da_weights_path is not None:
+                self.encoder.load_da_weights(self.run_opts.da_weights_path)
+        else:
+            raise ValueError("Unrecognized option for image encoder type!")
 
         # iniitalize the first half of the U-Net, encoding the cost volume
         # and image prior image feautres
@@ -175,7 +170,6 @@ class DepthModel(pl.LightningModule):
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
-                feat_fuser_layers_idx=[1, 4, 7],
                 intermediate_layers_idx=intermediate_layers_idx
             )
             if self.run_opts.da_weights_path is not None:
@@ -434,6 +428,10 @@ class DepthModel(pl.LightningModule):
             cur_image = torch.flip(cur_image, (-1,))
             src_image = torch.flip(src_image, (-1,))
 
+        # Compute image features for the current view. Used for a strong image
+        # prior.
+        cur_feats = self.encoder(cur_image)
+
         # Compute matching features
         matching_cur_feats, matching_src_feats = self.compute_matching_feats(
             cur_image, src_image, unbatched_matching_encoder_forward
@@ -476,8 +474,7 @@ class DepthModel(pl.LightningModule):
         elif self.run_opts.cv_encoder_type == "vit_encoder":
             cur_feats = self.cost_volume_net(
                         cost_volume, 
-                        cur_image,
-                        matching_cur_feats,
+                        cur_feats,
                     )
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             cur_feats = self.cost_volume_net(
@@ -799,11 +796,11 @@ class DepthModel(pl.LightningModule):
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
-            self.cost_volume_net.model.parameters(),
+            self.encoder.parameters(),
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
-            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.cv_feat_fusers.parameters()) + list(self.cost_volume_net.patch_embed.parameters()), 
+            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
             lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
