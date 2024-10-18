@@ -222,6 +222,9 @@ class MultiViewDepthEvaluation:
             self.cur_sample_num = sample_num
             self.cur_sample_idx = sample_idx
 
+            self.model.min_depth_cache = {}
+            self.model.max_depth_cache = {}
+
             if self.verbose:
                 print(f"Processing sample {self.cur_sample_num+1} / {len(self.sample_indices)} "
                       f"(index: {self.cur_sample_idx}):")
@@ -230,6 +233,10 @@ class MultiViewDepthEvaluation:
             should_qualitative = (self.cur_sample_idx in self.qualitative_indices) and (self.out_dir is not None)
             keyview_idx = int(sample['keyview_idx'])
             sample_inputs, sample_gt = self._inputs_and_gt_from_sample(sample)
+
+            if "indices" in self.inputs:
+                indices = [idx for idx in range(len(sample_inputs['images'])) if idx != keyview_idx]
+                sample_inputs['indices'] = indices
 
             # get evaluation order:
             ordered_source_indices = self._get_source_view_ordering(sample_inputs=sample_inputs, sample_gt=sample_gt)
@@ -716,6 +723,10 @@ def filter_views_in_sample(sample, indices_to_keep):
     sample = deepcopy(sample)
     keyview_idx = int(sample['keyview_idx'])
     assert keyview_idx in indices_to_keep, "Keyview must not be filtered out."
+
+    if "indices" in sample:
+        sample['indices'] = [idx for idx in sample['indices'] if idx in indices_to_keep and idx != keyview_idx]
+
     keyview_idx = indices_to_keep.index(keyview_idx)
 
     if "images" in sample:

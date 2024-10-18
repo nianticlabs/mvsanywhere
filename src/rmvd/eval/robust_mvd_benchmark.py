@@ -141,11 +141,13 @@ class RobustMultiViewDepthBenchmark:
             Results of the evaluation.
         """
 
-        datasets = [("kitti.robustmvd.mvd", kitti_size),
+        datasets = [
+            ("kitti.robustmvd.mvd", kitti_size),
                     ("dtu.robustmvd.mvd", dtu_size),
                     ("scannet.robustmvd.mvd", scannet_size),
                     ("tanks_and_temples.robustmvd.mvd", tanks_and_temples_size),
-                    ("eth3d.robustmvd.mvd", eth3d_size),]
+                    ("eth3d.robustmvd.mvd", eth3d_size),
+        ]
 
         results = []
 
