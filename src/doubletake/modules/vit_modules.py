@@ -263,18 +263,21 @@ class CostVolumePatchEmbed(nn.Module):
                 num_ch_in, num_ch_out, stride=1 if i == 0 else 2
             )
 
-            self.convs[f"conv_{i}"] = nn.Sequential(
-                BasicBlock(num_ch_out, num_ch_out, stride=1),
-                BasicBlock(num_ch_out, num_ch_out, stride=1),
-            )
+            if i < 1:
+                self.convs[f"conv_{i}"] = nn.Sequential(
+                    BasicBlock(num_ch_proj[i] + num_ch_out, num_ch_out, stride=1),
+                    BasicBlock(num_ch_out, num_ch_out, stride=1),
+                )
         
-    def forward(self, x):
+    def forward(self, x, img_feats):
         # resize such that 2 downsamples will give 1/14th resolution 
         B, C, H, W = x.shape
 
         for i in range(3):
             x = self.convs[f"ds_conv_{i}"](x)
-            x = self.convs[f"conv_{i}"](x)
+            if i < 1:
+                x = torch.cat([x, img_feats], dim=1)
+                x = self.convs[f"conv_{i}"](x)
 
         x = self.patch_embed(x)  # B HW C
         return x 
@@ -311,11 +314,11 @@ class ViTCVEncoder(nn.Module):
             self.num_channels,
         )
 
-    def forward(self, cv, img_features):
+    def forward(self, cv, img_features, cur_matching_feats):
         # TODO: make this work
 
         # Cost volume branch
-        x = self.prepare_tokens_with_masks(cv)
+        x = self.prepare_tokens_with_masks(cv, cur_matching_feats)
 
         feats = []
         for i, blk in enumerate(self.model.blocks):
@@ -329,9 +332,9 @@ class ViTCVEncoder(nn.Module):
                 
         return feats
 
-    def prepare_tokens_with_masks(self, x, masks=None):
+    def prepare_tokens_with_masks(self, x, matching_feats, masks=None):
         B, nc, w, h = x.shape
-        x = self.patch_embed(x)
+        x = self.patch_embed(x, matching_feats)
         if masks is not None:
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 

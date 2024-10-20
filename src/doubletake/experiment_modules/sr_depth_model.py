@@ -473,6 +473,7 @@ class DepthModel(pl.LightningModule):
             cur_feats = self.cost_volume_net(
                         cost_volume, 
                         cur_feats,
+                        matching_cur_feats,
                     )
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             cur_feats = self.cost_volume_net(
