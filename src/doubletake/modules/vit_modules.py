@@ -136,14 +136,14 @@ class CrossAttention(nn.Module):
         Nv = value.shape[1]
         
         q = self.projq(query).reshape(B,Nq,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
-        k = self.projk(key).reshape(B,Nk,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
-        v = self.projv(value).reshape(B,Nv,self.num_heads, C// self.num_heads).permute(0, 2, 1, 3)
-            
-        attn = (q @ k.transpose(-2, -1)) * self.scale
+        k = self.projk(key).reshape(B, Nk, 2, self.num_heads, C // self.num_heads).permute(0, 3, 1, 2, 4)
+        v = self.projk(value).reshape(B, Nv, 2, self.num_heads, C // self.num_heads).permute(0, 3, 1, 2, 4)
+
+        attn = (q.unsqueeze(-2) @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, Nq, C)
+        x = (attn @ v).squeeze(-2).transpose(1, 2).reshape(B, Nq, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
@@ -165,8 +165,13 @@ class CrossBlock(nn.Module):
 
     def forward(self, x, y):
         x = x + self.drop_path(self.attn(self.norm1(x)))
+        
         y_ = self.norm_y(y)
-        x = x + self.drop_path(self.cross_attn(self.norm2(x), y_, y_))
+        x_ = self.norm2(x)
+
+        # Cross attention to self patch and same mono patch
+        kv = torch.stack([x_, y_], dim=-2)
+        x = x + self.drop_path(self.cross_attn(x_, kv, kv))
         x = x + self.drop_path(self.mlp(self.norm3(x)))
         return x, y
 
@@ -354,4 +359,5 @@ class ViTCVEncoder(nn.Module):
         da_state_dict = torch.load(weights_path)
         self.load_state_dict(
             {k.replace('pretrained', 'model'): v for k, v in da_state_dict.items() if 'pretrained' in k},
+            strict=False
         )
