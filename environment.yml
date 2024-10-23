@@ -52,4 +52,3 @@ dependencies:
     - pyqt5
     - dill
     - easydict
-    - pillow-heif # needed for depth pro baseline
