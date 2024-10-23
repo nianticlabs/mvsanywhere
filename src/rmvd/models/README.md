@@ -325,3 +325,32 @@ eval = rmvd.create_evaluation(evaluation_type="mvd", out_dir="/tmp/eval_output",
 dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
 results = eval(dataset=dataset, model=model)
 ```
+
+## Printing tables for LaTeX
+
+When you run eval.py, the final thing printed to screen is a latex table row ready to be pasted into overleaf.
+E.g.
+
+```
+    &  6.86
+    &  37.75
+    &  4.63
+    &  53.44
+    &  4.76
+    &  51.27
+    &  5.44
+    &  45.90
+    &  4.65
+    &  61.29
+    &  5.27
+    &  49.93
+    &  5.17
+    \\
+```
+
+If you want to print out this again for a given `results.csv` file, there is a script `print_latex_table_row.py`.
+E.g.
+
+```bash
+python src/rmvd/eval/print_latex_table_row.py eval_benchmark_depth_pro/results.csv
+```
