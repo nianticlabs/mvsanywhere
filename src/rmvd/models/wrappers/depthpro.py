@@ -1,13 +1,16 @@
 import os.path as osp
+import math
 
 import torch
 from torchvision import transforms as T
 import torch.nn as nn
 import numpy as np
+import json
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
-from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index
+from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
+
 
 
 class DepthPro_Wrapped(nn.Module):
@@ -29,8 +32,7 @@ class DepthPro_Wrapped(nn.Module):
             fov_encoder_preset="dinov2l16_384",
         )
 
-        device = torch.device("cuda:0")
-        model, self.transform = create_model_and_transforms(config=CONFIG_DICT, device=device)
+        model, self.transform = create_model_and_transforms(config=CONFIG_DICT)
         model = model.eval()
         self.model = model
 
@@ -45,6 +47,9 @@ class DepthPro_Wrapped(nn.Module):
             'intrinsics': intrinsics,
         }
 
+        # if intrinsics is not None:
+        #     sample['fx'] = intrinsics[0][0]
+
         return sample
 
     def forward(self, images, keyview_idx, intrinsics):
@@ -53,18 +58,15 @@ class DepthPro_Wrapped(nn.Module):
         image_key = select_by_index(images, keyview_idx)
 
         image_key = image_key[0].permute((1, 2, 0)).cpu().numpy()
-        image = self.transform(image_key.astype(np.uint8))
-
-        if intrinsics is not None:
-            f_x = torch.tensor(intrinsics[0][0, 0, 0]).cuda()
-        else:
-            f_x = None
+        image = self.transform(image_key)
+        image = image.cuda()
 
         with torch.inference_mode():
             # Using the provided intrinsics, which gives focal length in pixels
-            pred = self.model.infer(image, f_px=f_x)
+            pred = self.model.infer(image, f_px=torch.tensor(intrinsics[0][0, 0, 0]).cuda())
 
-        pred['depth'] = pred['depth'].unsqueeze(0).unsqueeze(0)
+            # Predicted focallength_px is tensor(39216.5703, device='cuda:0') for  a 384x1280 image
+
         aux = {}
 
         return pred, aux
