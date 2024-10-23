@@ -89,9 +89,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_qualitatives', type=int, default=10,
                         help='Number of qualitatives to be output. Negative values output all qualitatives. '
-                             'Ignored if --qualitative is used. Default: 10.')
+                             'Ignored if --qualitatives is used. Default: 10.')
     parser.add_argument('--qualitatives', type=int, nargs='*',
-                        help='Index of sample where qualitatives should be output.')
+                        help='Index of samples for which qualitatives should be output.')
 
     parser.add_argument('--eval_uncertainty', action='store_true', help='Evaluate predicted depth uncertainty.')
 
