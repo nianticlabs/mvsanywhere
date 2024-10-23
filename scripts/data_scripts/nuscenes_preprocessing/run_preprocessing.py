@@ -148,7 +148,8 @@ if __name__ == "__main__":
     data_path = '/mnt/nas/shared/datasets/nuscenes'
     version = 'v1.0-trainval'
     save_path = '/mnt/nas/shared/datasets/nuscenes/depth'
-    split = 'val'
+    
+    split = 'train'
 
     model = DepthGenerator(data_path=data_path, version=version, save_path=save_path, split=split)
     model()
