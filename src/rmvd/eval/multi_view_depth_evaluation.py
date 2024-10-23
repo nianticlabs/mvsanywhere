@@ -522,6 +522,9 @@ class MultiViewDepthEvaluation:
         gpu_mem_reserved = int(torch.cuda.max_memory_reserved() / 1024 / 1024) if time_and_mem_valid else np.nan
         gpu_mem = {'gpu_mem_alloc_in_mib': gpu_mem_alloc, 'gpu_mem_alloc_in_mib': gpu_mem_reserved}
 
+        # Check the shape of the prediction to prevent downstream bugs
+        assert pred['depth'].ndim == 4
+
         return pred, runtimes, gpu_mem
 
     def _compute_metrics(self, sample_inputs, sample_gt, pred):
