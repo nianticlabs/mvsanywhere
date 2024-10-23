@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import numpy.ma as ma
 from PIL import Image
 
@@ -37,9 +37,9 @@ def load_and_plot_depth_and_image(npy_file, jpg_file, threshold=0.0):
 
     plt.figure(figsize=(8, 4))
     plt.hist(depth_data[depth_data > 0].flatten(), bins=100)
-    plt.title('Histogram of non-zero depth values')
-    plt.xlabel('Depth')
-    plt.ylabel('Frequency')
+    plt.title("Histogram of non-zero depth values")
+    plt.xlabel("Depth")
+    plt.ylabel("Frequency")
     plt.show()
 
     y_indices, x_indices = np.nonzero(~masked_depth.mask)
@@ -47,13 +47,15 @@ def load_and_plot_depth_and_image(npy_file, jpg_file, threshold=0.0):
 
     plt.figure(figsize=(8, 6))
     plt.imshow(image)
-    scatter = plt.scatter(x_indices, y_indices, c=depth_values, cmap='inferno', s=10, vmin=vmin, vmax=vmax)
-    plt.colorbar(scatter, label='Depth')
-    plt.title('Overlaid sparse depth on RGB')
-    plt.axis('off')
+    scatter = plt.scatter(
+        x_indices, y_indices, c=depth_values, cmap="inferno", s=10, vmin=vmin, vmax=vmax
+    )
+    plt.colorbar(scatter, label="Depth")
+    plt.title("Overlaid sparse depth on RGB")
+    plt.axis("off")
     plt.show()
 
 
-npy_file_path = '/mnt/nas/shared/datasets/nuscenes/depth/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.npy'
-jpg_file_path = '/mnt/nas/shared/datasets/nuscenes/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.jpg'
+npy_file_path = "/mnt/nas/shared/datasets/nuscenes/depth/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.npy"
+jpg_file_path = "/mnt/nas/shared/datasets/nuscenes/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.jpg"
 load_and_plot_depth_and_image(npy_file_path, jpg_file_path)
