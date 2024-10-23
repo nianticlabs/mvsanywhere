@@ -366,7 +366,7 @@ class MultiViewDepthEvaluation:
             columns = pd.Index(x, name="frac_removed")
             index = pd.MultiIndex.from_tuples([], names=("sample_idx", "curve"))
             self.sparsification_curves = pd.DataFrame(columns=columns, index=index)
-            
+
         self.dataset_updates = {}
 
     def _get_source_view_ordering(self, sample_inputs, sample_gt):

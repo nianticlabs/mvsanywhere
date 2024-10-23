@@ -24,3 +24,6 @@
 
 [mast3r]
     root = '/mnt/nas3/shared/projects/fmvs/mast3r'
+
+[depth_pro]
+    root = '/mnt/nas3/shared/projects/fmvs/ml-depth-pro'
