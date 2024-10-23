@@ -21,7 +21,6 @@ class DepthPro_Wrapped(nn.Module):
         repo_path = osp.join(get_path(paths_file, "depth_pro", "root"), "src")
         sys.path.insert(0, repo_path)
         from depth_pro.depth_pro import create_model_and_transforms, DepthProConfig
-        from depth_pro.utils import load_rgb
 
         CONFIG_DICT = DepthProConfig(
             patch_encoder_preset="dinov2l16_384",
@@ -36,7 +35,6 @@ class DepthPro_Wrapped(nn.Module):
         model, self.transform = create_model_and_transforms(config=CONFIG_DICT, device=device)
         model = model.eval()
         self.model = model
-        self.load_rgb = load_rgb
 
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
         device = get_torch_model_device(self)
