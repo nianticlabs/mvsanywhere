@@ -12,7 +12,6 @@ from ..helpers import build_model_with_cfg
 from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
 
 
-
 class DepthPro_Wrapped(nn.Module):
     def __init__(self):
         super().__init__()
@@ -22,6 +21,7 @@ class DepthPro_Wrapped(nn.Module):
         repo_path = osp.join(get_path(paths_file, "depth_pro", "root"), "src")
         sys.path.insert(0, repo_path)
         from depth_pro.depth_pro import create_model_and_transforms, DepthProConfig
+        from depth_pro.utils import load_rgb
 
         CONFIG_DICT = DepthProConfig(
             patch_encoder_preset="dinov2l16_384",
@@ -32,9 +32,11 @@ class DepthPro_Wrapped(nn.Module):
             fov_encoder_preset="dinov2l16_384",
         )
 
-        model, self.transform = create_model_and_transforms(config=CONFIG_DICT)
+        device = torch.device("cuda:0")
+        model, self.transform = create_model_and_transforms(config=CONFIG_DICT, device=device)
         model = model.eval()
         self.model = model
+        self.load_rgb = load_rgb
 
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
         device = get_torch_model_device(self)
@@ -47,9 +49,6 @@ class DepthPro_Wrapped(nn.Module):
             'intrinsics': intrinsics,
         }
 
-        # if intrinsics is not None:
-        #     sample['fx'] = intrinsics[0][0]
-
         return sample
 
     def forward(self, images, keyview_idx, intrinsics):
@@ -58,15 +57,18 @@ class DepthPro_Wrapped(nn.Module):
         image_key = select_by_index(images, keyview_idx)
 
         image_key = image_key[0].permute((1, 2, 0)).cpu().numpy()
-        image = self.transform(image_key)
-        image = image.cuda()
+        image = self.transform(image_key.astype(np.uint8))
+
+        if intrinsics is not None:
+            f_x = torch.tensor(intrinsics[0][0, 0, 0]).cuda()
+        else:
+            f_x = None
 
         with torch.inference_mode():
             # Using the provided intrinsics, which gives focal length in pixels
-            pred = self.model.infer(image, f_px=torch.tensor(intrinsics[0][0, 0, 0]).cuda())
+            pred = self.model.infer(image, f_px=f_x)
 
-            # Predicted focallength_px is tensor(39216.5703, device='cuda:0') for  a 384x1280 image
-
+        pred['depth'] = pred['depth'].unsqueeze(0).unsqueeze(0)
         aux = {}
 
         return pred, aux
