@@ -24,7 +24,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.vit_modules import DINOv2, DepthAnything, ViTCVEncoder
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -138,7 +138,12 @@ class DepthModel(pl.LightningModule):
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
         elif 'dinov2' in self.run_opts.image_encoder_name:
-            intermediate_layers_idx = list(range(12))
+            intermediate_layers_idx = {
+                'dinov2_vits14': [0, 2, 4, 5, 8, 11],
+                'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.encoder = DINOv2(
                 self.run_opts.image_encoder_name,
                 num_intermediate_layers=intermediate_layers_idx
@@ -170,10 +175,9 @@ class DepthModel(pl.LightningModule):
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
+                feat_fuser_layers_idx=intermediate_layers_idx,
                 intermediate_layers_idx=intermediate_layers_idx
             )
-            if self.run_opts.da_weights_path is not None:
-                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             self.cost_volume_net = CNNCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
@@ -487,7 +491,7 @@ class DepthModel(pl.LightningModule):
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
             B, C, H, W = cur_image.shape
-            depth_outputs = self.depth_decoder(cur_feats, H // 16, W // 16)
+            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
