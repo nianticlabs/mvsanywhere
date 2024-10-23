@@ -53,5 +53,4 @@ dependencies:
     - pyqt5
     - dill
     - easydict
-    # - mmcv  # needed to run Metric3D baseline
-    # - xformers==0.0.24  # needed to run UniDepth baseline
+    - pillow-heif # needed for depth pro baseline
