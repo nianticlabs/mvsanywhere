@@ -46,3 +46,9 @@ dependencies:
     - opencv-python==4.9.0.80
     - ninja==1.11.1.1
     - ray[train]
+    - pandas
+    - pytoml
+    - scikit-image
+    - pyqt5
+    - dill
+    - easydict
