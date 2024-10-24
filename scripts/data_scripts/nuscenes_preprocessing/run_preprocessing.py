@@ -8,9 +8,10 @@ from nuscenes.nuscenes import NuScenes
 from PIL import Image
 from pyquaternion import Quaternion
 
+from nuscenes.utils.splits import create_splits_scenes
 
 class DepthGenerator:
-    def __init__(self, data_path: str, version: str, save_path: str, split: str = "val") -> None:
+    def __init__(self, data_path: str, version: str, save_path: str, split: str = "train") -> None:
         self.data_path = Path(data_path)
         self.version = version
         self.save_path = Path(save_path)
@@ -19,33 +20,42 @@ class DepthGenerator:
         # Initialize NuScenes dataset
         self.nusc = NuScenes(version=self.version, dataroot=str(self.data_path), verbose=False)
 
-        split_file = Path("data_splits") / "nuscenes" / f"nuscenes_{self.split}.txt"
-        if not split_file.exists():
-            raise FileNotFoundError(f"{self.split}.txt file not found in the working directory.")
+        # Get the list of scene names for the specified split
+        splits = create_splits_scenes()
+        split_scenes = splits[self.split]
 
-        with split_file.open("r") as f:
-            self.data: List[str] = f.readlines()
+        # Collect sample tokens from scenes in the specified split
+        self.sample_tokens = []
+        for scene in self.nusc.scene:
+            scene_name = scene['name']
+            if scene_name in split_scenes:
+                # Collect all sample tokens in this scene
+                sample_token = scene['first_sample_token']
+                while sample_token != '':
+                    self.sample_tokens.append(sample_token)
+                    sample = self.nusc.get('sample', sample_token)
+                    sample_token = sample['next']
 
         # Setup output directories for depth maps
         self.camera_names = [
             "CAM_FRONT",
             "CAM_FRONT_LEFT",
-            "CAM_BACK_LEFT",
-            "CAM_BACK",
-            "CAM_BACK_RIGHT",
             "CAM_FRONT_RIGHT",
+            "CAM_BACK",
+            "CAM_BACK_LEFT",
+            "CAM_BACK_RIGHT",
         ]
 
         for camera_name in self.camera_names:
             (self.save_path / "samples" / camera_name).mkdir(parents=True, exist_ok=True)
 
     def __call__(self, num_workers: int = 8) -> None:
-        print(f"Generating nuscene depth maps from LiDAR projections using {self.split}.txt")
+        print(f"Generating nuscene depth maps from LiDAR projections using the '{self.split}' split.")
 
         def process_one_sample(index: int) -> None:
             """Process one sample and generate the depth map for each camera."""
-            index_t = self.data[index].strip()  # Get sample token
-            rec = self.nusc.get("sample", index_t)  # Get sample record
+            sample_token = self.sample_tokens[index]
+            rec = self.nusc.get("sample", sample_token)  # Get sample record
 
             # Get LiDAR sample data and ego pose
             lidar_sample = self.nusc.get("sample_data", rec["data"]["LIDAR_TOP"])
@@ -153,21 +163,23 @@ class DepthGenerator:
 
                 # Save the sparse depth map as a .npy file
                 output_path = self.save_path / camera_sample["filename"].replace(".jpg", ".npy")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
                 np.save(output_path, sparse_depth)
 
-            print(f"Finished processing index = {index:06d}")
+            print(f"Finished processing sample index = {index}")
 
         # Process samples in parallel
-        sample_id_list = list(range(len(self.data)))
+        sample_id_list = list(range(len(self.sample_tokens)))
         with futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
             executor.map(process_one_sample, sample_id_list)
+
 
 
 if __name__ == "__main__":
     data_path = "/mnt/nas/shared/datasets/nuscenes"
     version = "v1.0-trainval"
     save_path = "/mnt/nas/shared/datasets/nuscenes/depth"
-    split = "train"  # 'train' or 'val'
+    split = "train"
 
     model = DepthGenerator(data_path=data_path, version=version, save_path=save_path, split=split)
     model()

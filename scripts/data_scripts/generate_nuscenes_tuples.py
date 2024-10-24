@@ -15,6 +15,7 @@ if __name__ == "__main__":
     num_images_in_tuple = 8
 
     output_dir = Path(data_path) / 'tuples'
+
     camera_names = [
         'CAM_FRONT',
         'CAM_FRONT_LEFT',
@@ -66,11 +67,11 @@ if __name__ == "__main__":
                 for data in src_cam_data:
                     filenames.append(data['filename'])
 
-                frame_tuple = scene_name + ' ' + cam_name + ' ' + ' '.join(filenames)
+                frame_tuple = scene_name + ' ' + ' '.join(filenames)
                 frame_tuples.append(frame_tuple)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"nuscenes_{split}_tuples.txt"
+    output_file = output_dir / f"{split}_tuples.txt"
 
     print(f"Saving to {output_file}")
     with open(output_file, 'w') as f:

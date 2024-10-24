@@ -1,29 +1,19 @@
-
-from pathlib import Path
-
 import cv2
 
+from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 from nuscenes.nuscenes import NuScenes
 from pyquaternion import Quaternion
 
-from generic_mvs_dataset import GenericMVSDataset
 
-class NuscDataset(GenericMVSDataset):
+class NuScenesDataset(GenericMVSDataset):
     """
-    MVS Nuscenes Dataset class.
+    MVS nuScenes Dataset class.
 
-    Inherits from GenericMVSDataset and implements missing methods for the Nuscenes dataset.
+    Inherits from GenericMVSDataset and implements methods specific to the nuScenes dataset.
 
+    This dataset class handles the loading of images, depth maps, intrinsics,
+    and poses for the nuScenes dataset, including the generated depth maps.
     """
-
-    CAMERA_NAMES = [
-        "CAM_FRONT",
-        "CAM_FRONT_LEFT",
-        "CAM_BACK_LEFT",
-        "CAM_BACK",
-        "CAM_BACK_RIGHT",
-        "CAM_FRONT_RIGHT",
-    ]
 
     def __init__(
         self,
@@ -34,8 +24,8 @@ class NuscDataset(GenericMVSDataset):
         limit_to_scan_id=None,
         num_images_in_tuple=None,
         tuple_info_file_location=None,
-        image_height=384,
-        image_width=512,
+        image_height=900,
+        image_width=1600,
         high_res_image_width=1600,
         high_res_image_height=900,
         image_depth_ratio=2,
@@ -80,65 +70,66 @@ class NuscDataset(GenericMVSDataset):
             prediction_num_scales=prediction_num_scales,
         )
 
+        # Initialize nuScenes dataset
+        self.version = 'v1.0-trainval'
+        self.nusc = NuScenes(version=self.version, dataroot=self.dataset_path, verbose=verbose_init)
         self.min_valid_depth = min_valid_depth
         self.max_valid_depth = max_valid_depth
 
-        version = 'v1.0-trainval'
-        self.nusc = NuScenes(version=version, dataroot=dataset_path, verbose=verbose_init)
+        split_filename = f"{self.split}{mv_tuple_file_suffix}"
+        tuples_file = Path(tuple_info_file_location) / split_filename
 
-        # # Load sample tokens
-        # if self.tuple_info_file_location is None:
-        #     self.tuple_info_file_location = Path(self.dataset_path) / "tuples"
-        # tuple_file = self.tuple_info_file_location / f"{self.split}{self.mv_tuple_file_suffix}.txt"
-        # with open(tuple_file, 'r') as f:
-        #     self.sample_tokens = f.read().splitlines()
+        if not tuples_file.exists():
+            raise FileNotFoundError(f"Tuples file not found at {tuples_file}")
+
+        with open(tuples_file, 'r') as f:
+            self.tuples = [line.strip().split() for line in f]
+
+        # Build a mapping from filenames to sample_data_tokens
+        self.filename_to_sample_data_token = {}
+        for sample_data in self.nusc.sample_data:
+            filename_sd = sample_data['filename']
+            self.filename_to_sample_data_token[filename_sd] = sample_data['token']
 
     def get_frame_id_string(self, frame_id):
-        """Returns a unique frame ID string."""
+        """Returns an id string for this frame_id that's unique to this frame within the scan."""
         return frame_id
 
     def get_color_filepath(self, scan_id, frame_id):
-        """Returns the filepath for the RGB image."""
-        return self.get_high_res_color_filepath(scan_id, frame_id)
+        """Returns the filepath for a frame's color file at the dataset's configured RGB resolution."""
+        return os.path.join(self.dataset_path, frame_id)
 
     def get_high_res_color_filepath(self, scan_id, frame_id):
-        """Returns the filepath for the high-resolution RGB image."""
-        cam_name, sample_token = scan_id.split('_')
-        sample_data = self.nusc.get('sample_data', sample_token)
-        image_path = os.path.join(self.dataset_path, sample_data['filename'])
-        return image_path
-
-    def get_cached_depth_filepath(self, scan_id, frame_id):
-        """Returns the filepath for the cached depth image."""
-        cam_name, sample_token = scan_id.split('_')
-        sample_data = self.nusc.get('sample_data', sample_token)
-        depth_filename = sample_data['filename'].replace('samples', 'depth').replace('.jpg', '.png')
-        depth_path = os.path.join(self.dataset_path, depth_filename)
-        return depth_path
+        """Returns the filepath for a frame's higher resolution color file."""
+        return self.get_color_filepath(scan_id, frame_id)
 
     def get_full_res_depth_filepath(self, scan_id, frame_id):
-        """Returns the filepath for the full-resolution depth image."""
-        return self.get_cached_depth_filepath(scan_id, frame_id)
+        """Returns the filepath for a frame's depth file at the native resolution."""
+        depth_filename = frame_id.replace('.jpg', '.npy')
+
+        return os.path.join(self.dataset_path, 'depth', depth_filename)
 
     def load_intrinsics(self, scan_id, frame_id=None, flip=False):
-        """Loads camera intrinsics and returns them at multiple scales."""
-        cam_name, sample_token = scan_id.split('_')
-        sample_data = self.nusc.get('sample_data', sample_token)
-        calibrated_sensor = self.nusc.get('calibrated_sensor', sample_data['calibrated_sensor_token'])
-        intrinsics = np.array(calibrated_sensor['camera_intrinsic'])
+        """Loads intrinsics and computes scaled intrinsics matrices for a frame at multiple scales."""
+        # Get the sample_data_token from the filename
+        sample_data_token = self.get_sample_data_token_from_filename(frame_id)
+        cam_data = self.nusc.get('sample_data', sample_data_token)
+        calib_sensor = self.nusc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
+        intrinsics = np.array(calib_sensor['camera_intrinsic'])
 
-        width_pixels = sample_data['width']
-        height_pixels = sample_data['height']
+        K = torch.eye(4, dtype=torch.float32)
+        K[:3, :3] = torch.tensor(intrinsics, dtype=torch.float32)
 
-        K = torch.eye(4)
-        K[:3, :3] = torch.tensor(intrinsics)
-        K = K.float()
+        # Image size
+        width_pixels = cam_data['width']
+        height_pixels = cam_data['height']
 
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
 
         output_dict = {}
 
+        # Optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
             output_dict[f"K_full_depth_b44"] = K.clone()
             output_dict[f"invK_full_depth_b44"] = torch.inverse(K)
@@ -149,12 +140,13 @@ class NuscDataset(GenericMVSDataset):
         output_dict["K_matching_b44"] = K_matching
         output_dict["invK_matching_b44"] = torch.inverse(K_matching)
 
-        K_depth = K.clone()
-        K_depth[0] *= self.depth_width / float(width_pixels)
-        K_depth[1] *= self.depth_height / float(height_pixels)
+        # Scale intrinsics to the dataset's configured depth resolution.
+        K[0] *= self.depth_width / float(width_pixels)
+        K[1] *= self.depth_height / float(height_pixels)
 
+        # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
-            K_scaled = K_depth.clone()
+            K_scaled = K.clone()
             K_scaled[:2] /= 2 ** i
             invK_scaled = torch.inverse(K_scaled)
             output_dict[f"K_s{i}_b44"] = K_scaled
@@ -162,185 +154,190 @@ class NuscDataset(GenericMVSDataset):
 
         return output_dict, None
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
-        """Loads depth map at the target resolution with validity mask."""
-        depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
-        depth = self._load_depth(depth_filepath)
-
-        if depth is None:
-            # If depth is not available, create an empty depth map
-            depth = np.zeros((self.depth_height, self.depth_width), dtype=np.float32)
-            mask_b = torch.zeros((1, self.depth_height, self.depth_width), dtype=torch.bool)
-            depth = torch.tensor(depth).unsqueeze(0)
-            depth[~mask_b] = torch.tensor(np.nan)
-            return depth, mask_b.float(), mask_b
-
-        if crop:
-            depth = depth[crop[1]:crop[3], crop[0]:crop[2]]
-
-        depth = cv2.resize(depth, (self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST)
-
-        mask_b = torch.tensor((depth > self.min_valid_depth) & (depth < self.max_valid_depth)).bool().unsqueeze(0)
-        depth = torch.tensor(depth).float().unsqueeze(0)
-        depth[~mask_b] = torch.tensor(np.nan)
-
-        mask = mask_b.float()
-        return depth, mask, mask_b
-
-    def load_full_res_depth_and_mask(self, scan_id, frame_id, crop=None):
-        depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
-        depth = self._load_depth(depth_filepath)
-
-        if depth is None:
-            # If depth is not available, create an empty depth map
-            width, height = self.get_image_size(scan_id, frame_id)
-            depth = np.zeros((height, width), dtype=np.float32)
-            mask_b = torch.zeros((1, height, width), dtype=torch.bool)
-            depth = torch.tensor(depth).unsqueeze(0)
-            depth[~mask_b] = torch.tensor(np.nan)
-            return depth, mask_b.float(), mask_b
-
-        if crop:
-            depth = depth[crop[1]:crop[3], crop[0]:crop[2]]
-
-        mask_b = torch.tensor((depth > self.min_valid_depth) & (depth < self.max_valid_depth)).bool().unsqueeze(0)
-        depth = torch.tensor(depth).float().unsqueeze(0)
-        depth[~mask_b] = torch.tensor(np.nan)
-
-        mask = mask_b.float()
-        return depth, mask, mask_b
-
-    def load_pose(self, scan_id, frame_id):
-
-        cam_name, sample_token = scan_id.split('_')
-        sample_data = self.nusc.get('sample_data', sample_token)
-        calibrated_sensor = self.nusc.get('calibrated_sensor', sample_data['calibrated_sensor_token'])
-
-        # Transformation from ego vehicle to camera
-        ego_to_cam = self._get_transformation_matrix(calibrated_sensor['translation'], calibrated_sensor['rotation'])
-
-        # Transformation from global to ego vehicle
-        sample = self.nusc.get('sample', sample_data['sample_token'])
-        ego_pose = self.nusc.get('ego_pose', sample_data['ego_pose_token'])
-        global_to_ego = self._get_transformation_matrix(ego_pose['translation'], ego_pose['rotation'])
-
-        # The camera pose in global coordinates
-        world_T_cam = np.dot(global_to_ego, ego_to_cam)
-        cam_T_world = np.linalg.inv(world_T_cam)
-
-        return torch.tensor(world_T_cam).float(), torch.tensor(cam_T_world).float()
-
-    def _load_depth(self, depth_path):
-        """Loads the depth image from the given path."""
-        if not os.path.exists(depth_path):
-            return None
+    def _load_depth(self, depth_path, is_float16=True):
+        """Loads the depth map from a .npy file."""
         depth = np.load(depth_path)
         return depth
 
-    def _get_transformation_matrix(self, translation, rotation):
-        """Creates a transformation matrix from translation and rotation."""
-        tm = np.eye(4)
-        tm[:3, :3] = Quaternion(rotation).rotation_matrix
-        tm[:3, 3] = translation
-        return tm
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
+        """Loads a depth map at the resolution the dataset is configured for."""
+        depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
+        depth = self._load_depth(depth_filepath)
 
-    def get_image_size(self, scan_id, frame_id):
-        """Returns the image width and height."""
-        cam_name, sample_token = scan_id.split('_')
-        sample_data = self.nusc.get('sample_data', sample_token)
-        width = sample_data['width']
-        height = sample_data['height']
-        return width, height
+        if crop:
+            depth = depth[crop[1]:crop[3], crop[0]:crop[2]]
+
+        depth = cv2.resize(
+            depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
+        )
+
+        mask_b = torch.tensor(depth > self.min_valid_depth).bool().unsqueeze(0)
+        depth = torch.tensor(depth).float().unsqueeze(0)
+
+        mask = mask_b.float()
+
+        # Set invalids to NaN
+        depth[~mask_b] = torch.tensor(np.nan)
+
+        return depth, mask, mask_b
+
+    def load_full_res_depth_and_mask(self, scan_id, frame_id):
+        """Loads a depth map at the native resolution the dataset provides."""
+        full_res_depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
+        full_res_depth = self._load_depth(full_res_depth_filepath)
+
+        mask_b = torch.tensor(full_res_depth > self.min_valid_depth).bool().unsqueeze(0)
+        full_res_depth = torch.tensor(full_res_depth).float().unsqueeze(0)
+
+        # Get the float valid mask
+        full_res_mask = mask_b.float()
+
+        # Set invalids to NaN
+        full_res_depth[~mask_b] = torch.tensor(np.nan)
+
+        return full_res_depth, full_res_mask, mask_b
+
+    def load_pose(self, scan_id, frame_id):
+        """Loads a frame's pose."""
+        sample_data_token = self.get_sample_data_token_from_filename(frame_id)
+        cam_data = self.nusc.get('sample_data', sample_data_token)
+
+        # Get the ego pose
+        ego_pose = self.nusc.get('ego_pose', cam_data['ego_pose_token'])
+        translation = np.array(ego_pose['translation'])
+        rotation = Quaternion(ego_pose['rotation']).rotation_matrix
+
+        # Transformation from ego to world
+        ego_T_world = np.eye(4)
+        ego_T_world[:3, :3] = rotation
+        ego_T_world[:3, 3] = translation
+
+        # Get sensor (camera) to ego transformation
+        calib_sensor = self.nusc.get('calibrated_sensor', cam_data['calibrated_sensor_token'])
+        sensor_translation = np.array(calib_sensor['translation'])
+        sensor_rotation = Quaternion(calib_sensor['rotation']).rotation_matrix
+
+        # Transformation from sensor to ego
+        sensor_T_ego = np.eye(4)
+        sensor_T_ego[:3, :3] = sensor_rotation
+        sensor_T_ego[:3, 3] = sensor_translation
+
+        # Compute sensor to world transformation
+        sensor_T_world = ego_T_world @ sensor_T_ego
+
+        # Compute world to sensor transformation
+        world_T_sensor = np.linalg.inv(sensor_T_world)
+
+        return sensor_T_world, world_T_sensor
+
+    def get_sample_data_token_from_filename(self, filename):
+        """Extracts the sample_data_token from the filename."""
+        sample_data_token = self.filename_to_sample_data_token.get(filename)
+        if sample_data_token is None:
+            raise ValueError(f"Sample data token not found for filename: {filename}")
+        return sample_data_token
 
 
 import os
-import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
-import torch
 import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+import torch
+from torch.utils.data import DataLoader
+
+# Import the NuScenesDataset class
+# Ensure this path is correct based on where you saved the class
+from nuscenes_dataset import NuScenesDataset
 
 
-# Import your NuscDataset class
-# Adjust the import path based on your project structure
-# from your_project.datasets.nusc_dataset import NuscDataset
+def visualize_nuscenes_dataloader(dataloader, num_batches=1):
+    """
+    Visualizes batches from the NuScenesDataset using a DataLoader.
 
-# For demonstration purposes, let's assume NuscDataset is defined in the current scope
-# following the implementation we discussed earlier.
+    Args:
+        dataloader: A DataLoader wrapping the NuScenesDataset.
+        num_batches: Number of batches to visualize.
+    """
+    batch_count = 0
+    for batch in dataloader:
+        batch_count += 1
+        if batch_count > num_batches:
+            break
+        print(f"Visualizing batch {batch_count}/{num_batches}")
 
-def visualize_dataset_samples(dataset_path, split='train', num_samples=5):
+        # Assuming batch contains:
+        # - 'images': list of tensors [batch_size, C, H, W]
+        # - 'depth_b1hw': list of tensors [batch_size, 1, H, W]
+        # - 'depth_masks_b1hw': list of tensors [batch_size, 1, H, W]
+        images = batch['images'][0]  # List of images in the tuple
+        depths = batch['depth_b1hw']  # Corresponding depth maps
+        masks = batch['depth_masks_b1hw']  # Validity masks
+
+        batch_size = images.size(0)
+
+        for i in range(batch_size):
+            image = images[i]
+            depth = depths[i]
+            mask = masks[i]
+
+            # Convert image tensor to numpy array and transpose to (H, W, C)
+            image_np = image.permute(1, 2, 0).numpy()
+
+            # Convert depth tensor to numpy array
+            depth_np = depth.squeeze(0).numpy()
+            mask_np = mask.squeeze(0).numpy()
+
+            # Apply mask to depth map (set invalid depths to NaN for visualization)
+            depth_np_masked = np.where(mask_np, depth_np, np.nan)
+
+            # Plot image and depth map side by side
+            fig, axs = plt.subplots(1, 2, figsize=(15, 7))
+
+            axs[0].imshow(image_np.astype(np.uint8))
+            axs[0].set_title('RGB Image')
+            axs[0].axis('off')
+
+            # Use a colormap for depth visualization
+            depth_im = axs[1].imshow(depth_np_masked, cmap='plasma', vmin=0, vmax=50)
+            axs[1].set_title('Depth Map')
+            axs[1].axis('off')
+            fig.colorbar(depth_im, ax=axs[1], fraction=0.046, pad=0.04)
+
+            plt.show()
+
+
+if __name__ == "__main__":
+    # Configuration options
+    data_path = '/mnt/nas/shared/datasets/nuscenes/' # Replace with your NuScenes dataset path
+    version = 'v1.0-trainval'  # Dataset version
+    split = 'train'  # 'train' or 'val'
+    mv_tuple_file_suffix = ''  # Suffix used in your tuples file
+    num_images_in_tuple = 8  # Number of images in each tuple
+    image_height = 450  # Desired image height for visualization
+    image_width = 800  # Desired image width for visualization
+    tuple_info_file_location = '/mnt/nas/personal/guillermo/nuscenes/'  # Location of your tuples file
+
     # Initialize the dataset
-    dataset = NuscDataset(
-        dataset_path=dataset_path,
+    dataset = NuScenesDataset(
+        dataset_path=data_path,
         split=split,
-        mv_tuple_file_suffix=None,
-        include_full_res_depth=True,
-        image_height=384,
-        image_width=512,
-        high_res_image_width=1600,
-        high_res_image_height=900,
-        min_valid_depth=1e-3,
-        max_valid_depth=1e2,
-        verbose_init=True,
+        mv_tuple_file_suffix='_tuples.txt',
+        image_height=image_height,
+        image_width=image_width,
+        tuple_info_file_location=tuple_info_file_location,
+        num_images_in_tuple=num_images_in_tuple,
+        verbose_init=True
     )
 
-    # Initialize the DataLoader
+    # Create a DataLoader
     dataloader = DataLoader(
         dataset,
-        batch_size=1,  # Load one sample at a time
-        shuffle=False,  # Maintain the order of the dataset
-        num_workers=4,  # Use multiple CPU cores for data loading
-        pin_memory=True,  # Speeds up the transfer of data to GPU (if used)
+        batch_size=4,  # Adjust batch size as needed
+        shuffle=True,  # Shuffle data if desired
+        num_workers=4,  # Number of worker threads for loading data
+        pin_memory=True,  # Improves GPU transfer efficiency
+        drop_last=False  # Set to True if batch size doesn't divide dataset size evenly
     )
 
-    # Iterate over the DataLoader and visualize samples
-    for idx, data in enumerate(dataloader):
-        if idx >= num_samples:
-            break
-
-        # Extract data
-        # Adjust the keys based on how your dataset returns data
-        color_images = data.get('color_b3hw', None)  # Assuming 'color_b3hw' is the key for RGB images
-        depth_maps = data.get('depth_b1hw', None)  # Assuming 'depth_b1hw' is the key for depth maps
-
-        if color_images is None:
-            print(f"No color images found for sample {idx}.")
-            continue
-
-        # Convert tensors to numpy arrays for visualization
-        # Assuming images are in (batch_size, channels, height, width)
-        color_image = color_images[0].permute(1, 2, 0).numpy()
-        # Normalize images to [0, 1] if necessary
-        color_image = np.clip(color_image, 0, 1)
-
-        # Plot the color image
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.imshow(color_image)
-        plt.title(f'Color Image {idx}')
-        plt.axis('off')
-
-        # If depth map is available, visualize it
-        if depth_maps is not None:
-            depth_map = depth_maps[0].squeeze().numpy()
-
-            # Handle invalid depth values
-            valid_mask = np.isfinite(depth_map)
-            depth_map[~valid_mask] = 0
-
-            # Plot the depth map
-            plt.subplot(1, 2, 2)
-            plt.imshow(depth_map, cmap='inferno')
-            plt.title(f'Depth Map {idx}')
-            plt.axis('off')
-            plt.colorbar()
-
-        plt.tight_layout()
-        plt.show()
-
-    print('Visualization complete.')
-
-
-# Example usage:
-if __name__ == '__main__':
-    dataset_path = '/mnt/nas/shared/datasets/nuscenes'  # Replace with the path to your dataset
-    visualize_dataset_samples(dataset_path, split='train', num_samples=5)
+    # Visualize batches
+    visualize_nuscenes_dataloader(dataloader, num_batches=2)
