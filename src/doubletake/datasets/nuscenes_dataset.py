@@ -308,13 +308,13 @@ def visualize_nuscenes_dataloader(dataloader, num_batches=1):
 
 if __name__ == "__main__":
     # Configuration options
-    data_path = '/mnt/nas/shared/datasets/nuscenes/' # Replace with your NuScenes dataset path
-    version = 'v1.0-trainval'  # Dataset version
-    split = 'train'  # 'train' or 'val'
-    mv_tuple_file_suffix = ''  # Suffix used in your tuples file
-    num_images_in_tuple = 8  # Number of images in each tuple
-    image_height = 450  # Desired image height for visualization
-    image_width = 800  # Desired image width for visualization
+    data_path = '/mnt/nas/shared/datasets/nuscenes/'
+    version = 'v1.0-trainval'
+    split = 'train'
+    mv_tuple_file_suffix = ''
+    num_images_in_tuple = 8
+    image_height = 450
+    image_width = 800
     tuple_info_file_location = '/mnt/nas/personal/guillermo/nuscenes/'  # Location of your tuples file
 
     # Initialize the dataset
@@ -332,11 +332,11 @@ if __name__ == "__main__":
     # Create a DataLoader
     dataloader = DataLoader(
         dataset,
-        batch_size=4,  # Adjust batch size as needed
-        shuffle=True,  # Shuffle data if desired
-        num_workers=4,  # Number of worker threads for loading data
-        pin_memory=True,  # Improves GPU transfer efficiency
-        drop_last=False  # Set to True if batch size doesn't divide dataset size evenly
+        batch_size=4,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=False
     )
 
     # Visualize batches

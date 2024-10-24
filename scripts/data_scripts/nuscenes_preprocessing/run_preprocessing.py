@@ -5,10 +5,10 @@ from typing import List
 import numpy as np
 import torch
 from nuscenes.nuscenes import NuScenes
+from nuscenes.utils.splits import create_splits_scenes
 from PIL import Image
 from pyquaternion import Quaternion
 
-from nuscenes.utils.splits import create_splits_scenes
 
 class DepthGenerator:
     def __init__(self, data_path: str, version: str, save_path: str, split: str = "train") -> None:
@@ -27,14 +27,16 @@ class DepthGenerator:
         # Collect sample tokens from scenes in the specified split
         self.sample_tokens = []
         for scene in self.nusc.scene:
-            scene_name = scene['name']
+            scene_name = scene["name"]
             if scene_name in split_scenes:
                 # Collect all sample tokens in this scene
-                sample_token = scene['first_sample_token']
-                while sample_token != '':
+                sample_token = scene["first_sample_token"]
+                while sample_token != "":
                     self.sample_tokens.append(sample_token)
-                    sample = self.nusc.get('sample', sample_token)
-                    sample_token = sample['next']
+                    sample = self.nusc.get("sample", sample_token)
+                    sample_token = sample["next"]
+
+        print(f"Found {len(self.sample_tokens)} samples in the '{self.split}' split.")
 
         # Setup output directories for depth maps
         self.camera_names = [
@@ -49,8 +51,10 @@ class DepthGenerator:
         for camera_name in self.camera_names:
             (self.save_path / "samples" / camera_name).mkdir(parents=True, exist_ok=True)
 
-    def __call__(self, num_workers: int = 8) -> None:
-        print(f"Generating nuscene depth maps from LiDAR projections using the '{self.split}' split.")
+    def __call__(self, num_workers: int = 24) -> None:
+        print(
+            f"Generating nuscene depth maps from LiDAR projections using the '{self.split}' split."
+        )
 
         def process_one_sample(index: int) -> None:
             """Process one sample and generate the depth map for each camera."""
@@ -172,7 +176,6 @@ class DepthGenerator:
         sample_id_list = list(range(len(self.sample_tokens)))
         with futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
             executor.map(process_one_sample, sample_id_list)
-
 
 
 if __name__ == "__main__":
