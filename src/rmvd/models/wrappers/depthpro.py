@@ -1,15 +1,13 @@
 import os.path as osp
-import math
 
 import torch
 from torchvision import transforms as T
 import torch.nn as nn
 import numpy as np
-import json
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
-from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
+from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index
 
 
 class DepthPro_Wrapped(nn.Module):
