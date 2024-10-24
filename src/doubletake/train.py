@@ -129,8 +129,8 @@ def prepare_callbacks(
         save_last=True,
         save_top_k=1,
         verbose=True,
-        monitor="val_metrics/a5",
-        mode="max",
+        monitor="val/accuracy",
+        mode="min",
         dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
     )
 

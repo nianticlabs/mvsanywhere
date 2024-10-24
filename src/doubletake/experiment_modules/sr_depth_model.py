@@ -546,8 +546,11 @@ class DepthModel(pl.LightningModule):
             target.float()
         )
 
+        accuracy = ((torch.sigmoid(depth_range) > 0.5) == target).float().mean()
+
         losses = {
             "loss": loss,
+            'accuracy': accuracy
         }
         return losses
 
