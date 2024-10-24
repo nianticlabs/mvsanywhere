@@ -227,6 +227,11 @@ class CostVolumePatchEmbed(nn.Module):
                     BasicBlock(num_ch_out, num_ch_out, stride=1),
                 )
 
+        self.range_predictor = nn.Sequential(
+            BasicBlock(num_ch_out, num_ch_out, stride=1),
+            BasicBlock(num_ch_out, 64, stride=1),
+        )
+
         self.projects = nn.ModuleList([
             nn.Conv2d(
                 in_channels=num_feats,
@@ -272,9 +277,12 @@ class CostVolumePatchEmbed(nn.Module):
                 x = torch.cat([x, img_feat], dim=1)
                 x = self.convs[f"conv_{i}"](x)
 
+        depth_range = self.range_predictor(x).mean(dim=(2, 3))
+        # print('Depth range: ', depth_range.shape)
+
         x = self.patch_embed(x)  # B HW C
 
-        return x 
+        return x, depth_range
 
     def patch_embed(self, x):
         _, _, H, W = x.shape
@@ -319,7 +327,9 @@ class ViTCVEncoder(nn.Module):
         cv_embed_layers = img_feats[:2]
         fuser_layers = img_feats[2:]
 
-        x = self.prepare_tokens_with_masks(x, cv_embed_layers)
+        x, depth_range = self.prepare_tokens_with_masks(x, cv_embed_layers)
+
+        return x, depth_range
 
         feats = []
         for i, blk in enumerate(self.model.blocks):
@@ -336,11 +346,11 @@ class ViTCVEncoder(nn.Module):
             if i in self.intermediate_layers_idx:
                 feats.append((x[:, 1:], x[:, 0]))
                 
-        return feats
+        return feats, depth_range
 
     def prepare_tokens_with_masks(self, x, img_features, masks=None):
         B, nc, w, h = x.shape
-        x = self.patch_embed(x, img_features)
+        x, depth_range = self.patch_embed(x, img_features)
         if masks is not None:
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 
@@ -357,4 +367,4 @@ class ViTCVEncoder(nn.Module):
                 dim=1,
             )
 
-        return x
+        return x, depth_range
