@@ -1,4 +1,4 @@
-name: fmvs
+name: fmvs-mmcv
 channels:
   - default
   - pytorch
@@ -13,7 +13,8 @@ dependencies:
   - pytorch=2.0.1
   - torchvision
   - pytorch-cuda=11.7
-  # - cudatoolkit-dev=11.7  # for nvcc for metric3d
+  # - cudatoolkit=11.8  # for metric3d
+  - cudatoolkit-dev=11.7  # for nvcc for metric3d
   - lightning=2.0.0
   - pytorch3d # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op
@@ -53,3 +54,4 @@ dependencies:
     - pyqt5
     - dill
     - easydict
+    - mmcv
