@@ -6,6 +6,7 @@ from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.layers import BasicBlock
 from doubletake.modules.networks import double_basic_block
 
+
 DINOV2_ARCHS = {
     'dinov2_vits14': 384,
     'dinov2_vitb14': 768,

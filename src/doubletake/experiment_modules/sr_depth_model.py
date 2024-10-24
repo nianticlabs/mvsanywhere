@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
+import time
 
 from doubletake.losses import (
     MSGradientLoss,
@@ -13,7 +14,7 @@ from doubletake.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from doubletake.modules.cost_volume import CostVolumeManager
+from doubletake.modules.cost_volume import CostVolumeManager, EfficientCostVolumeManager
 from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.feature_volume import FeatureVolumeManager
 from doubletake.modules.layers import TensorFormatter
@@ -247,6 +248,7 @@ class DepthModel(pl.LightningModule):
         # what type of cost volume are we using?
         if self.run_opts.feature_volume_type == "simple_cost_volume":
             cost_volume_class = CostVolumeManager
+            cost_volume_class = EfficientCostVolumeManager
         elif self.run_opts.feature_volume_type == "mlp_feature_volume":
             cost_volume_class = FeatureVolumeManager
         else:
@@ -485,7 +487,6 @@ class DepthModel(pl.LightningModule):
                         cost_volume, 
                         cur_feats,
                     )     
-
         # Decode into depth at multiple resolutions.
         if "depth_anything" in self.run_opts.depth_decoder_name:
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
