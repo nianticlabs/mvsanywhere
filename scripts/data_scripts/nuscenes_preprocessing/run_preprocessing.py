@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 import torch
-from nuscenes.nuscenes import NuScenes  # pip install nuscenes-devkit
+from nuscenes.nuscenes import NuScenes
 from PIL import Image
 from pyquaternion import Quaternion
 
@@ -19,8 +19,7 @@ class DepthGenerator:
         # Initialize NuScenes dataset
         self.nusc = NuScenes(version=self.version, dataroot=str(self.data_path), verbose=False)
 
-        # Load the appropriate split (val.txt or train.txt)
-        split_file = Path(f"{self.split}.txt")
+        split_file = Path("data_splits") / "nuscenes" / f"nuscenes_{self.split}.txt"
         if not split_file.exists():
             raise FileNotFoundError(f"{self.split}.txt file not found in the working directory.")
 
