@@ -113,7 +113,7 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
         keyframe_config = DVMVS_Config
 
 
-    valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
+    valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan, store_computed=True)
 
     frame_ind_to_frame_id = {}
     for frame_ind, frame_line in enumerate(valid_frames):
@@ -192,12 +192,14 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
                 used_pairs.add((source_index, current_index))
                 used_pairs.add((current_index, source_index))
 
-                if len(sample["indices"]) == subsequence_length:
+                if len(sample["indices"]) >= 50:
                     break
 
-            if len(sample["indices"]) == subsequence_length:
-                samples.append(sample)
+            if len(sample["indices"]) >= 50:
                 break
+
+        if len(sample["indices"]) >= subsequence_length:
+            samples.append(sample)
 
 
     for sample in samples:

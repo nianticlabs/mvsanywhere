@@ -21,14 +21,21 @@ class CustomColorJitter(torch.nn.Module):
         hue: Union[Tensor, float, Tuple[float, float], List[float]] = 0.0,
     ):
         super().__init__()
-        self.transform = kornia.augmentation.ColorJiggle(
-            brightness=brightness,
-            contrast=contrast,
-            saturation=saturation,
-            hue=hue,
-            same_on_batch=False,
-            p=1,
+        self.transform = torch.nn.Sequential(
+            kornia.augmentation.ColorJiggle(
+                brightness=brightness,
+                contrast=contrast,
+                saturation=saturation,
+                hue=hue,
+                same_on_batch=False,
+                p=1,
+                keepdim=True,
+            ),
+            kornia.augmentation.RandomGaussianBlur((3, 3), (0.1, 2.0), keepdim=True),
+            kornia.augmentation.RandomGaussianNoise(mean=0., std=1/50, keepdim=True),
+            kornia.augmentation.RandomMotionBlur(9, 360., 1.0, keepdim=True)
         )
+
 
     def forward(self, x: torch.Tensor, denormalize_first=False) -> torch.Tensor:
         """Apply image augmentations.
@@ -42,10 +49,11 @@ class CustomColorJitter(torch.nn.Module):
 
         if denormalize_first:
             x = reverse_imagenet_normalize(x)
-            x = self.transform(x, keepdim=True)
+            with torch.autocast(device_type="cuda", enabled=False):
+                x = self.transform(x)
             x = imagenet_normalize(x)
         else:
-            x = self.transform(x, keepdim=True)
+            x = self.transform(x)
 
         if squeeze_dim:
             return x.squeeze(0)

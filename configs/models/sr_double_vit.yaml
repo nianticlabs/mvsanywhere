@@ -20,10 +20,11 @@ num_sanity_val_steps: 0
 num_workers: 12
 precision: 16
 random_seed: 0
-image_width: 448
-image_height: 336
-val_image_width: 448
-val_image_height: 336
+num_images_in_tuple: 8
+image_width: 512
+image_height: 384
+val_image_width: 512
+val_image_height: 384
 matching_scale: 0.25
 prediction_scale: 1.0
 model_type: depth_model

@@ -13,7 +13,7 @@ from doubletake.utils.generic_utils import (
     read_image_file,
     readlines,
 )
-from doubletake.utils.geometry_utils import pose_distance, rotz
+from doubletake.utils.geometry_utils import pose_distance, rotz, rotx, roty
 
 logger = logging.getLogger(__name__)
 
@@ -593,6 +593,16 @@ class GenericMVSDataset(Dataset):
         # Do imagenet normalization
         image = imagenet_normalize(image)
 
+        random_aug_poses = 0.5 if self.split == "train" else 0.0
+        if random_aug_poses:
+            rot_mat = world_T_cam[:3, :3]
+            trans = world_T_cam[:3, 3]
+            rot_mat = rot_mat @ rotx(np.random.randn() * 1e-3) @ roty(np.random.randn() * 1e-3) @ rotz(np.random.randn() * 1e-3)
+            trans = trans + np.random.randn(3) * 1e-2
+            world_T_cam[:3, :3] = rot_mat
+            world_T_cam[:3, 3] = trans
+            cam_T_world = np.linalg.inv(world_T_cam)
+
         output_dict.update(
             {
                 "image_b3hw": image,
@@ -622,11 +632,16 @@ class GenericMVSDataset(Dataset):
             # except:
             #     pass
 
+
             max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
             min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
 
-            max_depth = max_depth * (torch.rand(1)[0] + 1.0)
-            min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
+            if self.split == "train":
+                max_depth = max_depth * (torch.rand(1)[0] + 1.0)
+                min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
+            else:
+                max_depth = max_depth * 1.5
+                min_depth = min_depth * 0.75
 
             output_dict.update(
                 {
@@ -692,6 +707,24 @@ class GenericMVSDataset(Dataset):
             )
             output_dict.update(depth_hint_dict)
 
+        # Border augmentations
+        border_threshold = 0.5 if self.split == "train" else 0.0
+        border = torch.rand(1).item() < border_threshold
+
+        if border:
+            pad = torch.randint(low=1, high=20, size=(1,)).item()
+            def pad_tensor(x, value):
+                x[..., :pad, :] = value
+                x[..., -pad:, :] = value
+                x[..., :, :pad] = value
+                x[..., :, -pad:] = value
+                return x
+            
+            output_dict["image_b3hw"] = pad_tensor(output_dict["image_b3hw"], 0)
+            output_dict["depth_b1hw"] = pad_tensor(output_dict["depth_b1hw"], torch.nan)
+            output_dict["mask_b1hw"] = pad_tensor(output_dict["mask_b1hw"], 0.0)
+            output_dict["mask_b_b1hw"] = pad_tensor(output_dict["mask_b_b1hw"], False)
+
         return output_dict
 
     def stack_src_data(self, src_data):
@@ -724,12 +757,24 @@ class GenericMVSDataset(Dataset):
         # get the index of the tuple
         scan_id, *frame_ids = self.frame_tuples[idx].split(" ")
 
+        # Randomly use a random ref image
+        random_ref_threshold = 0.1 if self.split == "train" else 0.0
+        if torch.rand(1).item() < random_ref_threshold:
+            random.shuffle(frame_ids)
+
         # shuffle tuple order, by default false
         if self.shuffle_tuple:
             first_frame_id = frame_ids[0]
             shuffled_list = frame_ids[1:]
             random.shuffle(shuffled_list)
             frame_ids = [first_frame_id] + shuffled_list
+
+        # Get only past frames
+        only_past_threshold = 0.25 if self.split == "train" else 0.0
+        if only_past_threshold:
+            past_frames = np.array(frame_ids[1:]) < frame_ids[0]
+            if past_frames.sum() >= self.num_images_in_tuple - 1:
+                frame_ids = [frame_ids[0]] + np.array(frame_ids[1:])[past_frames].tolist()
 
         # the tuple file may have more images in the tuple than what might be
         # requested, so limit the tuple length to num_images_in_tuple
