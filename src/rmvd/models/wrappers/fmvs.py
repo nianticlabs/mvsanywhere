@@ -62,11 +62,15 @@ def get_epipolar_depth_range(
         torch.tensor([0, 1, -H], dtype=torch.float32).cuda()  # Bottom border (y = height)
     ]).unsqueeze(1)
 
+    # Compute epipoles
+    epipoles = kornia.geometry.convert_points_from_homogeneous(
+        (P1 @ kornia.geometry.convert_points_to_homogeneous(poses_source_inv[..., :3, 3]).unsqueeze(-1)).squeeze(-1)
+    )
+
     # Matching
     min_depth = []
     max_depth = []
     for i in range(num_sources):
-        
         
         # Compute epipolar lines
         epipolar_lines = kornia.geometry.epipolar.compute_correspond_epilines(
@@ -95,15 +99,39 @@ def get_epipolar_depth_range(
         indices = torch.nonzero(mask, as_tuple=False)
         intersections = intersections[indices[:, 0], indices[:, 1]][torch.argsort(indices[:, 1])].view(intersections.shape[1], 2, 2)
 
-        epipolar_lines_distances = torch.linalg.norm(intersections[:, 0] - intersections[:, 1], dim=-1)
+        epipole = epipoles[i]
+        if 0 < epipole[0].item() < W and 0 < epipole[1] < H:
+            # print('In')
 
-        # Point on the src image
-        dst_pts = pix_coords_n2[valid_pixels][epipolar_lines_distances.argmax()][None, None, :].expand(-1, 64, -1)
+            # Check which side of the epipolar line are correct
+            depths_pt1 = kornia.geometry.epipolar.triangulate_points(P1, P2[i:i+1], intersections[:, 0][None], pix_coords_n2[valid_pixels][None].cuda())[..., 2].squeeze(0)
+            depths_pt2 = kornia.geometry.epipolar.triangulate_points(P1, P2[i:i+1], intersections[:, 1][None], pix_coords_n2[valid_pixels][None].cuda())[..., 2].squeeze(0)
+            
+            a = torch.where((depths_pt1 > 0)[:, None], intersections[:, 0], intersections[:, 1])
+            b = epipole.unsqueeze(0).expand(a.shape[0], -1)
+            intersections = torch.stack((a, b), dim=1)
+
+            valid_pixels_2 = ((depths_pt1 > 0) | (depths_pt2 > 0))
+            intersections = intersections[valid_pixels_2]
+            kk = True
+        else:
+            valid_pixels_2 = torch.ones(valid_pixels.sum(), dtype=bool)
+            kk = False
+
         
-        # Points along epipolar line on the cur image
-        a, b = intersections[epipolar_lines_distances.argmax()]
-        src_pts = (a + torch.linspace(0, 1, steps=64).unsqueeze(1).cuda() * (b - a)).unsqueeze(0)
+        # epipolar_lines_distances = torch.linalg.norm(intersections[:, 0] - intersections[:, 1], dim=-1)
+        # best_epipolar_line = torch.argsort(epipolar_lines_distances)[int(len(epipolar_lines_distances) * 0.99)]
+        # num_points_sample = int(epipolar_lines_distances[best_epipolar_line].item()) * 4 # / (W * 0.0001))
 
+        # # Point on the src image
+        # dst_pts = pix_coords_n2[valid_pixels][valid_pixels_2][best_epipolar_line][None, None, :].expand(-1, num_points_sample, -1)
+        
+        # # Points along epipolar line on the cur image
+        # a, b = intersections[best_epipolar_line]
+        # src_pts = (a + torch.linspace(0, 1, steps=num_points_sample).unsqueeze(1).cuda() * (b - a)).unsqueeze(0)
+
+        src_pts = (intersections[:, 0] + torch.rand(intersections.shape[0]).unsqueeze(1).cuda() * (intersections[:, 1] - intersections[:, 0])).unsqueeze(0)
+        dst_pts = pix_coords_n2[valid_pixels][valid_pixels_2].unsqueeze(0)
 
         depths = kornia.geometry.epipolar.triangulate_points(
             P1, P2[i:i+1], src_pts.cuda(), dst_pts.cuda()
@@ -112,16 +140,25 @@ def get_epipolar_depth_range(
         mask = (depths > 0.0)
         if mask.sum() == 0:
             continue
+        
+        # sorted_d = torch.sort(depths[mask])[0].cpu().numpy()
+        # sorted_d_serie = (sorted_d[1:] / sorted_d[:-1])
+        # print(sorted_d[np.where((sorted_d[1:] / sorted_d[:-1]) < 2)[0].max() - 1])
 
-        pts_min_depth = torch.quantile(depths[mask], 0.05).item()
-        pts_max_depth = torch.quantile(depths[mask], 0.95).item()
+
+        # sorted_depths = torch.sort(depths[mask])[0]
+        # pts_min_depth = sorted_depths.min().item()
+        # pts_max_depth = depths[mask].max().item()
+        pts_min_depth = torch.quantile(depths[mask], 0.20).item()
+        pts_max_depth = torch.quantile(depths[mask], 0.997).item()
+
         
         if 0.0 < pts_min_depth:
             min_depth.append(pts_min_depth)
             max_depth.append(pts_max_depth)
 
     min_depth = np.median(min_depth) if len(min_depth) > 0 else None
-    max_depth = np.median(max_depth) if len(max_depth) > 0 else None
+    max_depth = np.max(max_depth) if len(max_depth) > 0 else None
 
     return min_depth, max_depth
 
@@ -186,8 +223,8 @@ def get_depth_range(
         pts_max_depth = torch.quantile(depths[mask], 0.95).item()
         
         if 0.0 < pts_min_depth:
-            min_depth.append(pts_min_depth * 0.25)
-            max_depth.append(pts_max_depth * 2.0)
+            min_depth.append(pts_min_depth)
+            max_depth.append(pts_max_depth)
 
     min_depth = np.median(min_depth) if len(min_depth) > 0 else None
     max_depth = np.median(max_depth) if len(max_depth) > 0 else None
@@ -322,6 +359,8 @@ class FMVS_Wrapped(nn.Module):
 
         self.model.depth_decoder.output_convs[0][1].size = tuple(image_key.shape[-2:])
 
+        print('PRE: ', min_depth, max_depth)
+
         # Use sift max_depth
         if len(indices) == 1:
             # Build the cache
@@ -359,10 +398,14 @@ class FMVS_Wrapped(nn.Module):
         baseline_max_depth = (torch.max(cam_dists) * intrinsics_key[:, 0, 0] * 4 ) / (0.01 * image_key.shape[-1])
         if min_depth is None:
             min_depth = baseline_min_depth
+        # else:
+        #     min_depth = max(min_depth, baseline_min_depth)
         if max_depth is None:
             max_depth = baseline_max_depth
+        # else:
+        #     max_depth = min(max_depth, baseline_max_depth)
 
-        print(min_depth, max_depth)
+        print('POST:', min_depth, max_depth)
         
         # print(f"min_depth: {min_depth}, max_depth: {max_depth}", intrinsics_key[:, 0, 0] * 4, image_key.shape[-1])
 
