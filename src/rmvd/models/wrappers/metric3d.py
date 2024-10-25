@@ -38,8 +38,7 @@ class Metric3D_Wrapped(nn.Module):
         # From the Metric3D readme:
         self.data_basic = DataBasic()
 
-        print(10*"\nWARNING – should switch to vit_large")
-        model_name: str = "metric3d_vit_small"
+        model_name: str = "metric3d_vit_large"
         self.model = torch.hub.load("yvanyin/metric3d", model_name, pretrain=True)#
         self.model = self.model.cuda()
 
@@ -79,7 +78,7 @@ class Metric3D_Wrapped(nn.Module):
             # Using the provided intrinsics, which gives focal length in pixels
             pred_depth, _, output_dict = self.model.inference({"input": rgb_input[None, ...]})
 
-        print("Label scale factor (should be dividing by this)", label_scale_factor)
+        print("Label scale factor (will be dividing by this)", label_scale_factor)
 
         # This step follows the `pred_depth = pred_depth * normalize_scale / scale_info`
         # step in Metric3D's postprocess_per_image function
