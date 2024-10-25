@@ -30,3 +30,6 @@
 
 [metric3d]
     root = '/mnt/nas3/shared/projects/fmvs/Metric3D'
+
+[unidepth]
+    root = '/mnt/nas3/shared/projects/fmvs/UniDepth'
