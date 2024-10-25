@@ -242,6 +242,10 @@ class BlendedMVGDataset(GenericMVSDataset):
         with open(intrinsics_filepath) as f:
             lines = f.readlines()
             lines = [line.rstrip() for line in lines]
+
+        output_dict["min_depth"] = float(lines[11].split()[0])
+        output_dict["max_depth"] = float(lines[11].split()[3])
+
         K = torch.eye(4, dtype=torch.float32)
         K[:3, :3] = torch.tensor(np.fromstring(' '.join(lines[7:10]), dtype=np.float32, sep=' ').reshape((3, 3)))
 

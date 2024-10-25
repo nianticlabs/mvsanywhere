@@ -632,9 +632,15 @@ class GenericMVSDataset(Dataset):
             # except:
             #     pass
 
-
-            max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
-            min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
+            if "min_depth" in output_dict:
+                min_depth = output_dict["min_depth"]
+            else:
+                min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
+            
+            if "max_depth" in output_dict:
+                max_depth = output_dict["max_depth"]
+            else:
+                max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
 
             if self.split == "train":
                 max_depth = max_depth * (torch.rand(1)[0] + 1.0)
