@@ -227,7 +227,7 @@ def render_scene_meshes(
                     )
                     Image.fromarray(numpy_weights).save(weights_path)
 
-                # for debug.py. make and dump a video.
+                # for debug make and dump a video.
                 colormapped_depth = colormap_image(depth_1hw, mask_1hw.float(), vmin=0.0, vmax=4)
                 if sampled_weights_1hw is not None:
                     colormapped_weights = colormap_image(
