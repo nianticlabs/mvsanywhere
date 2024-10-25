@@ -23,10 +23,6 @@ class DataBasic:
 
 class Metric3D_Wrapped(nn.Module):
 
-    # TODO - might not need these if we use metric3d functions
-    padding_values = torch.tensor([123.675, 116.28, 103.53]).float().view(1, 3, 1, 1)
-    std = torch.tensor([58.395, 57.12, 57.375]).float().view(1, 3, 1, 1)
-
     def __init__(self):
         super().__init__()
 
@@ -44,7 +40,8 @@ class Metric3D_Wrapped(nn.Module):
 
         print(10*"\nWARNING – should switch to vit_large")
         model_name: str = "metric3d_vit_small"
-        self.model = torch.hub.load("yvanyin/metric3d", model_name, pretrain=True)#.cuda()
+        self.model = torch.hub.load("yvanyin/metric3d", model_name, pretrain=True)#
+        self.model = self.model.cuda()
 
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
         device = get_torch_model_device(self)
@@ -59,16 +56,6 @@ class Metric3D_Wrapped(nn.Module):
 
         return sample
 
-    # def _standardize_image(self, image_b3hw: torch.Tensor) -> torch.Tensor:
-    #     """
-    #     Standardize the image to have a mean of 0 and std of 1
-    #     """
-    #     assert len(image_b3hw.shape) == 4, image_b3hw.shape
-    #     assert image_b3hw.shape[1] == 3, image_b3hw.shape
-    #     mean = self.padding_values.to(image_b3hw.device)
-    #     std = self.std.to(image_b3hw.device)
-    #     return (image_b3hw - mean) / std
-
     def forward(self, images, keyview_idx, intrinsics):
 
         # TODO: move this to input_adapter
@@ -82,26 +69,28 @@ class Metric3D_Wrapped(nn.Module):
 
         K = intrinsics[0][0]
         assert K.shape == (3, 3)
+
         metric3d_intrinsic = (K[0, 0], K[1, 1], K[0, 2], K[1, 2])
 
         # let's do the metric3d preprocessing
         rgb_input, _, pad, label_scale_factor = self.transform_test_data_scalecano(rgb=image, intrinsic=metric3d_intrinsic, data_basic=self.data_basic)
-        print(rgb_input.shape)
-
-        # if intrinsics is not None:
-        #     f_x = torch.tensor(intrinsics[0][0, 0, 0]).cuda()
-        # else:
-        #     f_x = None
 
         with torch.inference_mode():
             # Using the provided intrinsics, which gives focal length in pixels
             pred_depth, _, output_dict = self.model.inference({"input": rgb_input[None, ...]})
 
-        pred = {}
-        pred['depth'] = pred_depth
-        aux = {}
+        print("Label scale factor (should be dividing by this)", label_scale_factor)
 
-        assert len(pred['depth'].shape) == 4, pred['depth'].shape
+        # This step follows the `pred_depth = pred_depth * normalize_scale / scale_info`
+        # step in Metric3D's postprocess_per_image function
+        pred_depth = pred_depth / label_scale_factor
+
+        # Undo the padding
+        _, _, h, w = pred_depth.shape
+        pred_depth = pred_depth[:, :, pad[0] : h - pad[1], pad[2] : w - pad[3]]
+
+        pred = {'depth': pred_depth}
+        aux = {}
 
         return pred, aux
 
