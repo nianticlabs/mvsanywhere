@@ -1,4 +1,4 @@
-name: fmvs-mmcv
+name: fmvs
 channels:
   - default
   - pytorch
@@ -53,4 +53,5 @@ dependencies:
     - pyqt5
     - dill
     - easydict
-    - mmcv
+    - mmcv  # needed to run Metric3D baseline
+    - xformers==0.0.24  # needed to run UniDepth baseline
