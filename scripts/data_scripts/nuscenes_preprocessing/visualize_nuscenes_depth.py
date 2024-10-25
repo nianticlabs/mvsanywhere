@@ -56,6 +56,7 @@ def load_and_plot_depth_and_image(npy_file, jpg_file, threshold=0.0):
     plt.show()
 
 
-npy_file_path = "/mnt/nas/shared/datasets/nuscenes/depth/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.npy"
-jpg_file_path = "/mnt/nas/shared/datasets/nuscenes/samples/CAM_FRONT_LEFT/n008-2018-05-21-11-06-59-0400__CAM_FRONT_LEFT__1526915284904917.jpg"
+npy_file_path = "/mnt/nas/shared/datasets/nuscenes/depth/samples/CAM_FRONT/n008-2018-07-26-12-13-50-0400__CAM_FRONT__1532621803662404.npy"
+jpg_file_path = '/mnt/nas/shared/datasets/nuscenes/samples/CAM_FRONT/n008-2018-07-26-12-13-50-0400__CAM_FRONT__1532621803662404.jpg'
+
 load_and_plot_depth_and_image(npy_file_path, jpg_file_path)
