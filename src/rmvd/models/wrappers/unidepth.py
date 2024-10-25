@@ -18,7 +18,7 @@ class UniDepth_Wrapped(nn.Module):
         repo_path = get_path(paths_file, "unidepth", "root")
         sys.path.insert(0, repo_path)
 
-        from unidepth.models import UniDepthV1, UniDepthV2
+        from unidepth.models import UniDepthV2
 
         name = "unidepth-v2-vitl14"
         self.model = UniDepthV2.from_pretrained(f"lpiccinelli/{name}")
@@ -42,13 +42,11 @@ class UniDepth_Wrapped(nn.Module):
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
 
-        rgb_input = torch.from_numpy(image_key).permute(2, 0, 1)
-        assert len(rgb_input.shape) == 3
-        assert rgb_input.shape[0] == 3
+        rgb_input = image_key[0]
+        intrinsics_input = torch.tensor(intrinsics[0][0])
 
-        # TODO – check shape
-        intrinsics_input = intrinsics[0][0]
         assert intrinsics_input.shape == (3, 3)
+        assert rgb_input.shape[0] == 3
 
         with torch.inference_mode():
             # Using the provided intrinsics, which gives focal length in pixels
