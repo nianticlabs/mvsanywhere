@@ -434,41 +434,39 @@ class DepthModel(pl.LightningModule):
 
         # Compute image features for the current view. Used for a strong image
         # prior.
+        cur_feats = self.encoder(cur_image)
 
-        with torch.no_grad():
-            cur_feats = self.encoder(cur_image)
+        # Compute matching features
+        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
+            cur_image, src_image, unbatched_matching_encoder_forward
+        )
 
-            # Compute matching features
-            matching_cur_feats, matching_src_feats = self.compute_matching_feats(
-                cur_image, src_image, unbatched_matching_encoder_forward
-            )
+        if flip:
+            # now (carefully) flip matching features back for correct MVS.
+            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
+            matching_src_feats = torch.flip(matching_src_feats, (-1,))
 
-            if flip:
-                # now (carefully) flip matching features back for correct MVS.
-                matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
-                matching_src_feats = torch.flip(matching_src_feats, (-1,))
+        # Get min and max depth to the right shape, device and dtype
+        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
-            # Get min and max depth to the right shape, device and dtype
-            min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
-            max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        # Compute the cost volume. Should be size bdhw.
+        cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
+            cur_feats=matching_cur_feats,
+            src_feats=matching_src_feats,
+            src_extrinsics=src_cam_T_cur_cam,
+            src_poses=cur_cam_T_src_cam,
+            src_Ks=src_K,
+            cur_invK=cur_invK,
+            min_depth=min_depth,
+            max_depth=max_depth,
+            return_mask=return_mask,
+        )
 
-            # Compute the cost volume. Should be size bdhw.
-            cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
-                cur_feats=matching_cur_feats,
-                src_feats=matching_src_feats,
-                src_extrinsics=src_cam_T_cur_cam,
-                src_poses=cur_cam_T_src_cam,
-                src_Ks=src_K,
-                cur_invK=cur_invK,
-                min_depth=min_depth,
-                max_depth=max_depth,
-                return_mask=return_mask,
-            )
-
-            if flip:
-                # OK, we've computed the cost volume, now we need to flip the cost
-                # volume to have it aligned with flipped image prior features
-                cost_volume = torch.flip(cost_volume, (-1,))
+        if flip:
+            # OK, we've computed the cost volume, now we need to flip the cost
+            # volume to have it aligned with flipped image prior features
+            cost_volume = torch.flip(cost_volume, (-1,))
 
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
@@ -488,7 +486,27 @@ class DepthModel(pl.LightningModule):
                         cur_feats,
                     )     
 
-        depth_outputs = {}
+        # Decode into depth at multiple resolutions.
+        if "depth_anything" in self.run_opts.depth_decoder_name:
+            depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
+        else:
+            B, C, H, W = cur_image.shape
+            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
+
+        # loop through depth outputs, flip them if we need to and get linear
+        # scale depths.
+        for k in list(depth_outputs.keys()):
+            log_depth = depth_outputs[k].float()
+            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
+            # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
+
+            if flip:
+                # now flip the depth map back after final prediction
+                log_depth = torch.flip(log_depth, (-1,))
+
+            depth_outputs[k] = log_depth
+            depth_outputs[k.replace("log_", "")] = torch.exp(log_depth)
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
@@ -530,27 +548,63 @@ class DepthModel(pl.LightningModule):
                 and "log_l1_loss": absolute difference on logged depths.
         """
         depth_gt = cur_data["depth_b1hw"]
+        normals_gt = cur_data["normals_b3hw"]
+        mask_b = cur_data["mask_b_b1hw"]
+        mask = cur_data["mask_b1hw"]
+        depth_pred = outputs["depth_pred_s0_b1hw"]
+        log_depth_pred = outputs["log_depth_pred_s0_b1hw"]
+        normals_pred = outputs["normals_pred_b3hw"]
+
         log_depth_gt = torch.log(depth_gt)
+        found_scale = False
+        ms_loss = 0
+        for i in range(4):
+            if f"log_depth_pred_s{i}_b1hw" in outputs:
+                log_depth_pred_resized = F.interpolate(
+                    outputs[f"log_depth_pred_s{i}_b1hw"],
+                    size=depth_gt.shape[-2:],
+                    mode="nearest",
+                )
+                ms_loss += (
+                    self.ms_loss_fn(log_depth_gt[mask_b], log_depth_pred_resized[mask_b]) / 2**i
+                )
+                found_scale = True
 
-        depth_bins = outputs["depth_bins"]
-        depth_range = outputs["depth_range"]
+        if not found_scale:
+            raise Exception("Could not find a valid scale to compute si loss!")
 
-        min_log_depths = torch.amin(torch.nan_to_num(log_depth_gt, nan=torch.inf).flatten(1), dim=1, keepdim=True)
-        max_log_depths = torch.amax(torch.nan_to_num(log_depth_gt, nan=-torch.inf).flatten(1), dim=1, keepdim=True)
-        # print(max_log_depths.shape, min_log_depths.shape, depth_bins.shape)
-        target = (min_log_depths < depth_bins) & (depth_bins < max_log_depths)
+        grad_loss = self.grad_loss(depth_gt, depth_pred)
+        abs_loss = self.abs_loss(depth_gt[mask_b], depth_pred[mask_b])
+        si_loss = self.si_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
 
-        # print('LOSS', depth_range.shape, target.shape)
-        loss = torch.nn.functional.binary_cross_entropy_with_logits(
-            depth_range,
-            target.float()
+        mask_b_limit = torch.logical_and(mask_b, depth_pred > 0.1)
+        inv_abs_loss = self.abs_loss(1 / depth_gt[mask_b_limit], 1 / depth_pred[mask_b_limit])
+
+        log_l1_loss = self.abs_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
+        normals_loss = self.normals_loss(normals_gt, normals_pred)
+
+        mv_loss = self.mv_depth_loss(
+            depth_pred_b1hw=depth_pred,
+            cur_depth_b1hw=depth_gt,
+            src_depth_bk1hw=src_data["depth_b1hw"],
+            cur_invK_b44=cur_data[f"invK_s0_b44"],
+            src_K_bk44=src_data[f"K_s0_b44"],
+            cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
+            src_cam_T_world_bk44=src_data["cam_T_world_b44"],
         )
 
-        accuracy = ((torch.sigmoid(depth_range) > 0.5) == target).float().mean()
+        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
 
         losses = {
             "loss": loss,
-            'accuracy': accuracy
+            "si_loss": si_loss,
+            "grad_loss": grad_loss,
+            "abs_loss": abs_loss,
+            "normals_loss": normals_loss,
+            "ms_loss": ms_loss,
+            "inv_abs_loss": inv_abs_loss,
+            "log_l1_loss": log_l1_loss,
+            "mv_loss": mv_loss,
         }
         return losses
 
@@ -580,6 +634,27 @@ class DepthModel(pl.LightningModule):
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)
 
+        pred_H, pred_W = outputs["depth_pred_s0_b1hw"].shape[-2:]
+        if pred_H != self.compute_normals.height or pred_W != self.compute_normals.width:
+            self.compute_normals = NormalGenerator(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
+            self.mv_depth_loss = MVDepthLoss(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
+
+        depth_pred = outputs["depth_pred_s0_b1hw"]
+        depth_pred_lr = outputs["depth_pred_s3_b1hw"]
+        cv_min = outputs["lowest_cost_bhw"]
+
+        depth_gt = cur_data["depth_b1hw"]
+        mask = cur_data["mask_b1hw"]
+        mask_b = cur_data["mask_b_b1hw"]
+
+        # estimate normals for groundtruth
+        normals_gt = self.compute_normals(depth_gt, cur_data["invK_s0_b44"])
+        cur_data["normals_b3hw"] = normals_gt
+
+        # estimate normals for depth
+        normals_pred = self.compute_normals(depth_pred, cur_data["invK_s0_b44"])
+        outputs["normals_pred_b3hw"] = normals_pred
+
         # compute losses
         losses = self.compute_losses(cur_data, src_data, outputs)
 
@@ -587,13 +662,21 @@ class DepthModel(pl.LightningModule):
             self.manual_backward(losses["loss"] / 2.0)
 
             if (batch_idx + 1) % 2 == 0:
-                optimizer_sr = self.optimizers()
+                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
             
                 optimizer_sr.step()
+                optimizer_da_enc.step()
+                optimizer_da_dec.step()
+
                 optimizer_sr.zero_grad()
+                optimizer_da_enc.zero_grad()
+                optimizer_da_dec.zero_grad()
+
                 # multiple schedulers
-                scheduler_sr = self.lr_schedulers()
+                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
                 scheduler_sr.step()
+                scheduler_da_enc.step()
+                scheduler_da_dec.step()
 
         #
         is_train = phase == "train"
@@ -603,6 +686,53 @@ class DepthModel(pl.LightningModule):
             # logging and validation
             with torch.inference_mode():
                 # log images for train.
+                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
+
+                    prefix = "train" if is_train else "val"
+                    for i in range(4):
+                        mask_i = mask[i].float().cpu()
+                        depth_gt_viz_i, vmin, vmax = colormap_image(
+                            depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
+                        )
+                        depth_pred_viz_i = colormap_image(
+                            depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        cv_min_viz_i = colormap_image(
+                            cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        depth_pred_lr_viz_i = colormap_image(
+                            depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+
+                        image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
+
+                        import torchvision
+                        grid = torchvision.utils.make_grid(
+                            src_data["image_b3hw"][i], nrow=3
+                        )
+                        grid = F.interpolate(grid[None], image_i.shape[-2:], mode="bilinear")[0]
+                        grid = reverse_imagenet_normalize(grid)
+
+                        self.logger.experiment.add_image(f"{prefix}_image/{i}", image_i, global_step)
+                        self.logger.experiment.add_image(f"{prefix}_src_images/{i}", grid, global_step)
+                        self.logger.experiment.add_image(
+                                f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_depth_pred/{i}", depth_pred_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_depth_pred_lr/{i}", depth_pred_lr_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_normals_gt/{i}", 0.5 * (1 + normals_gt[i]), global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_normals_pred/{i}", 0.5 * (1 + normals_pred[i]), global_step
+                        )
+                        self.logger.experiment.add_image(f"{prefix}_cv_min/{i}", cv_min_viz_i, global_step)
+
+                    self.logger.experiment.flush()
 
                 # log losses
                 for loss_name, loss_val in losses.items():
@@ -614,6 +744,42 @@ class DepthModel(pl.LightningModule):
                         on_epoch=not is_train,
                         prog_bar=True
                     )
+
+                # high_res_validation: it isn't always wise to load in high
+                # resolution depth maps so this is an optional flag.
+                if phase == "train" or not self.run_opts.high_res_validation:
+                    # compute metrics at low res depth resolution for train or if
+                    # validation isn't set to use high res depth
+                    metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
+                else:
+                    # if we are validating or testing, we want to upscale our
+                    # predictions to full-size and compare against the GT depth map,
+                    # so that metrics are comparable across resolutions
+                    full_size_depth_gt = cur_data["full_res_depth_b1hw"]
+                    full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
+                    # this should be nearest to reflect test, but keeping it for
+                    # backwards comparison reasons.
+                    full_size_pred = F.interpolate(
+                        depth_pred,
+                        full_size_depth_gt.size()[-2:],
+                        mode="bilinear",
+                        align_corners=False,
+                    )
+                    metrics = compute_depth_metrics(
+                        full_size_depth_gt[full_size_mask_b],
+                        full_size_pred[full_size_mask_b],
+                    )
+
+                for metric_name, metric_val in metrics.items():
+                    self.log(
+                        f"{phase}_metrics/{metric_name}",
+                        metric_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
+                    )
+
+        # return losses["loss"]
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""
@@ -631,7 +797,17 @@ class DepthModel(pl.LightningModule):
 
         """
         optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume_net.patch_embed.range_predictor.parameters())
+            list(self.cost_volume.parameters()) + 
+            list(self.matching_model.parameters()),
+            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_encoder = torch.optim.AdamW(
+            self.encoder.parameters(),
+            lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_decoder = torch.optim.AdamW(
+            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
         def lr_lambda(step):
@@ -643,4 +819,6 @@ class DepthModel(pl.LightningModule):
                 return 0.01
 
         lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
-        return [optimizer_sr], [lr_scheduler_sr]
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]

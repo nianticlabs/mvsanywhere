@@ -329,8 +329,6 @@ class ViTCVEncoder(nn.Module):
 
         x, depth_range = self.prepare_tokens_with_masks(x, cv_embed_layers)
 
-        return x, depth_range
-
         feats = []
         for i, blk in enumerate(self.model.blocks):
 
