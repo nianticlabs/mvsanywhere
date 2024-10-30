@@ -14,6 +14,7 @@ from doubletake.datasets.dtu_dataset import DTUDataset
 from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.vkitti import VirtualKITTIDataset
+from doubletake.datasets.nuscenes_dataset import NuScenesDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -273,6 +274,12 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             print(f" KITTI Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
+
+    elif dataset_name == "nuscenes":
+        dataset_class = NuScenesDataset
+        scans = None
+
+
 
     else:
         raise ValueError(f"Not a recognized dataset: {dataset_name}")
