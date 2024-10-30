@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+import einops
 
 from doubletake.utils.geometry_utils import BackprojectDepth, Project3D
 
@@ -335,7 +336,7 @@ class CostVolumeManager(nn.Module):
         """Runs the cost volume and gets the lowest cost result"""
 
         # change to portrait if we need to.
-        if self.matching_height != cur_feats.shape[-2] or self.matching_height != cur_feats.shape[-2]:
+        if self.matching_height != cur_feats.shape[-2] or self.matching_width != cur_feats.shape[-1]:
             self.matching_width = cur_feats.shape[-1]
             self.matching_height = cur_feats.shape[-2]
             self.initialise_for_projection(device=cur_feats.device)
@@ -360,4 +361,165 @@ class CostVolumeManager(nn.Module):
                 depth_planes_bdhw,
             )
 
-        return cost_volume, lowest_cost, depth_planes_bdhw, overall_mask_bhw
+        return cost_volume, lowest_cost, depth_planes_bdhw, overall_mask_bhw,
+    
+
+class EfficientCostVolumeManager(CostVolumeManager):
+    def __init__(self, matching_height, matching_width, num_depth_bins=64, matching_dim_size=None,
+        num_source_views=None,):
+        super().__init__(matching_height, matching_width, num_depth_bins=num_depth_bins, matching_dim_size=None,
+        num_source_views=None,)
+
+    def warp_features(
+        self,
+        src_feats,
+        src_extrinsics,
+        src_Ks,
+        cur_invK,
+        depth_plane_bkhw,
+        num_src_frames,
+        num_feat_channels,
+        uv_scale,
+    ):
+        num_depth_planes = int(depth_plane_bkhw.shape[1])
+        depth_plane_B1hw = einops.rearrange(depth_plane_bkhw, "b k h w -> (b k) 1 h w")
+        world_points_B4N = self.backprojector(
+            depth_plane_B1hw, einops.repeat(cur_invK, "b i j -> (b k) i j", k=num_depth_planes)
+        )
+
+        world_points_B4N = einops.repeat(
+            world_points_B4N, "(b k) i N -> (b r k) i N", r=num_src_frames, k=num_depth_planes
+        )
+
+        # Warp features and reshape
+        cam_points_B3N = self.projector(
+            world_points_B4N,
+            einops.repeat(src_Ks, "b r i j -> (b r k) i j", r=num_src_frames, k=num_depth_planes),
+            einops.repeat(
+                src_extrinsics, "b r i j -> (b r k) i j", r=num_src_frames, k=num_depth_planes
+            ),
+        )
+
+        cam_points_B3hw = einops.rearrange(
+            cam_points_B3N, "B i (h w) -> B i h w", h=self.matching_height, w=self.matching_width
+        )
+        pix_coords_B2hw = cam_points_B3hw[:, :2]
+        pix_coords_brk2hw = einops.rearrange(
+            pix_coords_B2hw, "(b r k) i h w -> b r k i h w", r=num_src_frames, k=num_depth_planes
+        )
+        depths_B1hw = cam_points_B3hw[:, 2:]
+
+        uv_coords = 2 * einops.rearrange(pix_coords_B2hw, "B i h w -> B h w i") * uv_scale - 1
+
+        src_feats_Bfhw = einops.repeat(src_feats, "b r f h w -> (b r k) f h w", k=num_depth_planes)
+
+        src_feat_warped_Bfhw = F.grid_sample(
+            input=src_feats_Bfhw,
+            grid=uv_coords.type_as(src_feats_Bfhw),
+            padding_mode="zeros",
+            mode="bilinear",
+            align_corners=False,
+        )
+
+        # Reshape tensors to "unbatch"
+        src_feat_warped_brkfhw = einops.rearrange(
+            src_feat_warped_Bfhw,
+            "(b r k) f h w -> b r k f h w",
+            r=num_src_frames,
+            k=num_depth_planes,
+            f=num_feat_channels,
+            h=self.matching_height,
+            w=self.matching_width,
+        )
+
+        depths_brkhw = einops.rearrange(
+            depths_B1hw, "(b r k) i h w -> b r (k i) h w", r=num_src_frames, k=num_depth_planes
+        )
+
+        # mask values landing outside the image and optionally near the border
+        # mask_b = torch.logical_and(self.get_mask(pix_coords_bk2hw), depths > 0)
+        mask_b = depths_brkhw > 0
+        mask_brkhw = mask_b.type_as(src_feat_warped_brkfhw)
+
+        world_points_brk4hw = einops.rearrange(
+            world_points_B4N,
+            "(b r k) i (h w) -> b r k i h w",
+            r=num_src_frames,
+            k=num_depth_planes,
+            h=self.matching_height,
+            w=self.matching_width,
+        )
+
+        return (
+            world_points_brk4hw,
+            depths_brkhw,
+            src_feat_warped_brkfhw,
+            mask_brkhw,
+            pix_coords_brk2hw,
+        )
+
+    def build_cost_volume(
+        self,
+        cur_feats: Tensor,
+        src_feats: Tensor,
+        src_extrinsics: Tensor,
+        src_poses: Tensor,
+        src_Ks: Tensor,
+        cur_invK: Tensor,
+        min_depth: Tensor,
+        max_depth: Tensor,
+        depth_planes_bdhw: Tensor = None,
+        return_mask: bool = False,
+    ):
+        """
+        Build the cost volume. Using hypothesised depths, we backwarp src_feats onto cur_feats
+        using known intrinsics and take the abs difference. We average costs over src_feats.
+
+        :param cur_feats: input image features - B x C x H x W
+        :param src_feats: srcerence image features - B x num_src_frames x C x H x W
+        :param src_poses: srcerence image camera poses - B x num_src_frames x 4 x 4
+        :param src_Ks: srcerence image inverse intrinsics - B x num_src_frames x 4 x 4
+        :param cur_invK: current image intrinsics - B x 4 x 4
+        """
+
+        # to deal with different sized batches (e.g. landscape/portrait) set up projection
+        # here, not in __init__
+        num_src_frames, num_feat_channels, src_feat_height, src_feat_width = [
+            int(n) for n in src_feats.shape[1:]
+        ]
+        # change to portrait if we need to.
+        if self.matching_height != cur_feats.shape[-2] or self.matching_width != cur_feats.shape[-1]:
+            self.matching_width = cur_feats.shape[-1]
+            self.matching_height = cur_feats.shape[-2]
+            self.initialise_for_projection(device=cur_feats.device)
+
+        uv_scale = torch.tensor(
+            [1 / self.matching_width, 1 / self.matching_height],
+            dtype=src_poses.dtype,
+            device=src_poses.device,
+        ).view(1, 1, 1, 2)
+
+        if depth_planes_bdhw is None:
+            depth_planes_bdhw = self.generate_depth_planes(cur_feats.size(0), min_depth, max_depth)
+
+        _, _, src_feat_warped_brkfhw, mask_brkhw, _ = self.warp_features(
+            src_feats,
+            src_extrinsics,
+            src_Ks,
+            cur_invK,
+            depth_planes_bdhw,
+            int(num_src_frames),
+            int(num_feat_channels),
+            uv_scale,
+        )
+
+        # Compute the dot product between cur and src features
+        cur_feats_b1kfhw = einops.repeat(
+            cur_feats, "b f h w -> b 1 k f h w", k=int(depth_planes_bdhw.shape[1])
+        )
+        dot_product_brkhw = torch.sum(src_feat_warped_brkfhw * cur_feats_b1kfhw, dim=3) * mask_brkhw
+
+        # Sum over the frames
+        dot_product_bkhw = dot_product_brkhw.sum(dim=1)
+
+        return dot_product_bkhw, depth_planes_bdhw, None
