@@ -129,6 +129,16 @@ class NuScenesDataset(GenericMVSDataset):
         width_pixels = cam_data["width"]
         height_pixels = cam_data["height"]
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((height_pixels, width_pixels)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
+
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
 
@@ -157,7 +167,7 @@ class NuScenesDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict, None
+        return output_dict, (left, top, left+width_pixels, top+height_pixels) 
 
     def _load_depth(self, depth_path, is_float16=True):
         """Loads the depth map from a .npy file."""
@@ -243,6 +253,8 @@ class NuScenesDataset(GenericMVSDataset):
 
         # Transformation from camera frame to world frame
         world_T_cam = ego_to_world @ cam_to_ego
+
+        world_T_cam = world_T_cam.astype(np.float32)
 
         # Transformation from world frame to camera frame (inverse of world_T_cam)
         cam_T_world = np.linalg.inv(world_T_cam)
