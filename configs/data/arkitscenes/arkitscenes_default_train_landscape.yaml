@@ -1,0 +1,12 @@
+!!python/object:options.DataOptions
+dataset_path: /mnt/arkitscenes4b/
+tuple_info_file_location: data_splits/arkitscenes/
+dataset_scan_split_file: /mnt/arkitscenes4b/Training_landscape.txt
+dataset: arkitscenes
+mv_tuple_file_suffix: _landscape_eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+# default means every keyframe defined by DVMVS.
+frame_tuple_type: default
+split: train
+# train_max_pose_distance_mult: 1.5
+dvmvs_train_crawl_step: 1

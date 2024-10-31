@@ -324,7 +324,7 @@ class ScannetDataset(GenericMVSDataset):
         sensor_data_dir = os.path.join(scene_path, "sensor_data")
 
         cached_resized_path = os.path.join(
-            sensor_data_dir, f"frame-{frame_id}.color.{640}.png"
+            sensor_data_dir, f"frame-{frame_id}.color.640.png"
         )
         # check if we have cached resized images on disk first
         if os.path.exists(cached_resized_path):
@@ -378,7 +378,7 @@ class ScannetDataset(GenericMVSDataset):
         sensor_data_dir = os.path.join(scene_path, "sensor_data")
 
         cached_resized_path = os.path.join(
-            sensor_data_dir, f"frame-{frame_id}.depth.{self.depth_width}.png"
+            sensor_data_dir, f"frame-{frame_id}.depth.512.png"
         )
 
         # instead return the default image
@@ -456,6 +456,13 @@ class ScannetDataset(GenericMVSDataset):
 
         K = torch.tensor(np.genfromtxt(intrinsics_filepath).astype(np.float32))
 
+        top = 20
+        left = 20
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        data["depthWidth"] = float(data["depthWidth"]) - 40
+        data["depthHeight"] = float(data["depthHeight"]) - 40
+
         if flip:
             K[0, 2] = float(data["depthWidth"]) - K[0, 2]
 
@@ -482,9 +489,9 @@ class ScannetDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, int(left+data["depthWidth"]), int(top+data["depthHeight"]))
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -515,6 +522,7 @@ class ScannetDataset(GenericMVSDataset):
             width=self.depth_width,
             value_scale_factor=1e-3,
             resampling_mode=pil.NEAREST,
+            crop=crop,
         )
 
         # Get the float valid mask
@@ -526,7 +534,7 @@ class ScannetDataset(GenericMVSDataset):
 
         return depth, mask, mask_b
 
-    def load_full_res_depth_and_mask(self, scan_id, frame_id):
+    def load_full_res_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the native resolution the dataset provides.
 
         NOTE: This function will place NaNs where depth maps are invalid.
@@ -545,6 +553,14 @@ class ScannetDataset(GenericMVSDataset):
         full_res_depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         # Load depth
         full_res_depth = read_image_file(full_res_depth_filepath, value_scale_factor=1e-3)
+
+        if crop:
+            full_res_depth = full_res_depth[
+                :,
+                crop[1]:crop[3],
+                crop[0]:crop[2]
+            ]
+
 
         # Get the float valid mask
         full_res_mask_b = (full_res_depth > self.min_valid_depth) & (

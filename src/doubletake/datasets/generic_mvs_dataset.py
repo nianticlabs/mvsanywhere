@@ -195,6 +195,9 @@ class GenericMVSDataset(Dataset):
         self.high_res_image_width = high_res_image_width
         self.high_res_image_height = high_res_image_height
 
+        # Random resize crop
+        self.random_resize_crop = transforms.RandomResizedCrop((self.image_height, self.image_width), scale=(0.75, 1.0), ratio=(4/3, 4/3))
+
         # size up depth using ratio of RGB to depth
         self.depth_height = int(self.image_height * prediction_scale)
         self.depth_width = int(self.image_width * prediction_scale)
@@ -445,7 +448,7 @@ class GenericMVSDataset(Dataset):
         """
         raise NotImplementedError()
 
-    def load_color(self, scan_id, frame_id):
+    def load_color(self, scan_id, frame_id, crop=None):
         """Loads a frame's RGB file, resizes it to configured RGB size.
 
         Args:
@@ -459,13 +462,21 @@ class GenericMVSDataset(Dataset):
         """
 
         color_filepath = self.get_color_filepath(scan_id, frame_id)
-        image = read_image_file(
-            color_filepath,
-            height=self.image_height,
-            width=self.image_width,
-            resampling_mode=self.image_resampling_mode,
-            disable_warning=self.disable_resize_warning,
-        )
+        try:
+            image = read_image_file(
+                color_filepath,
+                height=self.image_height,
+                width=self.image_width,
+                resampling_mode=self.image_resampling_mode,
+                disable_warning=True,
+                crop=crop,
+            )
+        except:
+            print("Failed to load: ", scan_id, frame_id)
+            image = torch.zeros((3, self.image_height, self.image_width)).float()
+
+        # Remove alpha channel for PNGs
+        image = image[:3]
 
         return image
 
@@ -491,6 +502,9 @@ class GenericMVSDataset(Dataset):
             resampling_mode=self.image_resampling_mode,
             disable_warning=self.disable_resize_warning,
         )
+
+        # Remove alpha channel for PNGs
+        image = image[:3]
 
         return high_res_color
 
@@ -552,6 +566,9 @@ class GenericMVSDataset(Dataset):
         # load pose
         world_T_cam, cam_T_world = self.load_pose(scan_id, frame_id)
 
+        # load intrinsics
+        intrinsics, crop = self.load_intrinsics(scan_id, frame_id, flip=flip)
+
         if self.rotate_images:
             T = np.eye(4)
             T[:3, :3] = rotz(-np.pi / 2)
@@ -565,7 +582,7 @@ class GenericMVSDataset(Dataset):
             cam_T_world = np.linalg.inv(world_T_cam)
 
         # Load image
-        image = self.load_color(scan_id, frame_id)
+        image = self.load_color(scan_id, frame_id, crop)
 
         if self.rotate_images:
             image = torch.rot90(image, 3, [1, 2])
@@ -584,14 +601,11 @@ class GenericMVSDataset(Dataset):
             }
         )
 
-        # load intrinsics
-        intrinsics = self.load_intrinsics(scan_id, frame_id, flip=flip)
-
         output_dict.update(intrinsics)
 
         if load_depth:
             # get depth
-            depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id)
+            depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id, crop)
 
             if self.rotate_images:
                 depth = torch.rot90(depth, 3, [1, 2])
@@ -603,11 +617,24 @@ class GenericMVSDataset(Dataset):
                 mask = torch.flip(mask, (-1,))
                 mask_b = torch.flip(mask_b, (-1,))
 
+            # try:
+            #     depth[torch.isfinite(depth)].max()
+            # except:
+            #     pass
+
+            max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
+            min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
+
+            max_depth = max_depth * (torch.rand(1)[0] + 1.0)
+            min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
+
             output_dict.update(
                 {
                     "depth_b1hw": depth,
                     "mask_b1hw": mask,
                     "mask_b_b1hw": mask_b,
+                    "max_depth": max_depth, #depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
+                    "min_depth": min_depth, #depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
                 }
             )
 
@@ -631,7 +658,7 @@ class GenericMVSDataset(Dataset):
         if self.include_full_res_depth:
             # get high res depth
             full_res_depth, full_res_mask, full_res_mask_b = self.load_full_res_depth_and_mask(
-                scan_id, frame_id
+                scan_id, frame_id, crop
             )
 
             if self.rotate_images:

@@ -1,0 +1,10 @@
+big_city/aerial/test/big_high_block_1_test
+big_city/aerial/test/big_high_block_2_test
+big_city/aerial/test/big_high_block_3_test
+big_city/aerial/test/big_high_block_4_test
+big_city/aerial/test/big_high_block_5_test
+big_city/aerial/test/big_high_block_6_test
+big_city/street/test/bottom_area_test
+big_city/street/test/left_area_test
+big_city/street/test/right_area_test
+big_city/street/test/top_area_test

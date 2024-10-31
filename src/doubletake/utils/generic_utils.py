@@ -227,6 +227,7 @@ def read_image_file(
     width=None,
     value_scale_factor=1.0,
     resampling_mode=Image.BILINEAR,
+    crop=None,
     disable_warning=False,
     target_aspect_ratio=None,
 ):
@@ -253,6 +254,9 @@ def read_image_file(
     if target_aspect_ratio:
         crop_image_to_target_ratio(img, target_aspect_ratio)
 
+    if crop:
+        img = img.crop(crop)
+
     # resize if both width and height are not none.
     if height is not None and width is not None:
         img_width, img_height = img.size
@@ -278,6 +282,7 @@ def read_pfm_file(
     width=None, 
     value_scale_factor=1.0, 
     resampling_mode=Image.BILINEAR,
+    crop=None,
     disable_warning=False,
     target_aspect_ratio=None
 ):
@@ -316,6 +321,9 @@ def read_pfm_file(
     # Stuff from read_image_file
     if target_aspect_ratio:
         crop_image_to_target_ratio(img, target_aspect_ratio)
+
+    if crop:
+        img = img.crop(crop)
 
     # resize if both width and height are not none.
     if height is not None and width is not None:

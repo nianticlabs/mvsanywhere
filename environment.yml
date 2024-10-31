@@ -46,12 +46,10 @@ dependencies:
     - opencv-python==4.9.0.80
     - ninja==1.11.1.1
     - ray[train]
+    - nuscenes-devkit # nuscenes dataset
     - pandas
     - pytoml
     - scikit-image
     - pyqt5
     - dill
     - easydict
-
-
-python3 eval.py --model fmvs_wrapped --eval_type robustmvd --weights /mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/regression_multids_double_img_encoder_sigmoid_augs/code/_ray_pkg_b38c97c1d7c74197/:/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/regression_multids_double_img_encoder_sigmoid_augs/TorchTrainer_96783_00000_0_2024-10-07_03-33-27/checkpoint_000017/checkpoint.ckpt --inputs poses intrinsics --max_source_views 7 --kitti_size 336 448 --dtu_size 336 448  --eth3d_size 336 448 --scannet_size 336 448 --tanks_and_temples_size 336 448 --output ./results/kk

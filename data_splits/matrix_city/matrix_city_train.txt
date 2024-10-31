@@ -1,0 +1,10 @@
+big_city/aerial/train/big_high_block_1
+big_city/aerial/train/big_high_block_2
+big_city/aerial/train/big_high_block_3
+big_city/aerial/train/big_high_block_4
+big_city/aerial/train/big_high_block_5
+big_city/aerial/train/big_high_block_6
+big_city/street/train/bottom_area
+big_city/street/train/left_area
+big_city/street/train/right_area
+big_city/street/train/top_area
