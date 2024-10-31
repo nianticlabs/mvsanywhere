@@ -47,7 +47,7 @@ from pathlib import Path
 
 import numpy as np
 import doubletake.options as options
-from doubletake.tools.keyframe_buffer import DVMVS_Config, is_valid_pair
+from doubletake.tools.keyframe_buffer import DVMVS_Config, DVMVS_MatrixCity_Config, DVMVS_TartanAir_Config, is_valid_pair
 from doubletake.utils.dataset_utils import get_dataset
 
 
@@ -163,19 +163,26 @@ def crawl_subprocess_short(opts_temp_filepath, scan, count, progress):
 
     # get dataset
     dataset_class, _ = get_dataset(
-        opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id, verbose=False
+        opts.datasets[0].dataset, opts.datasets[0].dataset_scan_split_file, opts.single_debug_scan_id, verbose=False
     )
 
     ds = dataset_class(
-        dataset_path=opts.dataset_path,
+        dataset_path=opts.datasets[0].dataset_path,
         mv_tuple_file_suffix=None,
-        split=opts.split,
-        tuple_info_file_location=opts.tuple_info_file_location,
+        split=opts.datasets[0].split,
+        tuple_info_file_location=opts.datasets[0].tuple_info_file_location,
         pass_frame_id=True,
         verbose_init=False,
     )
 
-    valid_frames = ds.get_valid_frame_ids(opts.split, scan)
+    if opts.datasets[0].dataset == "tartanair":
+        keyframe_config = DVMVS_TartanAir_Config
+    elif opts.datasets[0].dataset == "matrix_city" or opts.datasets[0].dataset == "vkitti":
+        keyframe_config = DVMVS_MatrixCity_Config
+    else:
+        keyframe_config = DVMVS_Config
+
+    valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
 
     frame_ind_to_frame_id = {}
     for frame_ind, frame_line in enumerate(valid_frames):
@@ -195,8 +202,8 @@ def crawl_subprocess_short(opts_temp_filepath, scan, count, progress):
             poses,
             used_pairs,
             is_backward=multiplier[1],
-            initial_pose_dist_min=(multiplier[0] * DVMVS_Config.train_minimum_pose_distance),
-            initial_pose_dist_max=(multiplier[0] * DVMVS_Config.train_maximum_pose_distance),
+            initial_pose_dist_min=(multiplier[0] * keyframe_config.train_minimum_pose_distance),
+            initial_pose_dist_max=(multiplier[0] * keyframe_config.train_maximum_pose_distance),
         )
 
         for pair in pairs:
@@ -250,22 +257,30 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
 
     # get dataset
     dataset_class, _ = get_dataset(
-        opts.dataset,
-        opts.dataset_scan_split_file,
+        opts.datasets[0].dataset,
+        opts.datasets[0].dataset_scan_split_file,
         opts.single_debug_scan_id,
         verbose=False,
     )
 
     ds = dataset_class(
-        dataset_path=opts.dataset_path,
+        dataset_path=opts.datasets[0].dataset_path,
         mv_tuple_file_suffix=None,
-        split=opts.split,
-        tuple_info_file_location=opts.tuple_info_file_location,
+        split=opts.datasets[0].split,
+        tuple_info_file_location=opts.datasets[0].tuple_info_file_location,
         pass_frame_id=True,
         verbose_init=False,
     )
 
-    valid_frames = ds.get_valid_frame_ids(opts.split, scan)
+    if opts.datasets[0].dataset == "tartanair":
+        keyframe_config = DVMVS_TartanAir_Config
+    elif opts.datasets[0].dataset == "matrix_city" or opts.datasets[0].dataset == "vkitti":
+        keyframe_config = DVMVS_MatrixCity_Config
+    else:
+        keyframe_config = DVMVS_Config
+
+
+    valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
 
     frame_ind_to_frame_id = {}
     for frame_ind, frame_line in enumerate(valid_frames):
@@ -287,7 +302,7 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
     for i in range(sequence_length):
         used_nodes[i] = 0
 
-    calculated_step = DVMVS_Config.train_crawl_step
+    calculated_step = keyframe_config.train_crawl_step
     samples = []
     for offset, multiplier, is_backward in [
         (0 % calculated_step, 1.0, False),
@@ -336,10 +351,10 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
                     check3 = is_valid_pair(
                         poses[previous_index],
                         poses[current_index],
-                        (multiplier * DVMVS_Config.train_minimum_pose_distance),
-                        (multiplier * DVMVS_Config.train_maximum_pose_distance),
+                        (multiplier * keyframe_config.train_minimum_pose_distance),
+                        (multiplier * keyframe_config.train_maximum_pose_distance),
                         t_norm_threshold=(
-                            multiplier * DVMVS_Config.train_minimum_pose_distance * 0.5
+                            multiplier * keyframe_config.train_minimum_pose_distance * 0.5
                         ),
                     )
 
@@ -436,12 +451,12 @@ if __name__ == "__main__":
 
     # get dataset
     dataset_class, scan_names = get_dataset(
-        opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id, verbose=False
+        opts.datasets[0].dataset, opts.datasets[0].dataset_scan_split_file, opts.single_debug_scan_id, verbose=False
     )
 
-    Path(opts.tuple_info_file_location).mkdir(exist_ok=True, parents=True)
-    split_filename = f"{opts.split}{opts.mv_tuple_file_suffix}"
-    split_filepath = os.path.join(opts.tuple_info_file_location, split_filename)
+    Path(opts.datasets[0].tuple_info_file_location).mkdir(exist_ok=True, parents=True)
+    split_filename = f"{opts.datasets[0].split}{opts.datasets[0].mv_tuple_file_suffix}"
+    split_filepath = os.path.join(opts.datasets[0].tuple_info_file_location, split_filename)
     print(f"Saving to {split_filepath}")
 
     item_list = []
