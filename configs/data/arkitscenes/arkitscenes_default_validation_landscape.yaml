@@ -1,4 +1,4 @@
-!!python/object:options.Options
+!!python/object:options.DataOptions
 dataset_path: /mnt/arkitscenes-data
 tuple_info_file_location: data_splits/arkitscenes/
 dataset_scan_split_file: /mnt/disks/arkitscenes/Validation_landscape.txt

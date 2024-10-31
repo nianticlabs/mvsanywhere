@@ -4,12 +4,12 @@ import pickle
 import numpy as np
 import PIL.Image as pil
 import torch
-from datasets.generic_mvs_dataset import GenericMVSDataset
+from doubletake.datasets.change_of_basis import ChangeOfBasis
+from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 from torchvision import transforms
-from utils.generic_utils import readlines, read_image_file
-from utils.geometry_utils import rotz
+from doubletake.utils.generic_utils import readlines, read_image_file
+from doubletake.utils.geometry_utils import rotz
 import csv
-
 
 class ARKitScenesDataset(GenericMVSDataset):
     """
@@ -85,7 +85,6 @@ class ARKitScenesDataset(GenericMVSDataset):
         include_full_res_depth=False,
         limit_to_scan_id=None,
         num_images_in_tuple=None,
-        color_transform=transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
         tuple_info_file_location=None,
         image_height=384,
         image_width=512,
@@ -97,17 +96,15 @@ class ARKitScenesDataset(GenericMVSDataset):
         include_high_res_color=False,
         pass_frame_id=False,
         skip_frames=None,
+        skip_to_frame=None,
         verbose_init=True,
         min_valid_depth=1e-3,
-        max_valid_depth=10,
-        get_bd_info=False,
-        num_rays=4096,
-        samples_per_ray=64,
-        full_depth_supervision=False,
-        near_surface_ratio=0.75,
-        near_edge_sampling=False,
-        near_edge_ratio=0.4,
-        surface_noise_type="additive",
+        max_valid_depth=1e3,
+        disable_flip=False,
+        rotate_images=False,
+        matching_scale=0.25,
+        prediction_scale=0.5,
+        prediction_num_scales=5,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -116,7 +113,6 @@ class ARKitScenesDataset(GenericMVSDataset):
             include_full_res_depth=include_full_res_depth,
             limit_to_scan_id=limit_to_scan_id,
             num_images_in_tuple=num_images_in_tuple,
-            color_transform=color_transform,
             tuple_info_file_location=tuple_info_file_location,
             image_height=image_height,
             image_width=image_width,
@@ -128,15 +124,12 @@ class ARKitScenesDataset(GenericMVSDataset):
             include_high_res_color=include_high_res_color,
             pass_frame_id=pass_frame_id,
             skip_frames=skip_frames,
+            skip_to_frame=skip_to_frame,
             verbose_init=verbose_init,
-            get_bd_info=get_bd_info,
-            num_rays=num_rays,
-            samples_per_ray=samples_per_ray,
-            full_depth_supervision=full_depth_supervision,
-            near_surface_ratio=near_surface_ratio,
-            near_edge_sampling=near_edge_sampling,
-            near_edge_ratio=near_edge_ratio,
-            surface_noise_type=surface_noise_type,
+            disable_flip=disable_flip,
+            matching_scale=matching_scale,
+            prediction_scale=prediction_scale,
+            prediction_num_scales=prediction_num_scales,
         )
 
         """
@@ -522,6 +515,43 @@ class ARKitScenesDataset(GenericMVSDataset):
         interpolated_pose_dir = os.path.join(scan_dir, "interpolated_wide_poses")
 
         return os.path.join(interpolated_pose_dir, f"{frame_id}.txt")
+    
+    def load_color(self, scan_id, frame_id, crop=None):
+        """Loads a frame's RGB file, resizes it to configured RGB size.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+
+        Returns:
+            iamge: tensor of the resized RGB image at self.image_height and
+            self.image_width resolution.
+
+        """
+
+        color_filepath = self.get_color_filepath(scan_id, frame_id)
+        try:
+            image = read_image_file(
+                color_filepath,
+                height=None,
+                width=None,
+                resampling_mode=self.image_resampling_mode,
+                disable_warning=True,
+                crop=crop,
+            )
+        except:
+            print("Failed to load: ", scan_id, frame_id)
+            image = torch.zeros((3, self.image_height, self.image_width)).float()
+
+        image = self.handle_spatial_rotation(image, scan_id)
+        image = torch.nn.functional.interpolate(
+            image.unsqueeze(0), (self.image_height, self.image_width), mode='nearest'
+        ).squeeze(0)
+
+        # Remove alpha channel for PNGs
+        image = image[:3]
+
+        return image
 
     def handle_intrinsic_rotation(
         self, intrinsics_44, old_height, old_width, scan_id, frame_id=None
@@ -625,6 +655,20 @@ class ARKitScenesDataset(GenericMVSDataset):
         K[0, 2] = full_color_cx
         K[1, 2] = full_color_cy
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((int(full_color_height), int(full_color_width))),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
+
+        width_pixels = full_color_width
+        height_pixels = full_color_height
+
+
         K = self.handle_intrinsic_rotation(
             K,
             old_height=full_color_height,
@@ -641,20 +685,27 @@ class ARKitScenesDataset(GenericMVSDataset):
             output_dict[f"invK_full_depth_b44"] = torch.tensor(np.linalg.inv(K))
 
         # scale intrinsics to the dataset's configured depth resolution.
-        K[0] *= self.depth_width / full_color_width
-        K[1] *= self.depth_height / full_color_height
+        K_matching = K.clone()
+        K_matching[0] *= self.matching_width / float(width_pixels)
+        K_matching[1] *= self.matching_height / float(height_pixels)
+        output_dict["K_matching_b44"] = K_matching
+        output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
+
+        # scale intrinsics to the dataset's configured depth resolution.
+        K[0] *= self.depth_width / float(width_pixels)
+        K[1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
-        for i in range(5):
+        for i in range(self.prediction_num_scales):
             K_scaled = K.clone()
             K_scaled[:2] /= 2**i
             invK_scaled = np.linalg.inv(K_scaled)
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+width_pixels, top+height_pixels)
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
 
         Internally, if the loaded depth map isn't at the target resolution,
@@ -681,22 +732,25 @@ class ARKitScenesDataset(GenericMVSDataset):
         # Load depth, resize
         depth = read_image_file(
             depth_filepath,
-            height=self.depth_height,
-            width=self.depth_width,
+            height=None,
+            width=None,
             value_scale_factor=1e-3,
             resampling_mode=pil.NEAREST,
+            crop=crop,
         )
+
+        depth = self.handle_spatial_rotation(depth, scan_id)
+
+        depth = torch.nn.functional.interpolate(
+            depth.unsqueeze(0), (self.depth_height, self.depth_width), mode='nearest'
+        ).squeeze(0)
 
         # Get the float valid mask
         mask_b = (depth > self.min_valid_depth) & (depth < self.max_valid_depth)
         mask = mask_b.float()
-
-        # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        depth = self.handle_spatial_rotation(depth, scan_id)
-        mask_b = self.handle_spatial_rotation(mask_b, scan_id)
-        mask = self.handle_spatial_rotation(mask, scan_id)
+        # set invalids to nan
 
         return depth, mask, mask_b
 

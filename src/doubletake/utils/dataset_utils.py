@@ -2,6 +2,7 @@ import os
 import json
 from pathlib import Path
 
+from doubletake.datasets.arkitscenes_dataset import ARKitScenesDataset
 from doubletake.datasets.blendedmvg import BlendedMVGDataset
 from doubletake.datasets.dynamic_replica import DynamicReplicaDataset
 from doubletake.datasets.kitti import KITTIDataset
@@ -278,6 +279,21 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
     elif dataset_name == "nuscenes":
         dataset_class = NuScenesDataset
         scans = None
+
+    elif dataset_name == "arkitscenes":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = ARKitScenesDataset
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" ARKitScenes Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
 
 
 

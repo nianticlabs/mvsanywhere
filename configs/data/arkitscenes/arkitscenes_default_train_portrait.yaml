@@ -1,7 +1,7 @@
-!!python/object:options.Options
-dataset_path: /mnt/arkitscenes-data
+!!python/object:doubletake.options.DataOptions
+dataset_path: /mnt/arkitscenes4b
 tuple_info_file_location: data_splits/arkitscenes/
-dataset_scan_split_file: /mnt/disks/arkitscenes/Training_portrait.txt
+dataset_scan_split_file: /mnt/arkitscenes4b/Training_portrait.txt
 dataset: arkitscenes
 mv_tuple_file_suffix: _portrait_eight_view_deepvmvs.txt
 num_images_in_tuple: 8
