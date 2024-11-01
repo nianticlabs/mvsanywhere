@@ -56,3 +56,5 @@ dependencies:
     - easydict
     - mmcv  # needed to run Metric3D baseline
     - xformers==0.0.24  # needed to run UniDepth baseline
+    - dask[dataframe]==2023.3.1  # needed to load waymo
+    - tensorflow==2.12  # needed to load waymo

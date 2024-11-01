@@ -302,15 +302,6 @@ def show_raw_pointcloud(pts3d, colors, point_size=2):
     scene.show(line_settings={'point_size': point_size})
 
 
-def get_parser():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--waymo_dir', required=True)
-    parser.add_argument('--output_dir', default='data/waymo_processed')
-    parser.add_argument('--workers', type=int, default=1)
-    return parser
-
-
 def main(waymo_root, output_dir, workers=1):
     extract_frames(waymo_root, output_dir, workers=workers)
     make_crops(output_dir, workers=args.workers)
@@ -367,7 +358,7 @@ def extract_frames_one_seq(filename):
     calib = None
     frames = []
 
-    for data in tqdm(dataset, leave=False):
+    for data in tqdm(dataset, leave=False, desc="Extracting frames for one seq"):
         frame = open_dataset.Frame()
         frame.ParseFromString(bytearray(data.numpy()))
 
@@ -467,7 +458,7 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=512):
     # from dust3r.viz import SceneViz
     # viz = SceneViz()
 
-    for frame in tqdm(frames, leave=False):
+    for frame in tqdm(frames, leave=False, desc="Processing frames"):
         cam_idx = frame[-2]  # cam index
         assert cam_idx in '12345', f'bad {cam_idx=} in {frame=}'
         data = np.load(osp.join(seq_dir, frame + 'npz'))
@@ -483,10 +474,12 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=512):
 
         # load image
         image = imread_cv2(osp.join(seq_dir, frame + 'jpg'))
+        print("Before", image.shape)
 
         # downscale image
         output_resolution = (resolution, 1) if W > H else (1, resolution)
         image, _, intrinsics2 = rescale_image_depthmap(image, None, cam_K[cam_idx], output_resolution)
+        print("After", image.size)
         image.save(osp.join(out_dir, frame + 'jpg'), quality=80)
 
         # save as an EXR file? yes it's smaller (and easier to load)
@@ -495,18 +488,22 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=512):
         pos2d = geotrf(intrinsics2 @ inv(cam_K[cam_idx]), pos2d).round().astype(np.int16)
         x, y = pos2d.T
         depthmap[y.clip(min=0, max=H - 1), x.clip(min=0, max=W - 1)] = pts3d[:, 2]
-        cv2.imwrite(osp.join(out_dir, frame + 'exr'), depthmap)
+        # cv2.imwrite(osp.join(out_dir, frame + 'exr'), depthmap)
+
+        # Save the sparse depth map
+        np.savez(osp.join(out_dir, frame + '_sparse_depth.npz'), xyd=pos2d, width=W, height=H)
 
         # save camera parametes
         cam2world = car_to_world @ cam_to_car[cam_idx] @ inv(axes_transformation)
         np.savez(osp.join(out_dir, frame + 'npz'), intrinsics=intrinsics2,
-                 cam2world=cam2world, distortion=cam_distortion[cam_idx])
+                 cam2world=cam2world, distortion=cam_distortion[cam_idx], width=W, height=H)
 
         # viz.add_rgbd(np.asarray(image), depthmap, intrinsics2, cam2world)
     # viz.show()
 
 
 if __name__ == '__main__':
-    parser = get_parser()
-    args = parser.parse_args()
-    main(args.waymo_dir,  args.output_dir, workers=args.workers)
+    main(
+        waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records",
+        output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed",
+        workers=16)
