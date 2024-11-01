@@ -234,6 +234,18 @@ from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import cpu_count
 
 
+def starcall(args):
+    """ convenient wrapper for Process.Pool """
+    function, args = args
+    return function(*args)
+
+
+def starstarcall(args):
+    """ convenient wrapper for Process.Pool """
+    function, args = args
+    return function(**args)
+
+
 def parallel_map(function, args, workers=0, star_args=False, kw_args=False, front_num=1, Pool=ThreadPool, **tqdm_kw):
     """ tqdm but with parallel execution.
 
@@ -304,7 +316,7 @@ def show_raw_pointcloud(pts3d, colors, point_size=2):
 
 def main(waymo_root, output_dir, workers=1):
     extract_frames(waymo_root, output_dir, workers=workers)
-    make_crops(output_dir, workers=args.workers)
+    make_crops(output_dir, workers=workers)
     shutil.rmtree(osp.join(output_dir, 'tmp'))
     print('Done! all data generated at', output_dir)
 
@@ -420,7 +432,7 @@ def make_crops(output_dir, workers=16, **kw):
     parallel_map(crop_one_seq, args, star_args=True, workers=workers, front_num=0)
 
 
-def crop_one_seq(input_dir, output_dir, seq, resolution=512):
+def crop_one_seq(input_dir, output_dir, seq, resolution=640):
     seq_dir = osp.join(input_dir, seq)
     out_dir = osp.join(output_dir, seq)
     if osp.isfile(osp.join(out_dir, '00100_1.jpg')):
@@ -491,7 +503,7 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=512):
         # cv2.imwrite(osp.join(out_dir, frame + 'exr'), depthmap)
 
         # Save the sparse depth map
-        np.savez(osp.join(out_dir, frame + '_sparse_depth.npz'), xyd=pos2d, width=W, height=H)
+        np.savez(osp.join(out_dir, frame.removesuffix('.') + '_sparse_depth.npz'), xy=pos2d, z=pts3d[:, 2], width=W, height=H)
 
         # save camera parametes
         cam2world = car_to_world @ cam_to_car[cam_idx] @ inv(axes_transformation)

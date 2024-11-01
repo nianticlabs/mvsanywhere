@@ -143,7 +143,7 @@ class GenericMVSDataset(Dataset):
 
             # check if this file exists
             assert os.path.exists(tuple_information_filepath), (
-                f"Tuple file {tuple_information_filepath}"
+                f"Tuple file {tuple_information_filepath} "
                 "doesn't exist! Pass none for mv_tuple_file_suffix if you don't"
                 " actually need a tuple file, otherwise check your paths."
             )
