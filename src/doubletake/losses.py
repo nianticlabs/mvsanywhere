@@ -21,16 +21,17 @@ class MSGradientLoss(nn.Module):
 
         grad_loss = torch.tensor(0, dtype=depth_gt.dtype, device=depth_gt.device)
         for depth_pred_down, depth_gtn_down in zip(depth_pred_pyr, depth_gtn_pyr):
-            depth_gtn_grad = kornia.filters.spatial_gradient(depth_gtn_down)
+            depth_gtn_grad = kornia.filters.spatial_gradient(1.0 / (depth_gtn_down + 1e-6))
 
             mask_down_b = depth_gtn_grad.isfinite().all(dim=1, keepdim=True)
 
-            depth_pred_grad = kornia.filters.spatial_gradient(depth_pred_down).masked_select(
+            depth_pred_grad = kornia.filters.spatial_gradient(1.0 / (depth_pred_down + 1e-6)).masked_select(
                 mask_down_b
             )
 
             grad_error = torch.abs(depth_pred_grad - depth_gtn_grad.masked_select(mask_down_b))
             grad_loss += torch.mean(grad_error)
+
 
         return grad_loss
 
@@ -83,6 +84,52 @@ class MVDepthLoss(nn.Module):
 
         self.backproject = BackprojectDepth(self.height, self.width)
         self.project = Project3D()
+
+    def _check_warped_image(
+        self,
+        image_name,
+        cur_depth_b1hw,
+        cur_img_b3hw,
+        src_img_b3hw,
+        cur_invK_b44,
+        src_K_b44,
+        cur_world_T_cam_b44,
+        src_cam_T_world_b44,
+    ):
+        import matplotlib.pyplot as plt
+        depth_height, depth_width = cur_depth_b1hw.shape[2:]
+
+        cur_cam_points_b4N = self.backproject(cur_depth_b1hw, cur_invK_b44)
+        world_points_b4N = cur_world_T_cam_b44 @ cur_cam_points_b4N
+
+        # Compute valid mask
+        src_cam_points_b3N = self.project(world_points_b4N, src_K_b44, src_cam_T_world_b44)
+        # src_cam_points_b3N = self.project(src_cam_T_world_b44 @ world_points_b4N, src_K_b44, torch.stack([torch.eye(4) for i in range(4)]).cuda())
+
+        cam_points_b3hw = src_cam_points_b3N.view(-1, 3, depth_height, depth_width)
+        pix_coords_b2hw = cam_points_b3hw[:, :2]
+
+        uv_coords = pix_coords_b2hw.permute(0, 2, 3, 1) / torch.tensor(
+            [depth_width, depth_height]
+        ).view(1, 1, 1, 2).type_as(pix_coords_b2hw)
+        uv_coords = 2 * uv_coords - 1
+
+        src_img_sampled_b1hw = F.grid_sample(
+            input=src_img_b3hw,
+            grid=uv_coords,
+            padding_mode="zeros",
+            mode="nearest",
+            align_corners=False,
+        )
+        src_img_sampled_b1hw = F.upsample(
+            src_img_sampled_b1hw, scale_factor=2.0
+        )
+        for i in range(cur_img_b3hw.shape[0]):
+            plt.imsave(f"{image_name}_{i}_cur.png", cur_img_b3hw[i, 0].detach().cpu().numpy(), cmap='gray')
+            plt.imsave(f"{image_name}_{i}_src.png", src_img_b3hw[i, 0].detach().cpu().numpy(), cmap='gray')
+            plt.imsave(f"{image_name}_{i}_smp.png", src_img_sampled_b1hw[i, 0].detach().cpu().numpy(), cmap='gray')
+
+
 
     def get_valid_mask(
         self,

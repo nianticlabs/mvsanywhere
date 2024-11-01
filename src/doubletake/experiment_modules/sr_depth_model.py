@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
+import time
 
 from doubletake.losses import (
     MSGradientLoss,
@@ -13,7 +14,8 @@ from doubletake.losses import (
     NormalsLoss,
     ScaleInvariantLoss,
 )
-from doubletake.modules.cost_volume import CostVolumeManager
+from doubletake.modules.cost_volume import CostVolumeManager, EfficientCostVolumeManager
+from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.feature_volume import FeatureVolumeManager
 from doubletake.modules.layers import TensorFormatter
 from doubletake.modules.networks import (
@@ -23,6 +25,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -135,6 +138,19 @@ class DepthModel(pl.LightningModule):
             self.encoder = timm.create_model("resnet18d", pretrained=True, features_only=True)
 
             self.encoder.num_ch_enc = self.encoder.feature_info.channels()
+        elif 'dinov2' in self.run_opts.image_encoder_name:
+            intermediate_layers_idx = {
+                'dinov2_vits14': [0, 2, 4, 5, 8, 11],
+                'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            self.encoder = DINOv2(
+                self.run_opts.image_encoder_name,
+                num_intermediate_layers=intermediate_layers_idx
+            )
+            if self.run_opts.da_weights_path is not None:
+                self.encoder.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for image encoder type!")
 
@@ -143,21 +159,67 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             self.cost_volume_net = CVEncoder(
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_enc=self.encoder.num_ch_enc[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
+                num_ch_enc=self.encoder.num_ch_enc[1:],
                 num_ch_outs=[64, 128, 256, 384],
             )
             dec_num_input_ch = (
-                self.encoder.num_ch_enc[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))]
+                self.encoder.num_ch_enc[:1]
                 + self.cost_volume_net.num_ch_enc
             )
+        elif self.run_opts.cv_encoder_type == 'vit_encoder':
+            intermediate_layers_idx = {
+                'dinov2_vits14': [2, 5, 8, 11],
+                'dinov2_vitb14': [2, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            self.cost_volume_net = ViTCVEncoder(
+                model_name=self.run_opts.image_encoder_name,
+                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                feat_fuser_layers_idx=intermediate_layers_idx,
+                intermediate_layers_idx=intermediate_layers_idx
+            )
+        elif self.run_opts.cv_encoder_type == "cnn_encoder":
+            self.cost_volume_net = CNNCVEncoder(
+                model_name=self.run_opts.image_encoder_name,
+                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                num_ch_outs=[64, 128, 256, 384]
+            )
+            dec_num_input_ch = [32, 64, 128, 256, 384]
+            if self.run_opts.da_weights_path is not None:
+                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for cost volume encoder type!")
 
         # iniitalize the final depth decoder
         if self.run_opts.depth_decoder_name == "unet_pp":
-            self.depth_decoder = DepthDecoderPP(dec_num_input_ch)
+            self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
+        elif self.run_opts.depth_decoder_name == "dpt":
+            self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
+        elif "depth_anything" in self.run_opts.depth_decoder_name:
+            intermediate_layer_idx = {
+                'dinov2_vits14': [2, 5, 8, 11],
+                'dinov2_vitb14': [2, 5, 8, 11], 
+                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitg14': [9, 19, 29, 39]
+            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            self.depth_decoder = DepthAnything(
+                dec_num_input_ch[1:],
+                model_name=self.run_opts.depth_decoder_name.split(".")[1],
+                intermediate_layers=intermediate_layer_idx
+            )
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
+        elif "dpt" in self.run_opts.depth_decoder_name:
+            self.depth_decoder = DPTHead(
+                model_name=self.run_opts.depth_decoder_name.split(".")[1],
+            )
+            if self.run_opts.da_weights_path is not None:
+                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for depth decoder name!")
 
@@ -186,6 +248,7 @@ class DepthModel(pl.LightningModule):
         # what type of cost volume are we using?
         if self.run_opts.feature_volume_type == "simple_cost_volume":
             cost_volume_class = CostVolumeManager
+            cost_volume_class = EfficientCostVolumeManager
         elif self.run_opts.feature_volume_type == "mlp_feature_volume":
             cost_volume_class = FeatureVolumeManager
         else:
@@ -217,6 +280,8 @@ class DepthModel(pl.LightningModule):
         self.tensor_formatter = TensorFormatter()
 
         self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
+
+        self.automatic_optimization = False
 
     def compute_matching_feats(
         self,
@@ -384,8 +449,8 @@ class DepthModel(pl.LightningModule):
             matching_src_feats = torch.flip(matching_src_feats, (-1,))
 
         # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(self.run_opts.min_matching_depth).type_as(src_K).view(1, 1, 1, 1)
-        max_depth = torch.tensor(self.run_opts.max_matching_depth).type_as(src_K).view(1, 1, 1, 1)
+        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
         # Compute the cost volume. Should be size bdhw.
         cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
@@ -409,17 +474,33 @@ class DepthModel(pl.LightningModule):
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
             cost_volume_features = self.cost_volume_net(
                 cost_volume,
-                cur_feats[int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale)) :],
+                cur_feats[1:],
             )
-            cur_feats = cur_feats[: int(np.log2(self.run_opts.prediction_scale / self.run_opts.matching_scale))] + cost_volume_features
-
+            cur_feats = cur_feats[:1] + cost_volume_features
+        elif self.run_opts.cv_encoder_type == "vit_encoder":
+            cur_feats = self.cost_volume_net(
+                        cost_volume, 
+                        cur_feats,
+                    )
+        elif self.run_opts.cv_encoder_type == "cnn_encoder":
+            cur_feats = self.cost_volume_net(
+                        cost_volume, 
+                        cur_feats,
+                    )     
         # Decode into depth at multiple resolutions.
-        depth_outputs = self.depth_decoder(cur_feats)
+        if "depth_anything" in self.run_opts.depth_decoder_name:
+            depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
+        else:
+            B, C, H, W = cur_image.shape
+            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
+            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
+            # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
             if flip:
                 # now flip the depth map back after final prediction
@@ -511,7 +592,7 @@ class DepthModel(pl.LightningModule):
             src_cam_T_world_bk44=src_data["cam_T_world_b44"],
         )
 
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss + 0.2 * mv_loss
+        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
 
         losses = {
             "loss": loss,
@@ -544,8 +625,18 @@ class DepthModel(pl.LightningModule):
                     src_data["image_b3hw"][:, src_ind], denormalize_first=True
                 )
 
+        a = (cur_data["image_b3hw"].sum(dim=(1, 2, 3)) == 0).any().item()
+        b = (src_data["image_b3hw"].sum(dim=(2, 3, 4)) == 0).any().item()
+        if a or b:
+            return 0.0
+
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)
+
+        pred_H, pred_W = outputs["depth_pred_s0_b1hw"].shape[-2:]
+        if pred_H != self.compute_normals.height or pred_W != self.compute_normals.width:
+            self.compute_normals = NormalGenerator(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
+            self.mv_depth_loss = MVDepthLoss(pred_H, pred_W).to(outputs["depth_pred_s0_b1hw"].device)
 
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
@@ -566,96 +657,128 @@ class DepthModel(pl.LightningModule):
         # compute losses
         losses = self.compute_losses(cur_data, src_data, outputs)
 
+        if phase == "train":
+            self.manual_backward(losses["loss"] / 2.0)
+
+            if (batch_idx + 1) % 2 == 0:
+                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
+            
+                optimizer_sr.step()
+                optimizer_da_enc.step()
+                optimizer_da_dec.step()
+
+                optimizer_sr.zero_grad()
+                optimizer_da_enc.zero_grad()
+                optimizer_da_dec.zero_grad()
+
+                # multiple schedulers
+                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
+                scheduler_sr.step()
+                scheduler_da_enc.step()
+                scheduler_da_dec.step()
+
         #
         is_train = phase == "train"
+        global_step = self.global_step // 3
 
-        # logging and validation
-        with torch.inference_mode():
-            # log images for train.
-            if is_train and self.global_step % self.trainer.log_every_n_steps == 0:
-                for i in range(4):
-                    mask_i = mask[i].float().cpu()
-                    depth_gt_viz_i, vmin, vmax = colormap_image(
-                        depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
-                    )
-                    depth_pred_viz_i = colormap_image(
-                        depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
-                    )
-                    cv_min_viz_i = colormap_image(
-                        cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
-                    )
-                    depth_pred_lr_viz_i = colormap_image(
-                        depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
+        if batch_idx % 2 == 0:
+            # logging and validation
+            with torch.inference_mode():
+                # log images for train.
+                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
+
+                    prefix = "train" if is_train else "val"
+                    for i in range(4):
+                        mask_i = mask[i].float().cpu()
+                        depth_gt_viz_i, vmin, vmax = colormap_image(
+                            depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
+                        )
+                        depth_pred_viz_i = colormap_image(
+                            depth_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        cv_min_viz_i = colormap_image(
+                            cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        depth_pred_lr_viz_i = colormap_image(
+                            depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
+
+                        image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
+
+                        import torchvision
+                        grid = torchvision.utils.make_grid(
+                            src_data["image_b3hw"][i], nrow=3
+                        )
+                        grid = F.interpolate(grid[None], image_i.shape[-2:], mode="bilinear")[0]
+                        grid = reverse_imagenet_normalize(grid)
+
+                        self.logger.experiment.add_image(f"{prefix}_image/{i}", image_i, global_step)
+                        self.logger.experiment.add_image(f"{prefix}_src_images/{i}", grid, global_step)
+                        self.logger.experiment.add_image(
+                                f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_depth_pred/{i}", depth_pred_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_depth_pred_lr/{i}", depth_pred_lr_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_normals_gt/{i}", 0.5 * (1 + normals_gt[i]), global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_normals_pred/{i}", 0.5 * (1 + normals_pred[i]), global_step
+                        )
+                        self.logger.experiment.add_image(f"{prefix}_cv_min/{i}", cv_min_viz_i, global_step)
+
+                    self.logger.experiment.flush()
+
+                # log losses
+                for loss_name, loss_val in losses.items():
+                    self.log(
+                        f"{phase}/{loss_name}",
+                        loss_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
+                        prog_bar=True
                     )
 
-                    image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
-
-                    self.logger.experiment.add_image(f"image/{i}", image_i, self.global_step)
-                    self.logger.experiment.add_image(
-                        f"depth_gt/{i}", depth_gt_viz_i, self.global_step
+                # high_res_validation: it isn't always wise to load in high
+                # resolution depth maps so this is an optional flag.
+                if phase == "train" or not self.run_opts.high_res_validation:
+                    # compute metrics at low res depth resolution for train or if
+                    # validation isn't set to use high res depth
+                    metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
+                else:
+                    # if we are validating or testing, we want to upscale our
+                    # predictions to full-size and compare against the GT depth map,
+                    # so that metrics are comparable across resolutions
+                    full_size_depth_gt = cur_data["full_res_depth_b1hw"]
+                    full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
+                    # this should be nearest to reflect test, but keeping it for
+                    # backwards comparison reasons.
+                    full_size_pred = F.interpolate(
+                        depth_pred,
+                        full_size_depth_gt.size()[-2:],
+                        mode="bilinear",
+                        align_corners=False,
                     )
-                    self.logger.experiment.add_image(
-                        f"depth_pred/{i}", depth_pred_viz_i, self.global_step
+                    metrics = compute_depth_metrics(
+                        full_size_depth_gt[full_size_mask_b],
+                        full_size_pred[full_size_mask_b],
                     )
-                    self.logger.experiment.add_image(
-                        f"depth_pred_lr/{i}", depth_pred_lr_viz_i, self.global_step
+
+                for metric_name, metric_val in metrics.items():
+                    self.log(
+                        f"{phase}_metrics/{metric_name}",
+                        metric_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
                     )
-                    self.logger.experiment.add_image(
-                        f"normals_gt/{i}", 0.5 * (1 + normals_gt[i]), self.global_step
-                    )
-                    self.logger.experiment.add_image(
-                        f"normals_pred/{i}", 0.5 * (1 + normals_pred[i]), self.global_step
-                    )
-                    self.logger.experiment.add_image(f"cv_min/{i}", cv_min_viz_i, self.global_step)
 
-                self.logger.experiment.flush()
-
-            # log losses
-            for loss_name, loss_val in losses.items():
-                self.log(
-                    f"{phase}/{loss_name}",
-                    loss_val,
-                    sync_dist=True,
-                    on_step=is_train,
-                    on_epoch=not is_train,
-                    prog_bar=True
-                )
-
-            # high_res_validation: it isn't always wise to load in high
-            # resolution depth maps so this is an optional flag.
-            if phase == "train" or not self.run_opts.high_res_validation:
-                # compute metrics at low res depth resolution for train or if
-                # validation isn't set to use high res depth
-                metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
-            else:
-                # if we are validating or testing, we want to upscale our
-                # predictions to full-size and compare against the GT depth map,
-                # so that metrics are comparable across resolutions
-                full_size_depth_gt = cur_data["full_res_depth_b1hw"]
-                full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
-                # this should be nearest to reflect test, but keeping it for
-                # backwards comparison reasons.
-                full_size_pred = F.interpolate(
-                    depth_pred,
-                    full_size_depth_gt.size()[-2:],
-                    mode="bilinear",
-                    align_corners=False,
-                )
-                metrics = compute_depth_metrics(
-                    full_size_depth_gt[full_size_mask_b],
-                    full_size_pred[full_size_mask_b],
-                )
-
-            for metric_name, metric_val in metrics.items():
-                self.log(
-                    f"{phase}_metrics/{metric_name}",
-                    metric_val,
-                    sync_dist=True,
-                    on_step=is_train,
-                    on_epoch=not is_train,
-                )
-
-        return losses["loss"]
+        # return losses["loss"]
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""
@@ -672,8 +795,18 @@ class DepthModel(pl.LightningModule):
         70000 and 80000.
 
         """
-        optimizer = torch.optim.AdamW(
-            self.parameters(), lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        optimizer_sr = torch.optim.AdamW(
+            list(self.cost_volume.parameters()) + 
+            list(self.matching_model.parameters()),
+            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_encoder = torch.optim.AdamW(
+            self.encoder.parameters(),
+            lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
+        )
+        optimizer_da_decoder = torch.optim.AdamW(
+            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
         def lr_lambda(step):
@@ -684,8 +817,7 @@ class DepthModel(pl.LightningModule):
             else:
                 return 0.01
 
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": lr_scheduler, "interval": "step"},
-        }
+        lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]

@@ -21,6 +21,30 @@ class DVMVS_Config:
     test_optimal_t_measure = 0.15
     test_optimal_R_measure = 0.0
 
+class DVMVS_TartanAir_Config:
+    # train tuple settings
+    train_minimum_pose_distance = 0.125
+    train_maximum_pose_distance = 5
+    train_crawl_step = 3
+
+    # test tuple settings
+    test_keyframe_buffer_size = 30
+    test_keyframe_pose_distance = 0.1
+    test_optimal_t_measure = 0.15
+    test_optimal_R_measure = 0.0
+
+class DVMVS_MatrixCity_Config:
+    # train tuple settings
+    train_minimum_pose_distance = 0.125
+    train_maximum_pose_distance = 40
+    train_crawl_step = 3
+
+    # test tuple settings
+    test_keyframe_buffer_size = 30
+    test_keyframe_pose_distance = 0.1
+    test_optimal_t_measure = 0.15
+    test_optimal_R_measure = 0.0
+
 
 def is_pose_available(pose):
     is_nan = np.isnan(pose).any()

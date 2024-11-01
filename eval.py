@@ -36,7 +36,9 @@ def eval(args):
         print(f"Evaluating {args.model} model on the Robust Multi-view Depth Benchmark.\n")
         dataset = None
 
-    model = create_model(name=args.model, weights=args.weights, train=False, num_gpus=args.num_gpus)
+    model = create_model(name=args.model, weights=args.weights, train=False, num_gpus=args.num_gpus, 
+                         use_sift_range=args.use_sift_range, use_refinement=args.use_refinement)
+    
     eval = create_evaluation(evaluation_type=args.eval_type,
                              out_dir=args.output,
                              inputs=args.inputs,
@@ -117,6 +119,10 @@ if __name__ == '__main__':
     parser.add_argument('--tanks_and_temples_size', type=int, nargs=2,
                         help="Input image size on Tanks and Temples in the format (height, width). "
                              "If not provided, scales images up to the nearest size that works with the model.")
+    
+    # Our arguments
+    parser.add_argument('--use_sift_range', action='store_true', help='Use SIFT range for evaluation')
+    parser.add_argument('--use_refinement', action='store_true', help='Use refinement for evaluation')
 
     args = parser.parse_args()
 
