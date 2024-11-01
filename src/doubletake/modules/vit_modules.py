@@ -27,6 +27,72 @@ DINOV2_NUM_BLOCKS = {
     'dinov2_vitl14': 24,
 }
 
+class Attention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int = 8,
+        qkv_bias: bool = False,
+        proj_bias: bool = True,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim**-0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim, bias=proj_bias)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+
+        q, k, v = qkv[0] * self.scale, qkv[1], qkv[2]
+        attn = q @ k.transpose(-2, -1)
+
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+class PytorchMemEffAttention(Attention):
+    def forward(self, x: torch.Tensor, attn_bias=None) -> torch.Tensor:
+
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        x = torch.nn.functional.scaled_dot_product_attention(q, k, v, dropout_p=self.attn_drop.p).transpose(1, 2)
+        x = x.reshape([B, N, C])
+
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+    
+def use_memeffattn_in_model(model):
+
+    for i in range(len(model.blocks)):
+
+        slow_attn = model.blocks[i].attn
+
+        meff_attn = PytorchMemEffAttention(
+            dim=slow_attn.qkv.in_features,
+            num_heads=slow_attn.num_heads,
+        )
+        meff_attn.qkv = slow_attn.qkv
+        meff_attn.attn_drop = slow_attn.attn_drop
+        meff_attn.proj = slow_attn.proj
+        meff_attn.proj_drop = slow_attn.proj_drop
+
+        model.blocks[i].attn = meff_attn
+
 
 class CNNCVEncoder(nn.Module):
     def __init__(
@@ -148,6 +214,7 @@ class DINOv2(nn.Module):
 
         assert model_name in DINOV2_ARCHS.keys(), f'Unknown model name {model_name}'
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+        use_memeffattn_in_model(self.model)
         self.num_channels = DINOV2_ARCHS[model_name]
         self.num_intermediate_layers = len(self.model.blocks) if num_intermediate_layers == -1 else num_intermediate_layers
 
@@ -297,6 +364,8 @@ class ViTCVEncoder(nn.Module):
         self.num_channels = DINOV2_ARCHS[model_name]
         self.num_ch_cv = num_ch_cv
         self.model = torch.hub.load('facebookresearch/dinov2', model_name)
+
+        use_memeffattn_in_model(self.model)
 
         self.feat_fuser_layers_idx = feat_fuser_layers_idx
         self.intermediate_layers_idx = intermediate_layers_idx
