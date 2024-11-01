@@ -477,6 +477,7 @@ class GenericMVSDataset(Dataset):
 
         # Remove alpha channel for PNGs
         image = image[:3]
+        assert image.shape == (3, self.image_height, self.image_width)
 
         return image
 
@@ -628,6 +629,17 @@ class GenericMVSDataset(Dataset):
             max_depth = max_depth * (torch.rand(1)[0] + 1.0)
             min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
 
+            assert depth.shape == (1, self.image_height, self.image_width)
+            assert mask.shape == (1, self.image_height, self.image_width)
+            assert mask_b.shape == (1, self.image_height, self.image_width)
+            assert output_dict['image_b3hw'].shape == (3, self.image_height, self.image_width)
+            assert output_dict['world_T_cam_b44'].shape == (4, 4)
+            assert output_dict['cam_T_world_b44'].shape == (4, 4)
+            assert min_depth.shape == ()
+            assert max_depth.shape == ()
+            for key, value in intrinsics.items():
+                assert value.shape == (4, 4), key
+
             output_dict.update(
                 {
                     "depth_b1hw": depth,
@@ -640,6 +652,7 @@ class GenericMVSDataset(Dataset):
 
         # Load high res image
         if self.include_high_res_color:
+            sds
             high_res_color = self.load_high_res_color(scan_id, frame_id)
             high_res_color = imagenet_normalize(high_res_color)
 
@@ -656,6 +669,7 @@ class GenericMVSDataset(Dataset):
             )
 
         if self.include_full_res_depth:
+            sds
             # get high res depth
             full_res_depth, full_res_mask, full_res_mask_b = self.load_full_res_depth_and_mask(
                 scan_id, frame_id, crop
@@ -680,9 +694,11 @@ class GenericMVSDataset(Dataset):
             )
 
         if self.pass_frame_id:
+            sds
             output_dict["frame_id_string"] = self.get_frame_id_string(frame_id)
 
         if load_depth_hint:
+            sds
             empty_hint = self.load_empty_hints or torch.rand(1).item() < self.depth_hint_aug
             depth_hint_dict = self.load_depth_hint(
                 scan_id,

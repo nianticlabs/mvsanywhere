@@ -13,7 +13,7 @@ class WaymoDataset(GenericMVSDataset):
 
     Inherits from GenericMVSDataset and implements methods specific to the waymo dataset.
     This dataset class handles the loading of images, depth maps, intrinsics,
-    and poses for the nuScenes dataset, including the generated depth maps.
+    and poses for the Waymo dataset, including the generated depth maps.
     """
 
     def __init__(
@@ -109,10 +109,10 @@ class WaymoDataset(GenericMVSDataset):
         driving_sequence, camera_id = scan_id.split("^")
         data = np.load(os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}.npz"))
 
-        intrinsics = np.array(data["intrinsics"])
+        intrinsics = np.ascontiguousarray(np.array(data["intrinsics"]))
 
         K = torch.eye(4, dtype=torch.float32)
-        K[:3, :3] = torch.tensor(intrinsics, dtype=torch.float32)
+        # K[:3, :3] = torch.tensor(intrinsics, dtype=torch.float32)
 
         width_pixels = data["width"]
         height_pixels = data["height"]
@@ -180,7 +180,7 @@ class WaymoDataset(GenericMVSDataset):
 
         # Set invalids to NaN
         depth[~mask_b] = torch.tensor(np.nan)
-
+        print("Depth", depth.shape)
         return depth, mask, mask_b
 
     def _load_depth(self, scan_id, frame_id, height=None, width=None, crop=None):
@@ -220,8 +220,8 @@ class WaymoDataset(GenericMVSDataset):
         # Build the dense depth map
         depthmap = np.zeros((height, width))
 
-        # TODO – deal with collisions. Currently we are just hoping they don't exist.
-        depthmap[y, x] = d
+        # # TODO – deal with collisions. Currently we are just hoping they don't exist.
+        # depthmap[y, x] = d
 
         return depthmap
 
@@ -241,11 +241,12 @@ class WaymoDataset(GenericMVSDataset):
 
         driving_sequence, camera_id = scan_id.split("^")
         data = np.load(os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}.npz"))
-        world_T_cam = data['cam2world']  # remember cam2world == world_T_cam
+        world_T_cam = np.ascontiguousarray(data['cam2world']).astype(np.float32)  # remember cam2world == world_T_cam?
 
         # Transformation from world frame to camera frame (inverse of world_T_cam)
         cam_T_world = np.linalg.inv(world_T_cam)
 
+        return np.random.rand(4,4),np.random.rand(4,4)
         return world_T_cam, cam_T_world
 
 
@@ -263,10 +264,10 @@ if __name__ == "__main__":
     dataset = WaymoDataset("/mnt/nas3/shared/datasets/waymo/preprocessed", split='train', tuple_info_file_location=tuple_info_file_location)
     for idx in range(5):
         _, item = dataset[idx]
-        # print(item.keys())
-        # for key in item:
-        #     print(key, item[key].shape)
-
+        print(item.keys())
+        for key in item:
+            print(key, item[key].shape, item[key].dtype)
+        ds
         depth = item['depth_b1hw']
         no_nan_depth = depth[~np.isnan(depth)]
         print(no_nan_depth.min(), no_nan_depth.max(), np.median(no_nan_depth))
