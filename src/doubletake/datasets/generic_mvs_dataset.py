@@ -738,7 +738,7 @@ class GenericMVSDataset(Dataset):
                 self.get_frame(
                     scan_id,
                     frame_id,
-                    load_depth=True,
+                    load_depth=(frame_ind == 0),
                     flip=flip,
                     load_depth_hint=(frame_ind == 0 and self.fill_depth_hints),
                 )

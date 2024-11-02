@@ -14,7 +14,7 @@ dependencies:
   - torchvision
   - pytorch-cuda=11.7
   # - cudatoolkit=11.8  # for metric3d
-  - cudatoolkit-dev=11.7  # for nvcc for metric3d
+  # - cudatoolkit-dev=11.7  # for nvcc for metric3d
   - lightning=2.0.0
   - pytorch3d # mesh rendering, https://github.com/facebookresearch/pytorch3d/issues/1679
   - pillow # image op

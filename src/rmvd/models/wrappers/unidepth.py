@@ -18,10 +18,12 @@ class UniDepth_Wrapped(nn.Module):
         repo_path = get_path(paths_file, "unidepth", "root")
         sys.path.insert(0, repo_path)
 
-        from unidepth.models import UniDepthV2
+        from unidepth.models import UniDepthV2, UniDepthV1
 
-        name = "unidepth-v2-vitl14"
-        self.model = UniDepthV2.from_pretrained(f"lpiccinelli/{name}")
+        # name = "unidepth-v2-vitl14"
+        # self.model = UniDepthV2.from_pretrained(f"lpiccinelli/{name}")
+        name = "unidepth-v1-vitl14"
+        self.model = UniDepthV1.from_pretrained(f"lpiccinelli/{name}")
         self.model = self.model.to(torch.device("cuda"))
 
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
