@@ -210,12 +210,11 @@ class WaymoDataset(GenericMVSDataset):
         y = (y / original_height) * height
 
         # (Optionally) crop in the new image space
-        # if crop is not None:
-        #     raise NotImplementedError
-            # print(crop)
+        if crop is not None:
+            # pass
             # crop_left, crop_top, crop_right, crop_bottom = crop
-            # x += crop_left
-            # y += crop_top
+            # x -= crop_left
+            # y -= crop_top
 
         valid_points = np.logical_and.reduce((x >= 0, y >= 0, x <= width - 1, y <= height -1))
 
