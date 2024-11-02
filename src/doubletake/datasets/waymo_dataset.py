@@ -117,12 +117,14 @@ class WaymoDataset(GenericMVSDataset):
         width_pixels = data["width"]
         height_pixels = data["height"]
 
+        # TODO - implement cropping (I found this non-trivial)
         # top, left, h, w = self.random_resize_crop.get_params(
         #     torch.empty((height_pixels, width_pixels)),
         #     self.random_resize_crop.scale,
         #     self.random_resize_crop.ratio
         # )
         top, left, h, w = 0, 0, height_pixels, width_pixels
+
         K[0, 2] = K[0, 2] - left
         K[1, 2] = K[1, 2] - top
         width_pixels = w
@@ -196,6 +198,7 @@ class WaymoDataset(GenericMVSDataset):
         d = data['z']
         original_height = data['height']
         original_width = data['width']
+        print("hw in depth", original_height, original_width)
 
         if height is None:
             assert width is None
@@ -207,10 +210,12 @@ class WaymoDataset(GenericMVSDataset):
         y = (y / original_height) * height
 
         # (Optionally) crop in the new image space
-        if crop is not None:
-            crop_left, crop_top, crop_right, crop_bottom = crop
-            x -= crop_left
-            y -= crop_top
+        # if crop is not None:
+        #     raise NotImplementedError
+            # print(crop)
+            # crop_left, crop_top, crop_right, crop_bottom = crop
+            # x += crop_left
+            # y += crop_top
 
         valid_points = np.logical_and.reduce((x >= 0, y >= 0, x <= width - 1, y <= height -1))
 
@@ -262,16 +267,10 @@ if __name__ == "__main__":
     dataset = WaymoDataset("/mnt/nas3/shared/datasets/waymo/preprocessed", split='train', tuple_info_file_location=tuple_info_file_location)
     for idx in range(5):
         _, item = dataset[idx]
-        # print(item.keys())
-        # for key in item:
-        #     print(key, item[key].shape, item[key].dtype)
+
         depth = item['depth_b1hw']
 
-        print(depth[0, 0].shape)
-        # assert depth[0, 0, 100:, :].max() > 0
-
         no_nan_depth = depth[~np.isnan(depth)]
-        print(no_nan_depth.min(), no_nan_depth.max(), np.median(no_nan_depth))
 
         d = depth[0, 0]
         d[np.isnan(d)] = 0.0
@@ -279,17 +278,14 @@ if __name__ == "__main__":
         d /= d.max()
         d = (d * 255).astype(np.uint8)
 
-
         import cv2
         image = item['image_b3hw'][0].transpose(1, 2, 0)
         image += 2.117904
         image /= image.max()
-        print(image.min(), image.max())
         image = (cv2.resize(image, (256, 192)) * 255).astype(np.uint8)
 
         image_overlay = image.copy().transpose(2, 0, 1)
         image_overlay[:, d > 0] = d[d > 0]
-        print(d.shape, image.shape)
 
         d = np.dstack((d, d, d))
         combined = np.hstack((image, d, image_overlay.transpose(1,2 ,0)))[:, :, ::-1]
