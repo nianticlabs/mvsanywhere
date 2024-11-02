@@ -52,7 +52,7 @@ class Options:
     # interval in number of training steps to log.
     log_interval: int = 100
     # interval in number of training steps to validate.
-    val_interval: int = 100
+    val_interval: int = 1000
 
     # number of validation batches per validation step
     val_batches: int = 100
