@@ -117,11 +117,12 @@ class WaymoDataset(GenericMVSDataset):
         width_pixels = data["width"]
         height_pixels = data["height"]
 
-        top, left, h, w = self.random_resize_crop.get_params(
-            torch.empty((height_pixels, width_pixels)),
-            self.random_resize_crop.scale,
-            self.random_resize_crop.ratio
-        )
+        # top, left, h, w = self.random_resize_crop.get_params(
+        #     torch.empty((height_pixels, width_pixels)),
+        #     self.random_resize_crop.scale,
+        #     self.random_resize_crop.ratio
+        # )
+        top, left, h, w = 0, 0, height_pixels, width_pixels
         K[0, 2] = K[0, 2] - left
         K[1, 2] = K[1, 2] - top
         width_pixels = w
@@ -209,17 +210,17 @@ class WaymoDataset(GenericMVSDataset):
         if crop is not None:
             crop_left, crop_top, crop_right, crop_bottom = crop
             x -= crop_left
-            y -= crop_right
+            y -= crop_top
 
-        # This follows dust3r's preprocessing; maybe though we'd want to remove
-        # out-of-range points rather than clip them?
-        y = y.clip(min=0, max=height - 1).round().astype(np.int16)
-        x = x.clip(min=0, max=width - 1).round().astype(np.int16)
+        valid_points = np.logical_and.reduce((x >= 0, y >= 0, x <= width - 1, y <= height -1))
+
+        y = y[valid_points].round().astype(np.int16)
+        x = x[valid_points].round().astype(np.int16)
+        d = d[valid_points]
 
         # Build the dense depth map
-        depthmap = np.zeros((height, width))
-
         # # TODO – deal with collisions. Currently we are just hoping they don't exist.
+        depthmap = np.zeros((height, width))
         depthmap[y, x] = d
 
         return depthmap
@@ -265,5 +266,32 @@ if __name__ == "__main__":
         # for key in item:
         #     print(key, item[key].shape, item[key].dtype)
         depth = item['depth_b1hw']
+
+        print(depth[0, 0].shape)
+        # assert depth[0, 0, 100:, :].max() > 0
+
         no_nan_depth = depth[~np.isnan(depth)]
         print(no_nan_depth.min(), no_nan_depth.max(), np.median(no_nan_depth))
+
+        d = depth[0, 0]
+        d[np.isnan(d)] = 0.0
+        d = d - d.min()
+        d /= d.max()
+        d = (d * 255).astype(np.uint8)
+
+
+        import cv2
+        image = item['image_b3hw'][0].transpose(1, 2, 0)
+        image += 2.117904
+        image /= image.max()
+        print(image.min(), image.max())
+        image = (cv2.resize(image, (256, 192)) * 255).astype(np.uint8)
+
+        image_overlay = image.copy().transpose(2, 0, 1)
+        image_overlay[:, d > 0] = d[d > 0]
+        print(d.shape, image.shape)
+
+        d = np.dstack((d, d, d))
+        combined = np.hstack((image, d, image_overlay.transpose(1,2 ,0)))[:, :, ::-1]
+
+        cv2.imwrite(f"{idx}.png", combined)
