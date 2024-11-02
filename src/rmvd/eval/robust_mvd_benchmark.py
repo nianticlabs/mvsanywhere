@@ -178,6 +178,27 @@ class RobustMultiViewDepthBenchmark:
         self._output_results(results, self.out_dir)
         return results
 
+    @staticmethod
+    def print_latex_table(results):
+        """
+        Prints a whole row of a latex-formatted table
+        """
+        printcell = lambda x: print(f"    &  {x:.2f}")
+
+        # Force the column order to be consistent on each run
+        for dataset in ('kitti', 'scannet', 'eth3d', 'dtu', 'tanks_and_temples'):
+            printcell(results[f'{dataset}.robustmvd.mvd']['absrel'])
+            printcell(results[f'{dataset}.robustmvd.mvd']['inliers103'])
+
+        # Print means
+        printcell(results.xs('absrel', level=1).mean())
+        printcell(results.xs('inliers103', level=1).mean())
+
+        # Print timings
+        printcell(results.xs('runtime_model_in_sec', level=1).mean())
+
+        print("    \\\\")
+
     def _output_results(self, results, out_dir):
         num_source_view_results = results.drop('best', axis=1, level=1).mean()
         results = results.loc[:, (slice(None), 'best')].droplevel(level=1, axis=1).mean()
@@ -186,6 +207,8 @@ class RobustMultiViewDepthBenchmark:
             print()
             print("Robust MVD Benchmark Results:")
             print(results)
+            print()
+            self.print_latex_table(results=results)
 
         if out_dir is not None:
 
