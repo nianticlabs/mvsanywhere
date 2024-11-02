@@ -15,8 +15,8 @@ from doubletake.datasets.dtu_dataset import DTUDataset
 from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.vkitti import VirtualKITTIDataset
+from doubletake.datasets.nuscenes_dataset import NuScenesDataset
 from doubletake.datasets.waymo_dataset import WaymoDataset
-# from doubletake.datasets.nuscenes_dataset import NuScenesDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
