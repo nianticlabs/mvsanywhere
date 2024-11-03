@@ -142,8 +142,8 @@ class DepthModel(pl.LightningModule):
             intermediate_layers_idx = {
                 'dinov2_vits14': [0, 2, 4, 5, 8, 11],
                 'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
-                'dinov2_vitg14': [9, 19, 29, 39]
+                'dinov2_vitl14': [0, 2, 4, 11, 17, 23], 
+                'dinov2_vitg14': [0, 2, 9, 19, 29, 39]
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.encoder = DINOv2(
                 self.run_opts.image_encoder_name,
@@ -492,7 +492,7 @@ class DepthModel(pl.LightningModule):
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
             B, C, H, W = cur_image.shape
-            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
+            depth_outputs = self.depth_decoder(cur_feats, H // 16, W // 16)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
@@ -582,15 +582,15 @@ class DepthModel(pl.LightningModule):
         log_l1_loss = self.abs_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
         normals_loss = self.normals_loss(normals_gt, normals_pred)
 
-        mv_loss = self.mv_depth_loss(
-            depth_pred_b1hw=depth_pred,
-            cur_depth_b1hw=depth_gt,
-            src_depth_bk1hw=src_data["depth_b1hw"],
-            cur_invK_b44=cur_data[f"invK_s0_b44"],
-            src_K_bk44=src_data[f"K_s0_b44"],
-            cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
-            src_cam_T_world_bk44=src_data["cam_T_world_b44"],
-        )
+        # mv_loss = self.mv_depth_loss(
+        #     depth_pred_b1hw=depth_pred,
+        #     cur_depth_b1hw=depth_gt,
+        #     src_depth_bk1hw=src_data["depth_b1hw"],
+        #     cur_invK_b44=cur_data[f"invK_s0_b44"],
+        #     src_K_bk44=src_data[f"K_s0_b44"],
+        #     cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
+        #     src_cam_T_world_bk44=src_data["cam_T_world_b44"],
+        # )
 
         loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
 
@@ -603,7 +603,7 @@ class DepthModel(pl.LightningModule):
             "ms_loss": ms_loss,
             "inv_abs_loss": inv_abs_loss,
             "log_l1_loss": log_l1_loss,
-            "mv_loss": mv_loss,
+            # "mv_loss": mv_loss,
         }
         return losses
 
