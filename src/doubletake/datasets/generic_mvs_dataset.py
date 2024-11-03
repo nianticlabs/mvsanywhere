@@ -625,9 +625,6 @@ class GenericMVSDataset(Dataset):
             max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
             min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
 
-            max_depth = max_depth * (torch.rand(1)[0] + 1.0)
-            min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
-
             output_dict.update(
                 {
                     "depth_b1hw": depth,

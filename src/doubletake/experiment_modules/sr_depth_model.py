@@ -175,7 +175,7 @@ class DepthModel(pl.LightningModule):
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
+                num_ch_cv=3,
                 feat_fuser_layers_idx=intermediate_layers_idx,
                 intermediate_layers_idx=intermediate_layers_idx
             )
@@ -498,7 +498,7 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
             # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
@@ -582,15 +582,15 @@ class DepthModel(pl.LightningModule):
         log_l1_loss = self.abs_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
         normals_loss = self.normals_loss(normals_gt, normals_pred)
 
-        mv_loss = self.mv_depth_loss(
-            depth_pred_b1hw=depth_pred,
-            cur_depth_b1hw=depth_gt,
-            src_depth_bk1hw=src_data["depth_b1hw"],
-            cur_invK_b44=cur_data[f"invK_s0_b44"],
-            src_K_bk44=src_data[f"K_s0_b44"],
-            cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
-            src_cam_T_world_bk44=src_data["cam_T_world_b44"],
-        )
+        # mv_loss = self.mv_depth_loss(
+        #     depth_pred_b1hw=depth_pred,
+        #     cur_depth_b1hw=depth_gt,
+        #     src_depth_bk1hw=src_data["depth_b1hw"],
+        #     cur_invK_b44=cur_data[f"invK_s0_b44"],
+        #     src_K_bk44=src_data[f"K_s0_b44"],
+        #     cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
+        #     src_cam_T_world_bk44=src_data["cam_T_world_b44"],
+        # )
 
         loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
 
@@ -603,7 +603,7 @@ class DepthModel(pl.LightningModule):
             "ms_loss": ms_loss,
             "inv_abs_loss": inv_abs_loss,
             "log_l1_loss": log_l1_loss,
-            "mv_loss": mv_loss,
+            # "mv_loss": mv_loss,
         }
         return losses
 
@@ -661,19 +661,19 @@ class DepthModel(pl.LightningModule):
             self.manual_backward(losses["loss"] / 2.0)
 
             if (batch_idx + 1) % 2 == 0:
-                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
+                optimizer_da_enc, optimizer_da_dec = self.optimizers()
             
-                optimizer_sr.step()
+                # optimizer_sr.step()
                 optimizer_da_enc.step()
                 optimizer_da_dec.step()
 
-                optimizer_sr.zero_grad()
+                # optimizer_sr.zero_grad()
                 optimizer_da_enc.zero_grad()
                 optimizer_da_dec.zero_grad()
 
                 # multiple schedulers
-                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
-                scheduler_sr.step()
+                scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
+                # scheduler_sr.step()
                 scheduler_da_enc.step()
                 scheduler_da_dec.step()
 
@@ -795,11 +795,11 @@ class DepthModel(pl.LightningModule):
         70000 and 80000.
 
         """
-        optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume.parameters()) + 
-            list(self.matching_model.parameters()),
-            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
-        )
+        # optimizer_sr = torch.optim.AdamW(
+        #     list(self.cost_volume.parameters())
+        #     list(self.matching_model.parameters()),
+        #     lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        # )
         optimizer_da_encoder = torch.optim.AdamW(
             self.encoder.parameters(),
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
@@ -817,7 +817,7 @@ class DepthModel(pl.LightningModule):
             else:
                 return 0.01
 
-        lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
+        # lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
         lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
         lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
-        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]
+        return [optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_da_encoder, lr_scheduler_da_decoder]

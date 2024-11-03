@@ -361,6 +361,12 @@ class CostVolumeManager(nn.Module):
                 depth_planes_bdhw,
             )
 
+            cost_volume = torch.cat([
+                torch.log(lowest_cost.unsqueeze(1)),
+                cost_volume.detach().mean(dim=1, keepdim=True),
+                cost_volume.detach().std(dim=1, keepdim=True),
+            ], dim=1)
+
         return cost_volume, lowest_cost, depth_planes_bdhw, overall_mask_bhw,
     
 
