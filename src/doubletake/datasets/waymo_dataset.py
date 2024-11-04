@@ -77,17 +77,75 @@ class WaymoDataset(GenericMVSDataset):
         split_filename = f"{self.split}{mv_tuple_file_suffix}"
         tuples_file = Path(tuple_info_file_location) / split_filename
 
-        if not tuples_file.exists():
-            raise FileNotFoundError(f"Tuples file not found at {tuples_file}")
+        # if not tuples_file.exists():
+        #     raise FileNotFoundError(f"Tuples file not found at {tuples_file}", tuple_info_file_location, split_filename)
 
-        with open(tuples_file, "r") as f:
-            self.tuples = [line.strip().split() for line in f]
+        # with open(tuples_file, "r") as f:
+        #     self.tuples = [line.strip().split() for line in f]
 
         # Compute matching and depth dimensions
         self.matching_width = int(image_width * matching_scale)
         self.matching_height = int(image_height * matching_scale)
         self.depth_width = int(image_width * prediction_scale)
         self.depth_height = int(image_height * prediction_scale)
+
+    @property
+    def waymo_splitname(self):
+        return {"train": "training"}[self.split]
+
+    def get_valid_frame_ids(self, split, scan, store_computed=True, overwrite=False):
+        """Either loads or computes the ids of valid frames in the dataset for
+        a scan.
+
+        A valid frame is one that has an existing RGB frame, an existing
+        depth file, and existing pose file where the pose isn't inf, -inf,
+        or nan.
+
+        Args:
+            split: the data split (train/val/test)
+            scan: the name of the scan
+            store_computed: store the valid_frame file where we'd expect to
+            see the file in the scan folder. get_valid_frame_path defines
+            where this file is expected to be. If the file can't be saved,
+            a warning will be printed and the exception reason printed.
+
+        Returns:
+            valid_frames: a list of strings with info on valid frames.
+            Each string is a concat of the scan_id and the frame_id.
+        """
+        # /mnt/nas3/shared/datasets/waymo/preprocessed/training/segment-54293441958058219_2335_200_2355_200_with_camera_labels.tfrecord/00113_3_sparse_depth.npz
+
+        driving_sequence, camera_id = scan.split("^")
+
+        waymo_split = {"train": "training"}[split]
+
+        load_path = Path(self.dataset_path) / waymo_split / driving_sequence
+        txt_filepath = load_path / f"valid_frames_{camera_id}.txt"
+        print(txt_filepath)
+
+        if txt_filepath.is_file() and not overwrite:
+            return txt_filepath.read_text().splitlines()
+        else:
+            frame_ids = []
+
+            depth_files = list(load_path.glob("*_sparse_depth.npz"))
+
+            for filepath in depth_files:
+                jpg_path = Path(str(filepath).replace("_sparse_depth.npz", ".jpg"))
+                if not jpg_path.is_file():
+                    continue
+
+                frame_id, frame_camera_id = filepath.name.removesuffix("_sparse_depth.npz").split("_")
+
+                if str(frame_camera_id) == str(camera_id):
+                    # We combine the scan with the camera id, as we treat each camera as its own 'scan'
+                    # for the purposes of loading scans with the dataloader
+                    frame_ids.append(f"{scan} {frame_id}")
+
+            if store_computed:
+                txt_filepath.write_text(''.join(f"{line}\n" for line in frame_ids))
+
+            return frame_ids
 
     def get_frame_id_string(self, frame_id):
         """Returns an id string for this frame_id that's unique to this frame within the scan."""
@@ -98,7 +156,7 @@ class WaymoDataset(GenericMVSDataset):
         driving_sequence, camera_id = scan_id.split("^")
 
         # Load and extract the saved data
-        return os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}.jpg")
+        return os.path.join(self.dataset_path, self.waymo_splitname, driving_sequence, f"{frame_id}_{camera_id}.jpg")
 
     def get_high_res_color_filepath(self, scan_id, frame_id):
         """Returns the filepath for a frame's higher resolution color file."""
@@ -107,7 +165,7 @@ class WaymoDataset(GenericMVSDataset):
     def load_intrinsics(self, scan_id, frame_id=None, flip=False):
         """Loads intrinsics and computes scaled intrinsics matrices for a frame at multiple scales."""
         driving_sequence, camera_id = scan_id.split("^")
-        data = np.load(os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}.npz"))
+        data = np.load(os.path.join(self.dataset_path, self.waymo_splitname, driving_sequence, f"{frame_id}_{camera_id}.npz"))
 
         intrinsics = np.array(data["intrinsics"])
 
@@ -191,7 +249,7 @@ class WaymoDataset(GenericMVSDataset):
         driving_sequence, camera_id = scan_id.split("^")
 
         # Load and extract the saved data
-        data = np.load(os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}_sparse_depth.npz"))
+        data = np.load(os.path.join(self.dataset_path, self.waymo_splitname, driving_sequence, f"{frame_id}_{camera_id}_sparse_depth.npz"))
         x, y = data['xy'].T
         d = data['z']
         original_height = data['height']
@@ -245,9 +303,8 @@ class WaymoDataset(GenericMVSDataset):
             cam_T_world (numpy array): matrix for transforming from the
                 world frame to the camera frame (extrinsics).
         """
-
         driving_sequence, camera_id = scan_id.split("^")
-        data = np.load(os.path.join(self.dataset_path, driving_sequence, f"{frame_id}_{camera_id}.npz"))
+        data = np.load(os.path.join(self.dataset_path, self.waymo_splitname, driving_sequence, f"{frame_id}_{camera_id}.npz"))
         world_T_cam = np.array(data['cam2world']).astype(np.float32)  # remember cam2world == world_T_cam?
 
         # Transformation from world frame to camera frame (inverse of world_T_cam)
