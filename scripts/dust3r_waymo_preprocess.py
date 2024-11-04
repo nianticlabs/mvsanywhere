@@ -314,10 +314,11 @@ def show_raw_pointcloud(pts3d, colors, point_size=2):
     scene.show(line_settings={'point_size': point_size})
 
 
-def main(waymo_root, output_dir, subslices, workers=1):
+def main(waymo_root, output_dir, subslices, do_extract_frames, workers=1):
     sequences = get_subsliced_sequences(waymo_root, subslices=subslices)
     print(sequences)
-    extract_frames(waymo_root, output_dir, sequences, workers=workers)
+    if do_extract_frames:
+        extract_frames(waymo_root, output_dir, sequences, workers=workers)
     make_crops(output_dir, sequences, workers=workers)
     # shutil.rmtree(osp.join(output_dir, 'tmp'))
     print('Done! all data generated at', output_dir)
@@ -537,10 +538,12 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=640):
 
 if __name__ == '__main__':
     subslices = [int(xx) for xx in sys.argv[1:]]
-    assert len(subslices)
+    do_extract_frames = False
+    print("Are we extracting frames?? ", do_extract_frames)
     main(
         waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records/training",
         output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed/training",
         subslices=subslices,
         workers=8,
+        do_extract_frames=do_extract_frames
         )

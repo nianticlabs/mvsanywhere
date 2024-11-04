@@ -287,7 +287,9 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             scans = [scan.strip() for scan in scans]
 
         dataset_class = WaymoDataset
-        scans = None
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
 
         if single_debug_scan_id is not None:
             scans = [single_debug_scan_id]
