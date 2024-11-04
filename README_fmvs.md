@@ -4,7 +4,7 @@
 make install-mamba
 
 make create-mamba-env
-mamba activate doubletake
+mamba activate fmvs
 python -m pip install -e .
 ```
 
