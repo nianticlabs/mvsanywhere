@@ -198,7 +198,7 @@ class WaymoDataset(GenericMVSDataset):
         d = data['z']
         original_height = data['height']
         original_width = data['width']
-        print("hw in depth", original_height, original_width)
+        # print("hw in depth", original_height, original_width)
 
         if height is None:
             assert width is None
@@ -211,7 +211,7 @@ class WaymoDataset(GenericMVSDataset):
 
         # (Optionally) crop in the new image space
         if crop is not None:
-            # pass
+            pass
             # crop_left, crop_top, crop_right, crop_bottom = crop
             # x -= crop_left
             # y -= crop_top
