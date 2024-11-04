@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.layers import BasicBlock
 from doubletake.modules.networks import double_basic_block
+from torchvision import transforms as T
+
 
 
 DINOV2_ARCHS = {
@@ -230,6 +232,8 @@ class DINOv2(nn.Module):
             f (torch.Tensor): The feature map [B, C, H // 14, W // 14].
             t (torch.Tensor): The token [B, C]. This is only returned if return_token is True.
         """
+        scale_factor = 14 / 16 
+        x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
         return self.model.get_intermediate_layers(x, self.num_intermediate_layers, return_class_token=True)
 
 
@@ -282,8 +286,13 @@ class CostVolumePatchEmbed(nn.Module):
         self.num_feats = num_feats
         self.convs = nn.ModuleDict()
 
+        self.quarter_cv = nn.Sequential(
+            BasicBlock(num_ch_cv, 32, stride=2),
+            BasicBlock(32, 64, stride=2),
+        )
+
         for i in range(3):
-            num_ch_in = num_ch_cv if i == 0 else num_ch_outs[i - 1]
+            num_ch_in = 64 if i == 0 else num_ch_outs[i - 1]
             num_ch_out = (num_ch_outs + [self.num_feats])[i]
             self.convs[f"ds_conv_{i}"] = BasicBlock(
                 num_ch_in, num_ch_out, stride=1 if i == 0 else 2
@@ -324,8 +333,10 @@ class CostVolumePatchEmbed(nn.Module):
         # resize such that 2 downsamples will give 1/14th resolution 
         B, C, H, W = x.shape
 
-        scale_factor = 16 / 14 
-        x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
+        # scale_factor = 16 / 14 
+        # x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
+
+        x = self.quarter_cv(x)
 
         for i in range(3):
 
@@ -333,7 +344,7 @@ class CostVolumePatchEmbed(nn.Module):
             x = self.convs[f"ds_conv_{i}"](x)
 
             if i < 2:
-                img_feat = img_feats[i][0].reshape((B, H * 4 // 14, W * 4 // 14, self.num_feats))
+                img_feat = img_feats[i][0].reshape((B, H // 16, W // 16, self.num_feats))
                 img_feat = img_feat.permute(0, 3, 1, 2)
                 img_feat = self.projects[i](img_feat)
                 img_feat = self.resize_layers[i](img_feat)
@@ -415,7 +426,7 @@ class ViTCVEncoder(nn.Module):
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 
         x = torch.cat((self.model.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + self.model.interpolate_pos_encoding(x, w * 4, h * 4)
+        x = x + self.model.interpolate_pos_encoding(x, w * 14 / 16, h * 14 / 16)
 
         if self.model.register_tokens is not None:
             x = torch.cat(
@@ -428,3 +439,52 @@ class ViTCVEncoder(nn.Module):
             )
 
         return x
+    
+
+CKPT_PATH =  '/mnt/nas3/shared/projects/fmvs/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
+
+class MAST3R_Wrapped(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        import sys
+        repo_path = '/mnt/nas3/shared/projects/fmvs/mast3r'
+        sys.path.insert(0, repo_path)
+        sys.path.insert(0, repo_path + '/dust3r')
+        from mast3r.model import AsymmetricMASt3R
+        from dust3r.inference import inference
+        from mast3r.fast_nn import fast_reciprocal_NNs
+        
+        model = AsymmetricMASt3R.from_pretrained(CKPT_PATH)
+        model.eval()
+        self.model = model
+        self.inference = inference
+
+        self.input_transform = T.Compose([
+            T.Normalize(mean=[-2.11790393, -2.03571429, -1.80444444], std=[4.36681223, 4.46428571, 4.44444444]),
+            T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ])
+
+    def forward(self, x):
+        
+        B, N, C, H, W = x.shape
+        # x = F.interpolate(x.flatten(0, 1), (384, 512), mode="bilinear", align_corners=False)
+        # H, W = (384, 512)
+        # first image is the current frame, the rest are the source
+        x = self.input_transform(x).reshape((B, N, C, H, W))
+
+        cur_img = x[:, 0]
+        image_source = x[:, 1]
+
+        batch = [{'img': cur_img, 'idx': 0, 'instance': str(0)}]
+        batch.append({'img': image_source, 'idx': 1, 'instance': str(1)})
+
+        pts1, pts2 = self.model(batch[0], batch[1])
+        desc1, desc2 = pts1['desc'].permute(0, 3, 1, 2), pts2['desc'].permute(0, 3, 1, 2)
+
+        # desc1 = F.interpolate(desc1, (H // 4, W // 4), mode="bilinear", align_corners=False)
+        # desc2 = F.interpolate(desc1, (H // 4, W // 4), mode="bilinear", align_corners=False)
+
+        return desc1, desc2.unsqueeze(1)
+        # result = torch.stack([desc1, desc2], dim=1)
+        # return 

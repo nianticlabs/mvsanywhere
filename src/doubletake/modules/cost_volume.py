@@ -356,15 +356,20 @@ class CostVolumeManager(nn.Module):
 
         # for visualisation - ignore 0s in cost volume for minimum
         with torch.no_grad():
-            lowest_cost = self.indices_to_disparity(
-                torch.argmax(cost_volume.detach(), 1),
-                depth_planes_bdhw,
+            values, indices = torch.topk(
+                cost_volume.detach(), k=3, dim=1, largest=True, sorted=True
             )
+            lowest_cost = self.indices_to_disparity(indices[:, 0], depth_planes_bdhw)
 
-            cost_volume = torch.cat([
-                torch.log(lowest_cost.unsqueeze(1)),
-                cost_volume.detach().mean(dim=1, keepdim=True),
-                cost_volume.detach().std(dim=1, keepdim=True),
+            cost_volume = torch.stack([
+                self.indices_to_disparity(indices[:, 0], depth_planes_bdhw),
+                self.indices_to_disparity(indices[:, 1], depth_planes_bdhw),
+                self.indices_to_disparity(indices[:, 2], depth_planes_bdhw),
+                values[:, 0],
+                values[:, 1],
+                values[:, 2],
+                cost_volume.detach().mean(dim=1),
+                cost_volume.detach().std(dim=1),
             ], dim=1)
 
         return cost_volume, lowest_cost, depth_planes_bdhw, overall_mask_bhw,
@@ -523,7 +528,9 @@ class EfficientCostVolumeManager(CostVolumeManager):
         cur_feats_b1kfhw = einops.repeat(
             cur_feats, "b f h w -> b 1 k f h w", k=int(depth_planes_bdhw.shape[1])
         )
-        dot_product_brkhw = torch.sum(src_feat_warped_brkfhw * cur_feats_b1kfhw, dim=3) * mask_brkhw
+        # dot_product_brkhw = torch.sum(src_feat_warped_brkfhw * cur_feats_b1kfhw, dim=3) * mask_brkhw
+        dists_brkhw = (src_feat_warped_brkfhw - cur_feats_b1kfhw).norm(dim=3) * mask_brkhw
+        dot_product_brkhw = 1 / (1 + dists_brkhw) # similarity
 
         # Sum over the frames
         dot_product_bkhw = dot_product_brkhw.sum(dim=1)

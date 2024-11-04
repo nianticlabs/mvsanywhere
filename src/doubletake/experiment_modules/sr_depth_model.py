@@ -25,7 +25,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, MAST3R_Wrapped, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -175,7 +175,7 @@ class DepthModel(pl.LightningModule):
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
-                num_ch_cv=3,
+                num_ch_cv=8,
                 feat_fuser_layers_idx=intermediate_layers_idx,
                 intermediate_layers_idx=intermediate_layers_idx
             )
@@ -271,6 +271,8 @@ class DepthModel(pl.LightningModule):
             self.matching_model = ResnetMatchingEncoder(18, self.run_opts.matching_feature_dims)
         elif "unet_encoder" == self.run_opts.matching_encoder_type:
             self.matching_model = UNetMatchingEncoder()
+        elif 'mast3r' == self.run_opts.matching_encoder_type:
+            self.matching_model = MAST3R_Wrapped()
         else:
             raise ValueError(
                 f"Unrecognized option {self.run_opts.matching_encoder_type} "
@@ -439,36 +441,41 @@ class DepthModel(pl.LightningModule):
         cur_feats = self.encoder(cur_image)
 
         # Compute matching features
-        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
-            cur_image, src_image, unbatched_matching_encoder_forward
-        )
+        # matching_cur_feats, matching_src_feats = self.compute_matching_feats(
+        #     cur_image, src_image, unbatched_matching_encoder_forward
+        # )
 
-        if flip:
-            # now (carefully) flip matching features back for correct MVS.
-            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
-            matching_src_feats = torch.flip(matching_src_feats, (-1,))
+        with torch.no_grad():
+            matching_cur_feats, matching_src_feats = self.matching_model(
+                torch.cat((cur_image.unsqueeze(1), src_image), dim=1)
+            )
 
-        # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
-        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+            if flip:
+                # now (carefully) flip matching features back for correct MVS.
+                matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
+                matching_src_feats = torch.flip(matching_src_feats, (-1,))
 
-        # Compute the cost volume. Should be size bdhw.
-        cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
-            cur_feats=matching_cur_feats,
-            src_feats=matching_src_feats,
-            src_extrinsics=src_cam_T_cur_cam,
-            src_poses=cur_cam_T_src_cam,
-            src_Ks=src_K,
-            cur_invK=cur_invK,
-            min_depth=min_depth,
-            max_depth=max_depth,
-            return_mask=return_mask,
-        )
+            # Get min and max depth to the right shape, device and dtype
+            min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+            max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
-        if flip:
-            # OK, we've computed the cost volume, now we need to flip the cost
-            # volume to have it aligned with flipped image prior features
-            cost_volume = torch.flip(cost_volume, (-1,))
+            # Compute the cost volume. Should be size bdhw.
+            cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
+                cur_feats=matching_cur_feats,
+                src_feats=matching_src_feats[:, :1],
+                src_extrinsics=src_cam_T_cur_cam[:, :1],
+                src_poses=cur_cam_T_src_cam,
+                src_Ks=src_K[:, :1],
+                cur_invK=cur_invK,
+                min_depth=min_depth,
+                max_depth=max_depth,
+                return_mask=return_mask,
+            )
+
+            if flip:
+                # OK, we've computed the cost volume, now we need to flip the cost
+                # volume to have it aligned with flipped image prior features
+                cost_volume = torch.flip(cost_volume, (-1,))
 
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
@@ -492,7 +499,7 @@ class DepthModel(pl.LightningModule):
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
             B, C, H, W = cur_image.shape
-            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
+            depth_outputs = self.depth_decoder(cur_feats, H // 16, W // 16)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
