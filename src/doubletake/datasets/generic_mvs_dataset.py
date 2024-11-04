@@ -460,7 +460,6 @@ class GenericMVSDataset(Dataset):
             self.image_width resolution.
 
         """
-
         color_filepath = self.get_color_filepath(scan_id, frame_id)
         try:
             image = read_image_file(

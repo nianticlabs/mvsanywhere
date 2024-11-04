@@ -117,13 +117,11 @@ class WaymoDataset(GenericMVSDataset):
         width_pixels = data["width"]
         height_pixels = data["height"]
 
-        # TODO - implement cropping (I found this non-trivial)
-        # top, left, h, w = self.random_resize_crop.get_params(
-        #     torch.empty((height_pixels, width_pixels)),
-        #     self.random_resize_crop.scale,
-        #     self.random_resize_crop.ratio
-        # )
-        top, left, h, w = 0, 0, height_pixels, width_pixels
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((height_pixels, width_pixels)),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
 
         K[0, 2] = K[0, 2] - left
         K[1, 2] = K[1, 2] - top
@@ -198,7 +196,20 @@ class WaymoDataset(GenericMVSDataset):
         d = data['z']
         original_height = data['height']
         original_width = data['width']
-        # print("hw in depth", original_height, original_width)
+
+        # (Optionally) crop in the new image space
+        if crop is not None:
+            # Rememer – the crop parameters are in the scale of the original loaded RGB image,
+            # i.e. original_height, original_width
+
+            # First apply the shift:
+            crop_left, crop_top, crop_right, crop_bottom = crop
+            x -= crop_left
+            y -= crop_top
+
+            # Now update the original dimensions, as the effective original dims will have changed:
+            original_width = crop_right - crop_left
+            original_height = crop_bottom - crop_top
 
         if height is None:
             assert width is None
@@ -209,24 +220,16 @@ class WaymoDataset(GenericMVSDataset):
         x = (x / original_width) * width
         y = (y / original_height) * height
 
-        # (Optionally) crop in the new image space
-        if crop is not None:
-            pass
-            # crop_left, crop_top, crop_right, crop_bottom = crop
-            # x -= crop_left
-            # y -= crop_top
-
-        valid_points = np.logical_and.reduce((x >= 0, y >= 0, x <= width - 1, y <= height -1))
-
+        # Mask out invalid points
+        valid_points = np.logical_and.reduce((x >= 0, y >= 0, x <= width - 1, y <= height -1, d > 0))
         y = y[valid_points].round().astype(np.int16)
         x = x[valid_points].round().astype(np.int16)
         d = d[valid_points]
 
         # Build the dense depth map
-        # # TODO – deal with collisions. Currently we are just hoping they don't exist.
+        # TODO – deal with collisions. Currently we are just hoping they don't exist.
         depthmap = np.zeros((height, width))
         depthmap[y, x] = d
-
         return depthmap
 
     def load_pose(self, scan_id, frame_id):
@@ -257,16 +260,18 @@ if __name__ == "__main__":
     tuple_info_file_location = Path("tmp")
     tuple_info_file_location.mkdir(exist_ok=True)
     with open(tuple_info_file_location / "train_tuples.txt", 'w') as f:
-        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^1 00083 00084 00085\n")
-        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^2 00083 00084 00085\n")
-        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^3 00083 00084 00085\n")
-        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^4 00083 00084 00085\n")
-        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^5 00083 00084 00085\n")
+        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^1 00013 00006 00007 00008 00009 00010 00011 00012\n")
+        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^2 00013 00006 00007 00008 00009 00010 00011 00012\n")
+        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^3 00013 00006 00007 00008 00009 00010 00011 00012\n")
+        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^4 00013 00006 00007 00008 00009 00010 00011 00012\n")
+        f.write("individual_files_training_segment-10017090168044687777_6380_000_6400_000_with_camera_labels.tfrecord^5 00013 00006 00007 00008 00009 00010 00011 00012\n")
 
     dataset = WaymoDataset("/mnt/nas3/shared/datasets/waymo/preprocessed", split='train', tuple_info_file_location=tuple_info_file_location)
-    for idx in range(5):
-        _, item = dataset[idx]
+    import cv2
 
+    for idx in range(5):
+        print(f"Loading {idx}")
+        _, item = dataset[idx]
         depth = item['depth_b1hw']
 
         no_nan_depth = depth[~np.isnan(depth)]
@@ -277,7 +282,6 @@ if __name__ == "__main__":
         d /= d.max()
         d = (d * 255).astype(np.uint8)
 
-        import cv2
         image = item['image_b3hw'][0].transpose(1, 2, 0)
         image += 2.117904
         image /= image.max()
@@ -289,4 +293,4 @@ if __name__ == "__main__":
         d = np.dstack((d, d, d))
         combined = np.hstack((image, d, image_overlay.transpose(1,2 ,0)))[:, :, ::-1]
 
-        cv2.imwrite(f"{idx}.png", combined)
+        cv2.imwrite(f"{idx}_with_crop.png", combined)
