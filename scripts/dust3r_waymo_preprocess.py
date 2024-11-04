@@ -246,7 +246,7 @@ def starstarcall(args):
     return function(**args)
 
 
-def parallel_map(function, args, workers=0, star_args=False, kw_args=False, front_num=1, Pool=ThreadPool, **tqdm_kw):
+def parallel_map(function, args, workers=0, star_args=False, kw_args=False, front_num=0, Pool=ThreadPool, **tqdm_kw):
     """ tqdm but with parallel execution.
 
     Will essentially return
@@ -314,26 +314,45 @@ def show_raw_pointcloud(pts3d, colors, point_size=2):
     scene.show(line_settings={'point_size': point_size})
 
 
-def main(waymo_root, output_dir, workers=1):
-    extract_frames(waymo_root, output_dir, workers=workers)
-    make_crops(output_dir, workers=workers)
-    shutil.rmtree(osp.join(output_dir, 'tmp'))
+def main(waymo_root, output_dir, subslices, workers=1):
+    sequences = get_subsliced_sequences(waymo_root, subslices=subslices)
+    print(sequences)
+    extract_frames(waymo_root, output_dir, sequences, workers=workers)
+    make_crops(output_dir, sequences, workers=workers)
+    # shutil.rmtree(osp.join(output_dir, 'tmp'))
     print('Done! all data generated at', output_dir)
 
 
 def _list_sequences(db_root):
     print('>> Looking for sequences in', db_root)
-    res = sorted(f for f in os.listdir(db_root) if f.endswith('.tfrecord'))
+    res = sorted(f for f in os.listdir(db_root) if f.endswith('.tfrecord'))[::-1]
     print(f'    found {len(res)} sequences')
     return res
 
+def make_subsequences(input_list):
+    """Divide into 16 subsequences
+    """
+    chunk_size = max(1, len(input_list) // 16)
+    return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
 
-def extract_frames(db_root, output_dir, workers=8):
-    sequences = _list_sequences(db_root)
+
+def get_subsliced_sequences(db_root, subslices):
+    _sequences = sorted(_list_sequences(db_root))
+    sequences = []
+    subsequences = make_subsequences(_sequences)
+    for subslice in subslices:
+        sequences += subsequences[subslice]
+    return sequences
+
+
+
+def extract_frames(db_root, output_dir, sequences, workers=8):
     output_dir = osp.join(output_dir, 'tmp')
     print('>> outputing result to', output_dir)
     args = [(db_root, output_dir, seq) for seq in sequences]
     parallel_map(process_one_seq, args, star_args=True, workers=workers)
+    # for _args in tqdm(args, desc="Each tfrecord file"):
+    #     process_one_seq(*_args)#, workers=workers)
 
 
 def process_one_seq(db_root, output_dir, seq):
@@ -360,9 +379,11 @@ def process_one_seq(db_root, output_dir, seq):
         json.dump(calib, f)
 
 
+from waymo_open_dataset import dataset_pb2 as open_dataset
+from waymo_open_dataset.utils import frame_utils
+
+
 def extract_frames_one_seq(filename):
-    from waymo_open_dataset import dataset_pb2 as open_dataset
-    from waymo_open_dataset.utils import frame_utils
 
     print('>> Opening', filename)
     dataset = tf.data.TFRecordDataset(filename, compression_type='')
@@ -425,9 +446,9 @@ def extract_frames_one_seq(filename):
     return calib, frames
 
 
-def make_crops(output_dir, workers=16, **kw):
+def make_crops(output_dir, sequences, workers=16, **kw):
     tmp_dir = osp.join(output_dir, 'tmp')
-    sequences = _list_sequences(tmp_dir)
+    # sequences = sorted(_list_sequences(tmp_dir))
     args = [(tmp_dir, output_dir, seq) for seq in sequences]
     parallel_map(crop_one_seq, args, star_args=True, workers=workers, front_num=0)
 
@@ -515,7 +536,11 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=640):
 
 
 if __name__ == '__main__':
+    subslices = [int(xx) for xx in sys.argv[1:]]
+    assert len(subslices)
     main(
-        waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records",
-        output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed",
-        workers=16)
+        waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records/training",
+        output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed/training",
+        subslices=subslices,
+        workers=8,
+        )
