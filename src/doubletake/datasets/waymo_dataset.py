@@ -91,7 +91,8 @@ class WaymoDataset(GenericMVSDataset):
 
     @property
     def waymo_splitname(self):
-        return {"train": "training"}[self.split]
+        # TODO – validation here is on the train set. not sure how to turn off val on this dataset
+        return {"train": "training", "val": "training"}[self.split]
 
     def get_valid_frame_ids(self, split, scan, store_computed=True, overwrite=False):
         """Either loads or computes the ids of valid frames in the dataset for
