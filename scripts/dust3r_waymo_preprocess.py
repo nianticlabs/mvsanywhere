@@ -316,7 +316,6 @@ def show_raw_pointcloud(pts3d, colors, point_size=2):
 
 def main(waymo_root, output_dir, subslices, do_extract_frames, workers=1):
     sequences = get_subsliced_sequences(waymo_root, subslices=subslices)
-    print(sequences)
     if do_extract_frames:
         extract_frames(waymo_root, output_dir, sequences, workers=workers)
     make_crops(output_dir, sequences, workers=workers)
@@ -361,6 +360,7 @@ def process_one_seq(db_root, output_dir, seq):
     os.makedirs(out_dir, exist_ok=True)
     calib_path = osp.join(out_dir, 'calib.json')
     if osp.isfile(calib_path):
+        print(f"Skipping {output_dir} as the calib file exists")
         return
 
     try:
@@ -458,6 +458,7 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=640):
     seq_dir = osp.join(input_dir, seq)
     out_dir = osp.join(output_dir, seq)
     if osp.isfile(osp.join(out_dir, '00100_1.jpg')):
+        print(f"Skipping {input_dir}")
         return
     os.makedirs(out_dir, exist_ok=True)
 
@@ -508,12 +509,10 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=640):
 
         # load image
         image = imread_cv2(osp.join(seq_dir, frame + 'jpg'))
-        print("Before", image.shape)
 
         # downscale image
         output_resolution = (resolution, 1) if W > H else (1, resolution)
         image, _, intrinsics2 = rescale_image_depthmap(image, None, cam_K[cam_idx], output_resolution)
-        print("After", image.size)
         image.save(osp.join(out_dir, frame + 'jpg'), quality=80)
 
         # save as an EXR file? yes it's smaller (and easier to load)
@@ -544,6 +543,6 @@ if __name__ == '__main__':
         waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records/training",
         output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed/training",
         subslices=subslices,
-        workers=8,
+        workers=2,
         do_extract_frames=do_extract_frames
         )

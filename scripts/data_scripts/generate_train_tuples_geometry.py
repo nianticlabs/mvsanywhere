@@ -111,6 +111,10 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
 
     valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
 
+    if len(valid_frames) == 0:
+        print("No valid frames; exiting")
+        return []
+
     frame_ind_to_frame_id = {}
     for frame_ind, frame_line in enumerate(valid_frames):
         frame_ind_to_frame_id[frame_ind] = frame_line.strip().split(" ")[1]
@@ -131,7 +135,6 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
         world_T_cams_b44.append(world_T_cam_44)
         cam_T_worlds_b44.append(cam_T_world_44)
 
-    import torch
     depths_b1hw = torch.stack(depths_b1hw).cuda()
     Ks_b44 = torch.stack(Ks_b44).cuda()
     invKs_b44 = torch.tensor(np.stack(invKs_b44)).cuda()
