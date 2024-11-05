@@ -537,12 +537,12 @@ def crop_one_seq(input_dir, output_dir, seq, resolution=640):
 
 if __name__ == '__main__':
     subslices = [int(xx) for xx in sys.argv[1:]]
-    do_extract_frames = False
+    do_extract_frames = True
     print("Are we extracting frames?? ", do_extract_frames)
     main(
         waymo_root="/mnt/nas3/shared/datasets/waymo/v1_records/training",
         output_dir="/mnt/nas3/shared/datasets/waymo/preprocessed/training",
         subslices=subslices,
-        workers=2,
+        workers=4,
         do_extract_frames=do_extract_frames
         )
