@@ -166,6 +166,7 @@ class WaymoDataset(GenericMVSDataset):
     def load_intrinsics(self, scan_id, frame_id=None, flip=False):
         """Loads intrinsics and computes scaled intrinsics matrices for a frame at multiple scales."""
         driving_sequence, camera_id = scan_id.split("^")
+
         data = np.load(os.path.join(self.dataset_path, self.waymo_splitname, driving_sequence, f"{frame_id}_{camera_id}.npz"))
 
         intrinsics = np.array(data["intrinsics"])
@@ -219,7 +220,7 @@ class WaymoDataset(GenericMVSDataset):
 
     def load_full_res_depth_and_mask(self, scan_id, frame_id):
         """Loads a depth map at the native resolution the dataset provides."""
-        depth = self._load_depth(scan_id=scan_id, frame_id=frame_id)
+        depth = self._safe_load_depth(scan_id=scan_id, frame_id=frame_id)
 
         mask_b = torch.tensor(depth > self.min_valid_depth).bool().unsqueeze(0)
         depth = torch.tensor(depth).float().unsqueeze(0)
@@ -231,7 +232,7 @@ class WaymoDataset(GenericMVSDataset):
 
     def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for."""
-        depth = self._load_depth(scan_id=scan_id, frame_id=frame_id, height=self.depth_height, width=self.depth_width, crop=crop)
+        depth = self._safe_load_depth(scan_id=scan_id, frame_id=frame_id, height=self.depth_height, width=self.depth_width, crop=crop)
 
         mask_b = torch.tensor(depth > self.min_valid_depth).bool().unsqueeze(0)
         depth = torch.tensor(depth).float().unsqueeze(0)
@@ -241,6 +242,15 @@ class WaymoDataset(GenericMVSDataset):
         # Set invalids to NaN
         depth[~mask_b] = torch.tensor(np.nan)
         return depth, mask, mask_b
+
+    def _safe_load_depth(self, scan_id, frame_id, height=None, width=None, crop=None):
+        try:
+            return self._load_depth(scan_id=scan_id, frame_id=frame_id, height=height, width=width, crop=crop)
+        except (FileNotFoundError, IOError, ValueError, OSError, EOFError):
+            if height is None or width is None:
+                return np.zeros((10, 10))
+            else:
+                return np.zeros((height, width))
 
     def _load_depth(self, scan_id, frame_id, height=None, width=None, crop=None):
         """Loads and densifies the sparse depth map to the specified height and width
