@@ -77,11 +77,11 @@ class WaymoDataset(GenericMVSDataset):
         split_filename = f"{self.split}{mv_tuple_file_suffix}"
         tuples_file = Path(tuple_info_file_location) / split_filename
 
-        # if not tuples_file.exists():
-        #     raise FileNotFoundError(f"Tuples file not found at {tuples_file}", tuple_info_file_location, split_filename)
+        if not tuples_file.exists():
+            raise FileNotFoundError(f"Tuples file not found at {tuples_file}", tuple_info_file_location, split_filename)
 
-        # with open(tuples_file, "r") as f:
-        #     self.tuples = [line.strip().split() for line in f]
+        with open(tuples_file, "r") as f:
+            self.tuples = [line.strip().split() for line in f]
 
         # Compute matching and depth dimensions
         self.matching_width = int(image_width * matching_scale)
