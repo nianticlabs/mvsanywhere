@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from nuscenes.nuscenes import NuScenes
-from pyquaternion import Quaternion
+# from nuscenes.nuscenes import NuScenes
+# from pyquaternion import Quaternion
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 
@@ -146,14 +146,14 @@ class NuScenesDataset(GenericMVSDataset):
 
         if self.include_full_depth_K:
             output_dict["K_full_depth_b44"] = K.clone()
-            output_dict["invK_full_depth_b44"] = torch.inverse(K)
+            output_dict["invK_full_depth_b44"] = torch.linalg.inv(K)
 
         # Compute matching intrinsics
         K_matching = K.clone()
         K_matching[0] *= self.matching_width / float(width_pixels)
         K_matching[1] *= self.matching_height / float(height_pixels)
         output_dict["K_matching_b44"] = K_matching
-        output_dict["invK_matching_b44"] = torch.inverse(K_matching)
+        output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         # Scale intrinsics to the dataset's configured depth resolution
         K[0] *= self.depth_width / float(width_pixels)
@@ -163,7 +163,7 @@ class NuScenesDataset(GenericMVSDataset):
         for i in range(self.prediction_num_scales):
             K_scaled = K.clone()
             K_scaled[:2] /= 2**i
-            invK_scaled = torch.inverse(K_scaled)
+            invK_scaled = torch.linalg.inv(K_scaled)
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
