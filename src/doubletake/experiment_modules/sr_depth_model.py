@@ -538,15 +538,19 @@ class DepthModel(pl.LightningModule):
         min_log_depths = torch.amin(torch.nan_to_num(log_depth_gt, nan=torch.inf).flatten(1), dim=1, keepdim=True)
         max_log_depths = torch.amax(torch.nan_to_num(log_depth_gt, nan=-torch.inf).flatten(1), dim=1, keepdim=True)
         # print(max_log_depths.shape, min_log_depths.shape, depth_bins.shape)
-        target = (min_log_depths < depth_bins) & (depth_bins < max_log_depths)
+
+        target_1 = (log_depth_gt > torch.cat([torch.zeros_like(depth_bins[:, :1]), depth_bins[:, :-1]], dim=1).unsqueeze(-1).unsqueeze(-1))
+        target_2 = (log_depth_gt <= depth_bins.unsqueeze(-1).unsqueeze(-1))
+        target = target_1 & target_2
 
         # print('LOSS', depth_range.shape, target.shape)
         loss = torch.nn.functional.binary_cross_entropy_with_logits(
-            depth_range,
+            F.interpolate(depth_range, target.shape[-2:], mode='bilinear'),
             target.float()
         )
 
-        accuracy = ((torch.sigmoid(depth_range) > 0.5) == target).float().mean()
+        target = (min_log_depths < depth_bins) & (depth_bins < max_log_depths)
+        accuracy = ((torch.sigmoid(depth_range.flatten(2).amax(-1)) > 0.5) == target).float().mean()
 
         losses = {
             "loss": loss,

@@ -277,7 +277,7 @@ class CostVolumePatchEmbed(nn.Module):
                 x = torch.cat([x, img_feat], dim=1)
                 x = self.convs[f"conv_{i}"](x)
 
-        depth_range = self.range_predictor(x).mean(dim=(2, 3))
+        depth_range = self.range_predictor(x)#.mean(dim=(2, 3))
         # print('Depth range: ', depth_range.shape)
 
         x = self.patch_embed(x)  # B HW C
