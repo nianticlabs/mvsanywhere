@@ -121,9 +121,6 @@ class MVDepthLoss(nn.Module):
             mode="nearest",
             align_corners=False,
         )
-        src_img_sampled_b1hw = F.upsample(
-            src_img_sampled_b1hw, scale_factor=2.0
-        )
         for i in range(cur_img_b3hw.shape[0]):
             plt.imsave(f"{image_name}_{i}_cur.png", cur_img_b3hw[i, 0].detach().cpu().numpy(), cmap='gray')
             plt.imsave(f"{image_name}_{i}_src.png", src_img_b3hw[i, 0].detach().cpu().numpy(), cmap='gray')
