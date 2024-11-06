@@ -16,6 +16,7 @@ from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.vkitti import VirtualKITTIDataset
 from doubletake.datasets.nuscenes_dataset import NuScenesDataset
+from doubletake.datasets.sailvos3d import SAILVOS3DDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -294,6 +295,23 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             print(f" ARKitScenes Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
+
+    elif dataset_name == "sailvos3d":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = SAILVOS3DDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" SAILVOS3D Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
 
 
 

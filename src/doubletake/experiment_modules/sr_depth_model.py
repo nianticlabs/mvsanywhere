@@ -424,6 +424,22 @@ class DepthModel(pl.LightningModule):
             # source view to current view.
             cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(1) @ src_world_T_cam
 
+            src_cam_T_world = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
+            cur_world_T_cam = torch.stack([torch.eye(4) for _ in range(len(cur_world_T_cam))]).cuda()
+
+            uid = np.random.randint(1e7)
+            for idx in range(7):
+                self.mv_depth_loss._check_warped_image(
+                    f"debug/debug_{uid}_{idx}",
+                    cur_data["depth_b1hw"],
+                    cur_image,
+                    src_image[:, idx],
+                    cur_data[f"invK_s0_b44"],
+                    src_data[f"K_s0_b44"][:, idx],
+                    cur_world_T_cam,
+                    src_cam_T_world[:, idx]
+                )
+
         # flip transformation! Figure out if we're flipping. Should be true if
         # we are training and a coin flip says we should.
         flip_threshold = 0.5 if phase == "train" else 0.0
