@@ -375,19 +375,31 @@ class MVSSynthDataset(GenericMVSDataset):
         pose_data = json.load(open(pose_path))
         # cam_T_world is world_to_cam
         # {"c_y": 270, "c_x": 405, "extrinsic": [[-0.44908585898412184, 0.8934850306969834, 0.0003050379099841516, -4832.132997116336], [0.05556650233743187, 0.027593971272776994, 0.998077140679204, 41.47634255972844], [-0.8917558547747484, -0.4482392072441913, 0.06204153273588026, 5253.430797558781], [0.0, 0.0, 0.0, 1.0]], "f_x": 579.0183013629736, "f_y": 579.015571480746}
-        cam_T_world = np.array(pose_data['extrinsic']).astype(np.float32)
 
+        # Create the pose obect
+        pose_mat = np.array(pose_data['extrinsic']).astype(np.float32)
 
-        # Flip one axis (e.g., x-axis)
-        flip_matrix = np.eye(4)
+        flip_matrix = np.eye(4).astype(np.float32)
         flip_matrix[0, 0] = -1  # Reflect across the x-axis
+        pose_mat = flip_matrix @ pose_mat
 
-        cam_T_world = flip_matrix @ cam_T_world
+        gl_to_cv = np.array(
+            [
+                [1, -1, -1, 1],
+                [-1, 1, 1, -1],
+                [-1, 1, 1, -1],
+                [1, 1, 1, 1]
+            ]
+        )
 
-        print(np.linalg.det(cam_T_world))
+        pose_mat =  pose_mat * gl_to_cv
+
+        # try to get the translation from CAM_TO_WORLD into WORLD_TO_CAM to match the rotation
+        pose_mat[:3, -1] = np.linalg.inv(pose_mat[:3, :3]) @ pose_mat[:3, -1]
 
         # gl_to_cv = np.array([[1, -1, -1, 1], [-1, 1, 1, -1], [-1, 1, 1, -1], [1, 1, 1, 1]])
         # world_T_cam *= gl_to_cv
+        cam_T_world = pose_mat
 
         world_T_cam = np.linalg.inv(cam_T_world)
 
