@@ -492,7 +492,7 @@ class DepthModel(pl.LightningModule):
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
             B, C, H, W = cur_image.shape
-            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
+            depth_outputs = self.depth_decoder(cur_feats, H // 16, W // 16)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
