@@ -1,15 +1,9 @@
 import os
 from pathlib import Path
-import glob
-import json
 
-import kornia
-
-from pytorch3d.renderer.cameras import PerspectiveCameras
-from pytorch3d.utils import opencv_from_cameras_projection
 from doubletake.datasets.change_of_basis import ChangeOfBasis
 
-os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
 import numpy as np
 from PIL import Image
@@ -17,6 +11,7 @@ import torch
 import cv2
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
+from typing import Tuple
 
 
 class SAILVOS3DDataset(GenericMVSDataset):
@@ -31,33 +26,33 @@ class SAILVOS3DDataset(GenericMVSDataset):
     """
 
     def __init__(
-        self,
-        dataset_path,
-        split,
-        mv_tuple_file_suffix,
-        include_full_res_depth=False,
-        limit_to_scan_id=None,
-        num_images_in_tuple=None,
-        tuple_info_file_location=None,
-        image_height=384,
-        image_width=512,
-        high_res_image_width=640,
-        high_res_image_height=480,
-        image_depth_ratio=2,
-        shuffle_tuple=False,
-        include_full_depth_K=False,
-        include_high_res_color=False,
-        pass_frame_id=False,
-        skip_frames=None,
-        skip_to_frame=None,
-        verbose_init=True,
-        min_valid_depth=1e-3,
-        max_valid_depth=1e3,
-        disable_flip=False,
-        rotate_images=False,
-        matching_scale=0.25,
-        prediction_scale=0.5,
-        prediction_num_scales=5,
+            self,
+            dataset_path,
+            split,
+            mv_tuple_file_suffix,
+            include_full_res_depth=False,
+            limit_to_scan_id=None,
+            num_images_in_tuple=None,
+            tuple_info_file_location=None,
+            image_height=384,
+            image_width=512,
+            high_res_image_width=640,
+            high_res_image_height=480,
+            image_depth_ratio=2,
+            shuffle_tuple=False,
+            include_full_depth_K=False,
+            include_high_res_color=False,
+            pass_frame_id=False,
+            skip_frames=None,
+            skip_to_frame=None,
+            verbose_init=True,
+            min_valid_depth=1e-3,
+            max_valid_depth=1e3,
+            disable_flip=False,
+            rotate_images=False,
+            matching_scale=0.25,
+            prediction_scale=0.5,
+            prediction_num_scales=5,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -127,14 +122,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
         self.min_valid_depth = min_valid_depth
         self.max_valid_depth = max_valid_depth
 
-        # Load all transforms files to save IO time
-        # self.transforms = {}
-        # transforms_paths = Path(self.dataset_path) / "big_city/**/train/**/transforms.json"
-        # for transform_file in glob.glob(str(transforms_paths)):
-        #     with open(transform_file) as f:
-        #         transforms = json.load(f)
-        #     self.transforms["/".join(transform_file.split("/")[-5:-1])] = transforms
-
+        self.original_width, self.original_height = 1280, 800
 
         self.tuple_info_file_location = tuple_info_file_location
 
@@ -146,15 +134,15 @@ class SAILVOS3DDataset(GenericMVSDataset):
         on disk.
         """
         return frame_id
-    
+
     def get_valid_frame_path(self, split, scan):
         """returns the filepath of a file that contains valid frame ids for a
         scan."""
 
         scan_dir = (
-            Path(self.dataset_path)
-            / "valid_frames"
-            / scan
+                Path(self.dataset_path)
+                / "valid_frames"
+                / scan
         )
 
         scan_dir.mkdir(parents=True, exist_ok=True)
@@ -163,9 +151,9 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
     def _get_frame_ids(self, split, scan):
         image_files = (
-            Path(self.dataset_path)
-            / scan
-            / "images"
+                Path(self.dataset_path)
+                / scan
+                / "images"
         ).glob("*.bmp")
         return [img.stem for img in image_files]
 
@@ -226,9 +214,9 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
                 world_T_cam_44, _ = self.load_pose(scan, frame_ind)
                 if (
-                    np.isnan(np.sum(world_T_cam_44))
-                    or np.isinf(np.sum(world_T_cam_44))
-                    or np.isneginf(np.sum(world_T_cam_44))
+                        np.isnan(np.sum(world_T_cam_44))
+                        or np.isinf(np.sum(world_T_cam_44))
+                        or np.isneginf(np.sum(world_T_cam_44))
                 ):
                     bad_file_count += 1
                     dist_to_last_valid_frame += 1
@@ -270,20 +258,20 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         """
         cached_resized_path = (
-            Path(self.dataset_path)
-            / scan_id
-            / "images"
-            / f"{frame_id}.{self.image_width}_{self.image_height}.bmp"
+                Path(self.dataset_path)
+                / scan_id
+                / "images"
+                / f"{frame_id}.{self.image_width}_{self.image_height}.bmp"
         )
 
         if cached_resized_path.exists():
             return str(cached_resized_path)
 
         path = (
-            Path(self.dataset_path)
-            / scan_id
-            / "images"
-            / f"{frame_id}.bmp"
+                Path(self.dataset_path)
+                / scan_id
+                / "images"
+                / f"{frame_id}.bmp"
         )
 
         return str(path)
@@ -300,10 +288,10 @@ class SAILVOS3DDataset(GenericMVSDataset):
             The full size RGB frame from the dataset.
         """
         path = (
-            Path(self.dataset_path)
-            / scan_id
-            / "images"
-            / f"{frame_id}.bmp"
+                Path(self.dataset_path)
+                / scan_id
+                / "images"
+                / f"{frame_id}.bmp"
         )
 
         # instead return the default image
@@ -339,10 +327,10 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         """
         path = (
-            Path(self.dataset_path)
-            / scan_id
-            / "depth"
-            / f"{frame_id}.npy"
+                Path(self.dataset_path)
+                / scan_id
+                / "depth"
+                / f"{frame_id}.npy"
         )
 
         return str(path)
@@ -353,7 +341,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         Args:
             scan_id: the scan this file belongs to.
-            frame_id: id for the frame. Not needed for Hypersim as images
+            frame_id: id for the frame.
             share intrinsics across a scene.
 
         Returns:
@@ -366,118 +354,147 @@ class SAILVOS3DDataset(GenericMVSDataset):
                 Only provided when include_full_res_depth is true.
 
         """
-        height_pixels, width_pixels = 800, 1200
+        # Use actual image dimensions
+        height_pixels, width_pixels = self.image_height, self.image_width
 
-        
         camera_file = (
-            Path(self.dataset_path)
-            / scan_id
-            / "camera"
-            / f"{frame_id}.yaml"
+                Path(self.dataset_path)
+                / scan_id
+                / "camera"
+                / f"{frame_id}.yaml"
         )
-        
+
         with open(camera_file, "r") as f:
             lines = f.readlines()
-        intrinsics = torch.tensor(np.array([list(map(float, lines[1+i][3:-2].split(","))) for i in range(3)]))
+
+        intrinsics = torch.tensor(np.array([list(map(float, lines[1 + i][3:-2].split(","))) for i in range(3)]))
 
         K = torch.eye(4, dtype=torch.float32)
         K[:3, :3] = intrinsics
         K[2, 2] *= -1.0
-        K[0, 2] = 1200 / 2
-        K[1, 2] = 800 / 2
+        K[0, 2] = width_pixels / 2
+        K[1, 2] = height_pixels / 2
 
-
-        focal_length = torch.tensor([K[0, 0], K[1, 1]])
-        focal_length = (focal_length * torch.tensor([1200, 800]) / 2) / 400
-
-        principal_point = torch.tensor([0, 0])
-
-        pcam = PerspectiveCameras(focal_length=focal_length[None], principal_point=principal_point[None], R=torch.eye(4)[None], T=torch.zeros(3)[None])
-        _, _, KK = opencv_from_cameras_projection(pcam, torch.tensor([800, 1200])[None])
-        K[0, 0] = focal_length[0]
-        K[1, 1] = focal_length[1]
-        # K[3, 3] = 1
-        
-
-        # K[0, 2] = 1200
-        # K[1, 2] = 800
-
-        # top, left, h, w = self.random_resize_crop.get_params(
-        #     torch.empty((height_pixels, width_pixels)),
-        #     self.random_resize_crop.scale,
-        #     self.random_resize_crop.ratio
-        # )
-        # K[0, 2] = K[0, 2] - left
-        # K[1, 2] = K[1, 2] - top
-        # width_pixels = w
-        # height_pixels = h
+        # Scale intrinsics
+        scale_x = width_pixels / self.original_width
+        scale_y = height_pixels / self.original_height
+        K[0, 0] *= scale_x
+        K[1, 1] *= scale_y
+        K[0, 2] *= scale_x
+        K[1, 2] *= scale_y
 
         if flip:
             K[0, 2] = float(width_pixels) - K[0, 2]
 
         output_dict = {}
 
-        # optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
             output_dict[f"K_full_depth_b44"] = K.clone()
-            output_dict[f"invK_full_depth_b44"] = torch.tensor(np.linalg.inv(K))
+            output_dict[f"invK_full_depth_b44"] = torch.inverse(K)
 
         K_matching = K.clone()
-        K_matching[0] *= self.matching_width / float(width_pixels)
-        K_matching[1] *= self.matching_height / float(height_pixels)
+        K_matching[0, 0] *= self.matching_width / float(width_pixels)
+        K_matching[1, 1] *= self.matching_height / float(height_pixels)
+        K_matching[0, 2] *= self.matching_width / float(width_pixels)
+        K_matching[1, 2] *= self.matching_height / float(height_pixels)
         output_dict["K_matching_b44"] = K_matching
-        output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
+        output_dict["invK_matching_b44"] = torch.inverse(K_matching)
 
-        # scale intrinsics to the dataset's configured depth resolution.
-        K[0] *= self.depth_width / float(width_pixels)
-        K[1] *= self.depth_height / float(height_pixels)
+        # Scale intrinsics to the dataset's configured depth resolution.
+        K_depth = K.clone()
+        K_depth[0, 0] *= self.depth_width / float(width_pixels)
+        K_depth[1, 1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
-            K_scaled = K.clone()
-            K_scaled[:2] /= 2**i
-            invK_scaled = np.linalg.inv(K_scaled)
+            K_scaled = K_depth.clone()
+            K_scaled[0, 0] /= 2 ** i
+            K_scaled[1, 1] /= 2 ** i
+            K_scaled[0, 2] /= 2 ** i
+            K_scaled[1, 2] /= 2 ** i
             output_dict[f"K_s{i}_b44"] = K_scaled
-            output_dict[f"invK_s{i}_b44"] = invK_scaled
+            output_dict[f"invK_s{i}_b44"] = torch.inverse(K_scaled)
 
-        return output_dict, None #(left, top, left+width_pixels, top+height_pixels)
-    
+        return output_dict, None
+
     def _load_rage_matrices(self, scan_id, frame_id):
+        """
+        Loads the rage matrices for a specific scan and frame.
+
+        Parameters:
+            scan_id (str): Identifier for the scan.
+            frame_id (str): Identifier for the frame within the scan.
+
+        Returns:
+            np.lib.npyio.NpzFile: Loaded rage matrices from the .npz file.
+        """
         path = (
-            Path(self.dataset_path)
-            / scan_id
-            / "rage_matrices"
-            / f"{frame_id}.npz"
+                Path(self.dataset_path)
+                / scan_id
+                / "rage_matrices"
+                / f"{frame_id}.npz"
         )
-        return np.load(path)
-    
-    @staticmethod
-    def convert_ndc_depth_to_cam(depth, P_inverse, H, W):
-        def pixels_to_ndcs(xx, yy, size):
-            s_y, s_x = size
-            s_x -= 1  # so 1 is being mapped into (n-1)th pixel
-            s_y -= 1  # so 1 is being mapped into (n-1)th pixel
-            x = (2 / s_x) * xx - 1
-            y = (-2 / s_y) * yy + 1
-            return x, y
-        
-        depth = depth/6.0 - 4e-5
+        if not path.exists():
+            raise FileNotFoundError(f"Rage matrices file not found: {path}")
+        try:
+            matrices = np.load(path)
+            return matrices
+        except Exception as e:
+            raise IOError(f"Failed to load rage matrices from {path}: {e}")
 
-        px = np.arange(0, W)
-        py = np.arange(0, H)
-        px, py = np.meshgrid(px, py, sparse=False)
-        px = px.reshape(-1)
-        py = py.reshape(-1)
+    def convert_ndc_depth_to_cam(self, depth: np.ndarray, P_inverse: np.ndarray, H: int, W: int) -> np.ndarray:
+        """
+        Converts a depth map from Normalized Device Coordinates (NDC) to camera space.
+        Parameters
+        ----------
+        depth : np.ndarray
+            A 2D numpy array of shape (H, W) representing the depth map in NDC. Depth values are
+            assumed to be in a normalized range and will be scaled accordingly.
 
-        ndcz = depth[py, px] # get the depth in NDC
-        ndcx, ndcy = pixels_to_ndcs(px, py, (H, W))
-        ndc_coord = np.stack([ndcx, ndcy, ndcz, np.ones_like(ndcz)], axis=1)
+        P_inverse : np.ndarray
+            A 4x4 numpy array representing the inverse of the projection matrix. This matrix is used
+            to transform NDC coordinates to camera coordinates.
 
-        camera_coord = ndc_coord @ P_inverse
-        camera_coord = camera_coord/camera_coord[:,-1:]
+        H : int
+            The height of the depth map in pixels.
 
-        return -camera_coord[..., 2].reshape(H, W)
+        W : int
+            The width of the depth map in pixels.
 
+        Returns
+        -------
+        np.ndarray
+            A 2D numpy array of shape (H, W) containing the depth values in camera space.
+
+        """
+
+        # Apply depth scaling based on dataset specification
+        depth_scaled = depth / 6.0 - 4e-5
+
+        # Generate pixel coordinates
+        px = np.arange(W)
+        py = np.arange(H)
+        px_grid, py_grid = np.meshgrid(px, py, sparse=False)
+        px_flat = px_grid.reshape(-1)
+        py_flat = py_grid.reshape(-1)
+
+        # Retrieve depth values at each pixel
+        ndcz = depth_scaled[py_flat, px_flat]  # Depth in NDC
+
+        # Convert pixel coordinates to NDC
+        ndcx, ndcy = self.pixels_to_ndcs(px_flat, py_flat, (H, W))
+
+        # Stack NDC coordinates with depth and homogeneous coordinate
+        ndc_coord = np.stack([ndcx, ndcy, ndcz, np.ones_like(ndcz)], axis=1)  # Shape: (N, 4)
+
+        # Transform NDC coordinates to camera space
+        camera_coord = ndc_coord @ P_inverse  # Shape: (N, 4)
+        camera_coord /= camera_coord[:, -1:]
+
+        # Extract and negate the Z-component to align with camera forward direction
+        depth_cam = -camera_coord[:, 2].reshape(H, W)  # Shape: (H, W)
+
+        return depth_cam
 
     def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
@@ -500,22 +517,22 @@ class SAILVOS3DDataset(GenericMVSDataset):
         """
         depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         rage_matrices = self._load_rage_matrices(scan_id, frame_id)
+
         depth = np.load(depth_filepath)
-        depth = self.convert_ndc_depth_to_cam(depth, rage_matrices['P_inv'], 800, 1200)
+        depth = self.convert_ndc_depth_to_cam(depth, rage_matrices['P_inv'], depth.shape[0], depth.shape[1])
 
         if crop:
             depth = depth[
-                crop[1]:crop[3],
-                crop[0]:crop[2]
-            ]
+                    crop[1]:crop[3],
+                    crop[0]:crop[2]
+                    ]
 
         depth = cv2.resize(
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
 
-
         mask_b = depth > 0
-        
+
         mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
         depth = torch.tensor(depth).float().unsqueeze(0)
 
@@ -529,6 +546,34 @@ class SAILVOS3DDataset(GenericMVSDataset):
         depth[~mask_b] = torch.tensor(np.nan)
 
         return depth, mask, mask_b
+
+    @staticmethod
+    def pixels_to_ndcs(xx: np.ndarray, yy: np.ndarray, size: Tuple[int, int]) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Converts pixel coordinates to Normalized Device Coordinates (NDC).
+
+        Parameters
+        ----------
+        xx : np.ndarray
+            A 1D numpy array of x pixel coordinates.
+
+        yy : np.ndarray
+            A 1D numpy array of y pixel coordinates.
+
+        size : Tuple[int, int]
+            A tuple containing the height (H) and width (W) of the image.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Two 1D numpy arrays representing the x and y coordinates in NDC space.
+        """
+        s_y, s_x = size
+        s_x -= 1  # so 1 is being mapped into (n-1)th pixel
+        s_y -= 1  # so 1 is being mapped into (n-1)th pixel
+        x_ndc = (2.0 / s_x) * xx - 1.0
+        y_ndc = (-2.0 / s_y) * yy + 1.0
+        return x_ndc, y_ndc
 
     def load_full_res_depth_and_mask(self, scan_id, frame_id):
         """Loads a depth map at the native resolution the dataset provides.
@@ -549,7 +594,8 @@ class SAILVOS3DDataset(GenericMVSDataset):
         full_res_depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
         rage_matrices = self._load_rage_matrices(scan_id, frame_id)
         full_res_depth = np.load(full_res_depth_filepath)
-        full_res_depth = self.convert_ndc_depth_to_cam(full_res_depth, rage_matrices['P_inv'], 800, 1200)
+        full_res_depth = self.convert_ndc_depth_to_cam(full_res_depth, rage_matrices['P_inv'], full_res_depth.shape[0],
+                                                       full_res_depth.shape[1])
 
         full_res_mask_b = full_res_depth > 0
         full_res_mask_b = torch.tensor(full_res_mask_b).bool().unsqueeze(0)
@@ -579,58 +625,26 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         """
         camera_file = (
-            Path(self.dataset_path)
-            / scan_id
-            / "camera"
-            / f"{frame_id}.yaml"
+                Path(self.dataset_path)
+                / scan_id
+                / "camera"
+                / f"{frame_id}.yaml"
         )
         if not camera_file.exists():
             return np.full((4, 4), np.nan), np.full((4, 4), np.nan)
 
         with open(camera_file, "r") as f:
             lines = f.readlines()
-        extrinsics = np.array([list(map(float, lines[5+i][3:-2].split(","))) for i in range(3)])
-
-        # rage_matrices = self._load_rage_matrices(scan_id, frame_id)
-
-        # world_T_cam = np.eye(4)
-        # world_T_cam[:3] = pose
-        # world_T_cam[:3, 3] /= 6.0
-
-
-        # Pytorch 3d stuff
-        # pose[:3, -1:] /= 6.0
-        # pose2 = np.eye(4)
-        # pose2[:3, :3] = pose[:3, :3].T
-        # pose2[:3, -1:] = -pose[:3, :3].T @ pose[:3, -1:]
-
-        # # pose = np.linalg.inv((rage_matrices["VP"] @ rage_matrices["P_inv"]).T)
-
-        # pcam = PerspectiveCameras(R=pose2[:3, :3][None], T=pose2[:3, 3][None])
-        # R, t, _ = opencv_from_cameras_projection(pcam, torch.tensor([384, 512])[None])
-        # world_to_cam = np.eye(4)
-        # world_to_cam[:3, :3] = R[0]
-        # world_to_cam[:3, 3] = t[0]
+        extrinsics = np.array([list(map(float, lines[5 + i][3:-2].split(","))) for i in range(3)])
 
         # kornia.geometry.conversions.worldtocam_to_camtoworld_Rt
         world_T_cam = np.eye(4)
         world_T_cam[:3, :3] = extrinsics[:3, :3].T
         world_T_cam[:3, -1:] = -extrinsics[:3, :3].T @ extrinsics[:3, -1:]
         world_T_cam = ChangeOfBasis.convert_matrix_to_vision_convention(world_T_cam).astype(np.float32)
-        # world_T_cam = kornia.geometry.conversions.camtoworld_graphics_to_vision_4x4(torch.tensor(world_T_cam)[None])[0].numpy()
-
-
-
-        # cam_T_world = world_to_cam.astype(np.float32)
-        # world_T_cam = np.linalg.inv(cam_T_world)
 
         world_T_cam = world_T_cam.astype(np.float32)
-        # world_T_cam = ChangeOfBasis.convert_matrix_to_vision_convention(world_T_cam).astype(np.float32)
-        
-        # Other way around?
-        cam_T_world = np.linalg.inv(world_T_cam)
 
-        # world_T_cam = np.linalg.inv(world_T_cam)
-        # cam_T_world = np.linalg.inv(cam_T_world)
+        cam_T_world = np.linalg.inv(world_T_cam)
 
         return world_T_cam, cam_T_world
