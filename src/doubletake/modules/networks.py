@@ -205,9 +205,13 @@ class UNetMatchingEncoder(nn.Module):
         self.outconv = nn.Sequential(
             nn.LeakyReLU(0.2, True),
             nn.Conv2d(32, 16, 1),
-            nn.InstanceNorm2d(16),
+            # nn.InstanceNorm2d(16),
         )
 
     def forward(self, x):
         encoder_feats = {f"feat_{i}": f for i, f in enumerate(self.encoder(x))}
-        return self.outconv(self.decoder(encoder_feats)["feat_1"])
+        out = self.outconv(self.decoder(encoder_feats)["feat_1"])
+        # normalise
+        out = out / torch.norm(out, dim=1, keepdim=True)
+        return out
+

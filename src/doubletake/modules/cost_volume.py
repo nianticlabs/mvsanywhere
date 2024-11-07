@@ -517,7 +517,8 @@ class EfficientCostVolumeManager(CostVolumeManager):
         cur_feats_b1kfhw = einops.repeat(
             cur_feats, "b f h w -> b 1 k f h w", k=int(depth_planes_bdhw.shape[1])
         )
-        dot_product_brkhw = torch.sum(src_feat_warped_brkfhw * cur_feats_b1kfhw, dim=3) * mask_brkhw
+        dists_brkhw = (src_feat_warped_brkfhw - cur_feats_b1kfhw).norm(dim=3) * mask_brkhw
+        dot_product_brkhw = 1 / (1 + dists_brkhw) # similarity
 
         # Sum over the frames
         dot_product_bkhw = dot_product_brkhw.sum(dim=1)

@@ -438,37 +438,38 @@ class DepthModel(pl.LightningModule):
         # prior.
         cur_feats = self.encoder(cur_image)
 
-        # Compute matching features
-        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
-            cur_image, src_image, unbatched_matching_encoder_forward
-        )
+        with torch.no_grad():
+            # Compute matching features
+            matching_cur_feats, matching_src_feats = self.compute_matching_feats(
+                cur_image, src_image, unbatched_matching_encoder_forward
+            )
 
-        if flip:
-            # now (carefully) flip matching features back for correct MVS.
-            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
-            matching_src_feats = torch.flip(matching_src_feats, (-1,))
+            if flip:
+                # now (carefully) flip matching features back for correct MVS.
+                matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
+                matching_src_feats = torch.flip(matching_src_feats, (-1,))
 
-        # Get min and max depth to the right shape, device and dtype
-        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
-        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+            # Get min and max depth to the right shape, device and dtype
+            min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+            max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
-        # Compute the cost volume. Should be size bdhw.
-        cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
-            cur_feats=matching_cur_feats,
-            src_feats=matching_src_feats,
-            src_extrinsics=src_cam_T_cur_cam,
-            src_poses=cur_cam_T_src_cam,
-            src_Ks=src_K,
-            cur_invK=cur_invK,
-            min_depth=min_depth,
-            max_depth=max_depth,
-            return_mask=return_mask,
-        )
+            # Compute the cost volume. Should be size bdhw.
+            cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
+                cur_feats=matching_cur_feats,
+                src_feats=matching_src_feats,
+                src_extrinsics=src_cam_T_cur_cam,
+                src_poses=cur_cam_T_src_cam,
+                src_Ks=src_K,
+                cur_invK=cur_invK,
+                min_depth=min_depth,
+                max_depth=max_depth,
+                return_mask=return_mask,
+            )
 
-        if flip:
-            # OK, we've computed the cost volume, now we need to flip the cost
-            # volume to have it aligned with flipped image prior features
-            cost_volume = torch.flip(cost_volume, (-1,))
+            if flip:
+                # OK, we've computed the cost volume, now we need to flip the cost
+                # volume to have it aligned with flipped image prior features
+                cost_volume = torch.flip(cost_volume, (-1,))
 
         # Encode the cost volume and current image features
         if self.run_opts.cv_encoder_type == "multi_scale_encoder":
@@ -650,25 +651,25 @@ class DepthModel(pl.LightningModule):
             self.manual_backward(losses["loss"] / 2.0)
 
             if (batch_idx + 1) % 2 == 0:
-                optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
+                optimizer_da_enc, optimizer_da_dec = self.optimizers()
             
-                optimizer_sr.step()
+                # optimizer_sr.step()
                 optimizer_da_enc.step()
                 optimizer_da_dec.step()
 
-                optimizer_sr.zero_grad()
+                # optimizer_sr.zero_grad()
                 optimizer_da_enc.zero_grad()
                 optimizer_da_dec.zero_grad()
 
                 # multiple schedulers
-                scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
-                scheduler_sr.step()
+                scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
+                # scheduler_sr.step()
                 scheduler_da_enc.step()
                 scheduler_da_dec.step()
 
         #
         is_train = phase == "train"
-        global_step = self.global_step // 3
+        global_step = self.global_step // 2
 
         if batch_idx % 2 == 0:
             # logging and validation
@@ -784,11 +785,11 @@ class DepthModel(pl.LightningModule):
         70000 and 80000.
 
         """
-        optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume.parameters()) + 
-            list(self.matching_model.parameters()),
-            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
-        )
+        # optimizer_sr = torch.optim.AdamW(
+        #     [list(self.cost_volume.parameters()) + 
+        #     list(self.matching_model.parameters())],
+        #     lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        # )
         optimizer_da_encoder = torch.optim.AdamW(
             self.encoder.parameters(),
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
@@ -806,7 +807,7 @@ class DepthModel(pl.LightningModule):
             else:
                 return 0.01
 
-        lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
+        # lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
         lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
         lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
-        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]
+        return [optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_da_encoder, lr_scheduler_da_decoder]
