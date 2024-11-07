@@ -616,7 +616,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
         return world_T_cam, cam_T_world
 
     @staticmethod
-    def compute_intrinsics_from_P(P, image_width, image_height):
+    def compute_intrinsics_from_P(P: np.ndarray, image_width: int, image_height: int) -> np.ndarray:
         """
         Computes camera intrinsics in pixel space from the projection matrix P.
 
