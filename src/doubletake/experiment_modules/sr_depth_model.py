@@ -141,8 +141,8 @@ class DepthModel(pl.LightningModule):
         elif 'dinov2' in self.run_opts.image_encoder_name:
             intermediate_layers_idx = {
                 'dinov2_vits14': [0, 2, 4, 5, 8, 11],
-                'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitb14': [0, 2, 4, 5, 8, 11],
+                'dinov2_vitl14': [4, 11, 17, 23],
                 'dinov2_vitg14': [9, 19, 29, 39]
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.encoder = DINOv2(
@@ -163,14 +163,14 @@ class DepthModel(pl.LightningModule):
                 num_ch_outs=[64, 128, 256, 384],
             )
             dec_num_input_ch = (
-                self.encoder.num_ch_enc[:1]
-                + self.cost_volume_net.num_ch_enc
+                    self.encoder.num_ch_enc[:1]
+                    + self.cost_volume_net.num_ch_enc
             )
         elif self.run_opts.cv_encoder_type == 'vit_encoder':
             intermediate_layers_idx = {
                 'dinov2_vits14': [2, 5, 8, 11],
-                'dinov2_vitb14': [2, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitb14': [2, 5, 8, 11],
+                'dinov2_vitl14': [4, 11, 17, 23],
                 'dinov2_vitg14': [9, 19, 29, 39]
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.cost_volume_net = ViTCVEncoder(
@@ -193,7 +193,8 @@ class DepthModel(pl.LightningModule):
 
         # iniitalize the final depth decoder
         if self.run_opts.depth_decoder_name == "unet_pp":
-            self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
+            self.depth_decoder = DepthDecoderPP(dec_num_input_ch,
+                                                num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
         elif self.run_opts.depth_decoder_name == "dpt":
@@ -203,8 +204,8 @@ class DepthModel(pl.LightningModule):
         elif "depth_anything" in self.run_opts.depth_decoder_name:
             intermediate_layer_idx = {
                 'dinov2_vits14': [2, 5, 8, 11],
-                'dinov2_vitb14': [2, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
+                'dinov2_vitb14': [2, 5, 8, 11],
+                'dinov2_vitl14': [4, 11, 17, 23],
                 'dinov2_vitg14': [9, 19, 29, 39]
             }[self.run_opts.depth_decoder_name.split(".")[1]]
             self.depth_decoder = DepthAnything(
@@ -284,10 +285,10 @@ class DepthModel(pl.LightningModule):
         self.automatic_optimization = False
 
     def compute_matching_feats(
-        self,
-        cur_image,
-        src_image,
-        unbatched_matching_encoder_forward,
+            self,
+            cur_image,
+            src_image,
+            unbatched_matching_encoder_forward,
     ):
         """
         Computes matching features for the current image (reference) and
@@ -339,12 +340,12 @@ class DepthModel(pl.LightningModule):
         return matching_cur_feats, matching_src_feats
 
     def forward(
-        self,
-        phase,
-        cur_data,
-        src_data,
-        unbatched_matching_encoder_forward=False,
-        return_mask=False,
+            self,
+            phase,
+            cur_data,
+            src_data,
+            unbatched_matching_encoder_forward=False,
+            return_mask=False,
     ):
         """
         Computes a forward pass through the depth model.
@@ -424,22 +425,6 @@ class DepthModel(pl.LightningModule):
             # source view to current view.
             cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(1) @ src_world_T_cam
 
-            src_cam_T_world = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
-            cur_world_T_cam = torch.stack([torch.eye(4) for _ in range(len(cur_world_T_cam))]).cuda()
-
-            uid = np.random.randint(1e7)
-            for idx in range(7):
-                self.mv_depth_loss._check_warped_image(
-                    f"debug/debug_{uid}_{idx}",
-                    cur_data["depth_b1hw"],
-                    cur_image,
-                    src_image[:, idx],
-                    cur_data[f"invK_s0_b44"],
-                    src_data[f"K_s0_b44"][:, idx],
-                    cur_world_T_cam,
-                    src_cam_T_world[:, idx]
-                )
-
         # flip transformation! Figure out if we're flipping. Should be true if
         # we are training and a coin flip says we should.
         flip_threshold = 0.5 if phase == "train" else 0.0
@@ -495,15 +480,15 @@ class DepthModel(pl.LightningModule):
             cur_feats = cur_feats[:1] + cost_volume_features
         elif self.run_opts.cv_encoder_type == "vit_encoder":
             cur_feats = self.cost_volume_net(
-                        cost_volume, 
-                        cur_feats,
-                    )
+                cost_volume,
+                cur_feats,
+            )
         elif self.run_opts.cv_encoder_type == "cnn_encoder":
             cur_feats = self.cost_volume_net(
-                        cost_volume, 
-                        cur_feats,
-                    )     
-        # Decode into depth at multiple resolutions.
+                cost_volume,
+                cur_feats,
+            )
+            # Decode into depth at multiple resolutions.
         if "depth_anything" in self.run_opts.depth_decoder_name:
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
@@ -581,7 +566,7 @@ class DepthModel(pl.LightningModule):
                     mode="nearest",
                 )
                 ms_loss += (
-                    self.ms_loss_fn(log_depth_gt[mask_b], log_depth_pred_resized[mask_b]) / 2**i
+                        self.ms_loss_fn(log_depth_gt[mask_b], log_depth_pred_resized[mask_b]) / 2 ** i
                 )
                 found_scale = True
 
@@ -598,17 +583,7 @@ class DepthModel(pl.LightningModule):
         log_l1_loss = self.abs_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
         normals_loss = self.normals_loss(normals_gt, normals_pred)
 
-        mv_loss = self.mv_depth_loss(
-            depth_pred_b1hw=depth_pred,
-            cur_depth_b1hw=depth_gt,
-            src_depth_bk1hw=src_data["depth_b1hw"],
-            cur_invK_b44=cur_data[f"invK_s0_b44"],
-            src_K_bk44=src_data[f"K_s0_b44"],
-            cur_world_T_cam_b44=cur_data["world_T_cam_b44"],
-            src_cam_T_world_bk44=src_data["cam_T_world_b44"],
-        )
-
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss # + 0.2 * mv_loss
+        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
 
         losses = {
             "loss": loss,
@@ -619,7 +594,6 @@ class DepthModel(pl.LightningModule):
             "ms_loss": ms_loss,
             "inv_abs_loss": inv_abs_loss,
             "log_l1_loss": log_l1_loss,
-            "mv_loss": mv_loss,
         }
         return losses
 
@@ -678,7 +652,7 @@ class DepthModel(pl.LightningModule):
 
             if (batch_idx + 1) % 2 == 0:
                 optimizer_sr, optimizer_da_enc, optimizer_da_dec = self.optimizers()
-            
+
                 optimizer_sr.step()
                 optimizer_da_enc.step()
                 optimizer_da_dec.step()
@@ -701,7 +675,8 @@ class DepthModel(pl.LightningModule):
             # logging and validation
             with torch.inference_mode():
                 # log images for train.
-                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
+                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (
+                        not is_train and batch_idx == 0):
 
                     prefix = "train" if is_train else "val"
                     for i in range(4):
@@ -731,7 +706,7 @@ class DepthModel(pl.LightningModule):
                         self.logger.experiment.add_image(f"{prefix}_image/{i}", image_i, global_step)
                         self.logger.experiment.add_image(f"{prefix}_src_images/{i}", grid, global_step)
                         self.logger.experiment.add_image(
-                                f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
+                            f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
                         )
                         self.logger.experiment.add_image(
                             f"{prefix}_depth_pred/{i}", depth_pred_viz_i, global_step
@@ -812,7 +787,7 @@ class DepthModel(pl.LightningModule):
 
         """
         optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume.parameters()) + 
+            list(self.cost_volume.parameters()) +
             list(self.matching_model.parameters()),
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
@@ -821,7 +796,7 @@ class DepthModel(pl.LightningModule):
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
-            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()),
             lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
@@ -834,6 +809,9 @@ class DepthModel(pl.LightningModule):
                 return 0.01
 
         lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
-        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
-        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
-        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0,
+                                                                    end_factor=0.001, total_iters=70000)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0,
+                                                                    end_factor=0.001, total_iters=70000)
+        return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder,
+                                                                            lr_scheduler_da_decoder]
