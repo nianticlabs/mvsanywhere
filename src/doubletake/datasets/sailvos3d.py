@@ -357,23 +357,14 @@ class SAILVOS3DDataset(GenericMVSDataset):
         # Use actual image dimensions
         height_pixels, width_pixels = self.image_height, self.image_width
 
-        camera_file = (
-                Path(self.dataset_path)
-                / scan_id
-                / "camera"
-                / f"{frame_id}.yaml"
-        )
+        rage_matrices = self._load_rage_matrices(scan_id, frame_id)
 
-        with open(camera_file, "r") as f:
-            lines = f.readlines()
-
-        intrinsics = torch.tensor(np.array([list(map(float, lines[1 + i][3:-2].split(","))) for i in range(3)]))
+        intrinsics = torch.from_numpy(self.compute_intrinsics_from_P(rage_matrices['P'],
+                                                                     self.original_width,
+                                                                     self.original_height))
 
         K = torch.eye(4, dtype=torch.float32)
-        K[:3, :3] = intrinsics
-        K[2, 2] *= -1.0
-        K[0, 2] = width_pixels / 2
-        K[1, 2] = height_pixels / 2
+        K[:3, :3] = intrinsics.clone()
 
         # Scale intrinsics
         scale_x = width_pixels / self.original_width
@@ -648,3 +639,43 @@ class SAILVOS3DDataset(GenericMVSDataset):
         cam_T_world = np.linalg.inv(world_T_cam)
 
         return world_T_cam, cam_T_world
+
+    @staticmethod
+    def compute_intrinsics_from_P(P, image_width, image_height):
+        """
+        Computes camera intrinsics in pixel space from the projection matrix P.
+
+        Args:
+            P: 4x4 projection matrix (numpy array)
+            image_width: Width of the image in pixels
+            image_height: Height of the image in pixels
+
+        Returns:
+            K: 3x3 depth  intrinsic matrix
+        """
+        P = np.array(P)
+
+        # Extract elements related to field of view
+        P00 = P[0, 0]
+        P11 = P[1, 1]
+
+        # Compute field of view angles in radians
+        fov_x = 2 * np.arctan(1 / P00)
+        fov_y = 2 * np.arctan(1 / P11)
+
+        # Compute focal lengths in pixels
+        fx = (image_width / 2) / np.tan(fov_x / 2)
+        fy = (image_height / 2) / np.tan(fov_y / 2)
+
+        # Assume principal point is at the center
+        cx = image_width / 2
+        cy = image_height / 2
+
+        # Construct the intrinsic matrix K_depth
+        K = np.array([
+            [fx, 0, cx],
+            [0, fy, cy],
+            [0, 0, 1]
+        ])
+
+        return K
