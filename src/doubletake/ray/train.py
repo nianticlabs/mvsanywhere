@@ -51,12 +51,15 @@ class RayRunner:
                 "py_modules": ["src/doubletake"],
                 "conda": "environment.yml",
                 "excludes": [
+                    "debug_dump/*",
                     ".git", "media/*", "*.ckpt",
                     "data_splits/ScanNetv2/standard_split/train_eight_view_deepvmvs.txt",
                     "data_splits/ScanNetv2/standard_split/train_test_eight_view_deepvmvs.txt",
                     "data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs_dense.txt",
                     "data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs_offline.txt",
                     "data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs.txt",
+                    "data_splits/arkitscenes/train_landscape_eight_view_deepvmvs.txt",
+                    "data_splits/arkitscenes/train_portrait_eight_view_deepvmvs.txt"
                 ],
             },
         )

@@ -681,7 +681,7 @@ class DepthModel(pl.LightningModule):
                 if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
 
                     prefix = "train" if is_train else "val"
-                    for i in range(min(4,batch_size)):
+                    for i in range(min(4, batch_size)):
                         mask_i = mask[i].float().cpu()
                         depth_gt_viz_i, vmin, vmax = colormap_image(
                             depth_gt[i].float().cpu(), mask_i, return_vminvmax=True

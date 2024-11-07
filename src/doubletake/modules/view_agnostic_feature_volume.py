@@ -182,10 +182,22 @@ class ViewAgnosticFeatureVolumeManager(CostVolumeManager):
             num_views=num_src_frames,
         )[:, :, None, None].expand(frame_pose_dist_bkhw.shape)
 
-        # normalize frame_pose_dist_bkhw, r, t measures across k.
-        frame_pose_dist_bkhw = frame_pose_dist_bkhw / frame_pose_dist_bkhw.max(dim=1, keepdim=True)[0]
-        t_measure_bkhw = t_measure_bkhw / t_measure_bkhw.max(dim=1, keepdim=True)[0]
-        r_measure_bkhw = r_measure_bkhw / r_measure_bkhw.max(dim=1, keepdim=True)[0]
+        # normalize frame_pose_dist_bkhw, r, t measures across k. Make sure we don't chew on a nan
+        # if the max is 0.
+        zero_check_b = torch.all((frame_pose_dist_bkhw[:,:,0,0] == 0), 1)
+        max_bkhw = frame_pose_dist_bkhw.max(dim=1, keepdim=True)[0]
+        max_bkhw[zero_check_b] = 1.0
+        frame_pose_dist_bkhw = frame_pose_dist_bkhw / max_bkhw
+        
+        zero_check_b = torch.all((t_measure_bkhw[:,:,0,0] == 0), 1)
+        max_bkhw = t_measure_bkhw.max(dim=1, keepdim=True)[0]
+        max_bkhw[zero_check_b] = 1.0
+        t_measure_bkhw = t_measure_bkhw / max_bkhw
+        
+        zero_check_b = torch.all((r_measure_bkhw[:,:,0,0] == 0), 1)
+        max_bkhw = r_measure_bkhw.max(dim=1, keepdim=True)[0]
+        max_bkhw[zero_check_b] = 1.0
+        r_measure_bkhw = r_measure_bkhw / max_bkhw
         
 
         # init an overall mask if need be
