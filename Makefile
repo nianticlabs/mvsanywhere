@@ -4,8 +4,8 @@ SYSTEM_NAME := $(shell uname)
 SYSTEM_ARCHITECTURE := $(shell uname -m)
 MAMBA_INSTALL_SCRIPT := Mambaforge-$(SYSTEM_NAME)-$(SYSTEM_ARCHITECTURE).sh
 
-MAMBA_ENV_NAME := doubletake
-PACKAGE_FOLDER := src/doubletake
+MAMBA_ENV_NAME := fmvs
+PACKAGE_FOLDER := src/fmvs
 
 # HELP: install-mamba: Install Mamba
 .PHONY: install-mamba
