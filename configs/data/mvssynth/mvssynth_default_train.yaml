@@ -1,0 +1,10 @@
+!!python/object:doubletake.options.DataOptions
+dataset_path: /mnt/nas3/shared/datasets/mvssynth/GTAV_540
+tuple_info_file_location: data_splits/mvssynth/
+dataset_scan_split_file: data_splits/mvssynth/train_scans.txt
+dataset: mvssynth
+mv_tuple_file_suffix: _eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: train
+val_interval: 100
