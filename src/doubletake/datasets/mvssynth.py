@@ -1,21 +1,15 @@
 import os
+
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-from PIL import Image
-import torch
-import h5py
-import scipy
-import json
-import cv2
-import OpenEXR
-import Imath
 
+import torch
+
+import json
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
-from doubletake.utils.geometry_utils import rotx
 
 
 class MVSSynthDataset(GenericMVSDataset):
@@ -30,33 +24,33 @@ class MVSSynthDataset(GenericMVSDataset):
     """
 
     def __init__(
-        self,
-        dataset_path,
-        split,
-        mv_tuple_file_suffix="_tuples.txt",
-        include_full_res_depth=False,
-        limit_to_scan_id=None,
-        num_images_in_tuple=None,
-        tuple_info_file_location=None,
-        image_height=384,
-        image_width=512,
-        high_res_image_width=640,
-        high_res_image_height=480,
-        image_depth_ratio=2,
-        shuffle_tuple=False,
-        include_full_depth_K=False,
-        include_high_res_color=False,
-        pass_frame_id=False,
-        skip_frames=None,
-        skip_to_frame=None,
-        verbose_init=True,
-        min_valid_depth=1e-3,
-        max_valid_depth=1e3,
-        disable_flip=False,
-        rotate_images=False,
-        matching_scale=0.25,
-        prediction_scale=0.5,
-        prediction_num_scales=5,
+            self,
+            dataset_path,
+            split,
+            mv_tuple_file_suffix="_tuples.txt",
+            include_full_res_depth=False,
+            limit_to_scan_id=None,
+            num_images_in_tuple=None,
+            tuple_info_file_location=None,
+            image_height=384,
+            image_width=512,
+            high_res_image_width=640,
+            high_res_image_height=480,
+            image_depth_ratio=2,
+            shuffle_tuple=False,
+            include_full_depth_K=False,
+            include_high_res_color=False,
+            pass_frame_id=False,
+            skip_frames=None,
+            skip_to_frame=None,
+            verbose_init=True,
+            min_valid_depth=1e-3,
+            max_valid_depth=1e3,
+            disable_flip=False,
+            rotate_images=False,
+            matching_scale=0.25,
+            prediction_scale=0.5,
+            prediction_num_scales=5,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -125,20 +119,8 @@ class MVSSynthDataset(GenericMVSDataset):
 
         self.min_valid_depth = min_valid_depth
         self.max_valid_depth = max_valid_depth
-
-    # def _get_frame_ids(self, split, scan):
-
-    #     split_path = Path("data_splits/MVSSynth/")
-
-    #     if split == "test":
-    #         split_files_json_path = split_path / "standard_split" / f"{split}_files_all.json"
-    #     else:
-    #         split_files_json_path = split_path / "bd_split" / f"{split}_files_bd.json"
-
-    #     with open(split_files_json_path, "r") as f:
-    #         frame_ids = json.load(f)[scan]
-
-    #     return frame_ids
+        self.original_width = 810
+        self.original_height = 540
 
     def get_valid_frame_path(self, split, scan):
         """returns the filepath of a file that contains valid frame ids for a
@@ -274,27 +256,36 @@ class MVSSynthDataset(GenericMVSDataset):
         camera_data_path = self.get_pose_filepath(scan_id=scan_id, frame_id=frame_id)
         json_data = json.load(open(camera_data_path))
 
-        K = torch.eye(4, dtype=torch.float32)
-        K[0, 0] = float(json_data['f_x'])
-        K[1, 1] = float(json_data['f_y'])
-        K[0, 2] = float(json_data['c_x'])
-        K[1, 2] = float(json_data['c_y'])
+        width_pixels = self.image_width
+        height_pixels = self.image_height
 
-        # Sorry to hard-code these
-        height_pixels, width_pixels = 540, 810
+        scale_x = width_pixels / self.original_width
+        scale_y = height_pixels / self.original_height
 
-        top, left, h, w = self.random_resize_crop.get_params(
-            torch.empty((height_pixels, width_pixels)),
-            self.random_resize_crop.scale,
-            self.random_resize_crop.ratio
-        )
-        K[0, 2] = K[0, 2] - left
-        K[1, 2] = K[1, 2] - top
-        width_pixels = w
-        height_pixels = h
+        # Read original intrinsics
+        c_x = json_data["c_x"]
+        c_y = json_data["c_y"]
+        f_x = json_data["f_x"]
+        f_x = f_x * 2 * 810 / 1920  # Annotation is wrong, need to adjust
+        f_y = json_data["f_y"]
+
+        c_x_new = c_x * scale_x
+        c_y_new = c_y * scale_y
+        f_x_new = f_x * scale_x
+        f_y_new = f_y * scale_y
 
         if flip:
-            K[0, 2] = float(width_pixels) - K[0, 2]
+            c_x_new = width_pixels - c_x_new
+
+        # Construct the intrinsic matrix in pixel coordinates
+        K = torch.eye(4, dtype=torch.float32)
+        K[:3, :3] = torch.tensor([[f_x_new, 0, c_x_new],
+                                  [0, f_y_new, c_y_new],
+                                  [0, 0, 1]], dtype=torch.float32)
+
+        # Store intrinsics in output_dict
+        output_dict["K_b44"] = K.clone()
+        output_dict["invK_b44"] = torch.inverse(K)
 
         # optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
@@ -307,19 +298,21 @@ class MVSSynthDataset(GenericMVSDataset):
         output_dict["K_matching_b44"] = K_matching
         output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
 
-        # scale intrinsics to the dataset's configured depth resolution.
-        K[0] *= self.depth_width / float(width_pixels)
-        K[1] *= self.depth_height / float(height_pixels)
+        K_depth = K.clone()
+        K_depth[0, 0] *= self.depth_width / float(width_pixels)
+        K_depth[1, 1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
-            K_scaled = K.clone()
-            K_scaled[:2] /= 2**i
-            invK_scaled = np.linalg.inv(K_scaled)
+            K_scaled = K_depth.clone()
+            K_scaled[0, 0] /= 2 ** i
+            K_scaled[1, 1] /= 2 ** i
+            K_scaled[0, 2] /= 2 ** i
+            K_scaled[1, 2] /= 2 ** i
             output_dict[f"K_s{i}_b44"] = K_scaled
-            output_dict[f"invK_s{i}_b44"] = invK_scaled
+            output_dict[f"invK_s{i}_b44"] = torch.linalg.inv(K_scaled)
 
-        return output_dict, (left, top, left+width_pixels, top+height_pixels)
+        return output_dict, None
 
     def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
@@ -376,30 +369,8 @@ class MVSSynthDataset(GenericMVSDataset):
         pose_path = self.get_pose_filepath(scan_id, frame_id)
 
         pose_data = json.load(open(pose_path))
-        # cam_T_world is world_to_cam
-        # {"c_y": 270, "c_x": 405, "extrinsic": [[-0.44908585898412184, 0.8934850306969834, 0.0003050379099841516, -4832.132997116336], [0.05556650233743187, 0.027593971272776994, 0.998077140679204, 41.47634255972844], [-0.8917558547747484, -0.4482392072441913, 0.06204153273588026, 5253.430797558781], [0.0, 0.0, 0.0, 1.0]], "f_x": 579.0183013629736, "f_y": 579.015571480746}
 
-        # Create the pose obect
         pose_mat = np.array(pose_data['extrinsic']).astype(np.float32)
-
-        flip_matrix = np.eye(4).astype(np.float32)
-        flip_matrix[0, 0] = -1  # Reflect across the x-axis
-        pose_mat = flip_matrix @ pose_mat
-
-        gl_to_cv = np.array(
-            [
-                [1, -1, -1, 1],
-                [-1, 1, 1, -1],
-                [-1, 1, 1, -1],
-                [1, 1, 1, 1]
-            ]
-        )
-
-        pose_mat =  pose_mat * gl_to_cv
-
-        # try to get the translation from CAM_TO_WORLD into WORLD_TO_CAM to match the rotation
-        pose_mat[:3, -1] = np.linalg.inv(pose_mat[:3, :3]) @ pose_mat[:3, -1]
-
         cam_T_world = pose_mat
 
         world_T_cam = np.linalg.inv(cam_T_world)
@@ -417,7 +388,8 @@ if __name__ == "__main__":
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
 
-    dataset = MVSSynthDataset("/mnt/nas3/shared/datasets/mvssynth/GTAV_540", split='train', tuple_info_file_location=tuple_info_file_location)
+    dataset = MVSSynthDataset("/mnt/nas3/shared/datasets/mvssynth/GTAV_540", split='train',
+                              tuple_info_file_location=tuple_info_file_location)
     import cv2
 
     for idx in range(5):
@@ -442,6 +414,6 @@ if __name__ == "__main__":
         image_overlay[:, d > 0] = d[d > 0]
 
         d = np.dstack((d, d, d))
-        combined = np.hstack((image, d, image_overlay.transpose(1,2 ,0)))[:, :, ::-1]
+        combined = np.hstack((image, d, image_overlay.transpose(1, 2, 0)))[:, :, ::-1]
 
         cv2.imwrite(f"{idx}_with_crop.png", combined)
