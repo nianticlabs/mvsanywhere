@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
-
+import cv2
 
 class MVSSynthDataset(GenericMVSDataset):
     """
@@ -342,7 +342,7 @@ class MVSSynthDataset(GenericMVSDataset):
         depth = torch.tensor(depth).float().unsqueeze(0)
 
         # # Get the float valid mask
-        mask_b = (depth > self.min_valid_depth) & (depth < self.max_valid_depth)
+        mask_b = (depth > 0.0) & (depth < torch.quantile(depth, 0.95))
         mask = mask_b.float()
 
         # set invalids to nan
