@@ -3,11 +3,14 @@ from loguru import logger
 
 import doubletake.modules.feature_volume as feature_volume
 from doubletake.experiment_modules.sr_depth_model import DepthModel
+from doubletake.experiment_modules.matching_model import MatchingModel
 
 
 def get_model_class(opts):
     if opts.model_type == "depth_model":
         model_class_to_use = DepthModel
+    elif opts.model_type == "matching_model":
+        model_class_to_use = MatchingModel
     else:
         raise ValueError(f"Unknown model type: {opts.model_type}")
     return model_class_to_use

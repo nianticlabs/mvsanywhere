@@ -26,7 +26,7 @@ from doubletake.modules.networks import (
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
 from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
-from doubletake.utils.augmentation_utils import CustomColorJitter
+from doubletake.utils.augmentation_utils import CustomColorJitter, CustomColorJitterNoise
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
     tensor_B_to_bM,
@@ -279,7 +279,7 @@ class DepthModel(pl.LightningModule):
 
         self.tensor_formatter = TensorFormatter()
 
-        self.color_aug = CustomColorJitter(0.2, 0.2, 0.2, 0.2)
+        self.color_aug = CustomColorJitterNoise(0.025, 0.025, 0.025, 0.025)
 
         self.automatic_optimization = False
 
@@ -453,7 +453,7 @@ class DepthModel(pl.LightningModule):
             min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
             max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
 
-            # Compute the cost volume. Should be size bdhw.
+            # # Compute the cost volume. Should be size bdhw.
             cost_volume, lowest_cost, _, overall_mask_bhw = self.cost_volume(
                 cur_feats=matching_cur_feats,
                 src_feats=matching_src_feats,

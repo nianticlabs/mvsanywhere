@@ -125,14 +125,24 @@ def prepare_callbacks(
         a list of callbacks
     """
     # set a checkpoint callback for lignting to save model checkpoints
-    checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
-        save_last=True,
-        save_top_k=1,
-        verbose=True,
-        monitor="val_metrics/a5",
-        mode="max",
-        dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
-    )
+    if opts.model_type == "depth_model":
+        checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
+            save_last=True,
+            save_top_k=1,
+            verbose=True,
+            monitor="val_metrics/a5",
+            mode="max",
+            dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
+        )
+    elif opts.model_type == "matching_model":
+        checkpoint_callback = pl.pytorch.callbacks.ModelCheckpoint(
+            save_last=True,
+            save_top_k=1,
+            verbose=True,
+            monitor="val/loss",
+            mode="min",
+            dirpath=str((Path(opts.log_dir) / opts.name).resolve()),
+        )
 
     # keep track of changes in learning rate
     lr_monitor = LearningRateMonitor(logging_interval="step")

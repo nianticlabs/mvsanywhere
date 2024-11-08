@@ -327,7 +327,12 @@ class FMVS_Wrapped(nn.Module):
                         pred_depth = outputs["depth_pred_s0_b1hw"]
                         min_depth = new_min
                         max_depth = new_max
+                        
+            lowest_cost = outputs["lowest_cost_bhw"].detach().cpu().numpy()
+            np.save('lowest_cost.npy', lowest_cost)
 
+            if len(images_source) == 7:
+                nakjsdfn
             pred = {
                 'depth': pred_depth,
             }
