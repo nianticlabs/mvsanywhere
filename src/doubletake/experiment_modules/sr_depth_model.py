@@ -561,7 +561,9 @@ class DepthModel(pl.LightningModule):
         with torch.no_grad():
             sparsity = torch.isnan(depth_gt).sum(dim=[1, 2, 3]) / np.prod(depth_gt.shape[-2:])
             l1_loss = torch.abs(log_depth_gt - log_depth_pred)
-            top_20_err = torch.stack([torch.quantile(l1_loss[i][mask_b[i]], 0.8) for i in range(mask_b.shape[0])])
+            top_20_err = torch.stack([(
+                torch.quantile(l1_loss[i][mask_b[i]], 0.8) if torch.any(mask_b[i]).item() else torch.tensor(torch.inf)).cuda() for i in range(mask_b.shape[0])
+            ])
             mask_b_top20 = mask_b & (l1_loss < torch.where(sparsity > 0.5, top_20_err, torch.inf)[:, None, None, None])
             mask_b_dense = mask_b & (sparsity < 0.5)[:, None, None, None]
 
