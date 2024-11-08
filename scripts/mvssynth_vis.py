@@ -38,7 +38,8 @@ def read_img_depth_pose(i):
         # See https://github.com/phuang17/DeepMVS/issues/13#issuecomment-642539491
         c_x = r_info["c_x"] / im_width * 2.0 - 1.0
         c_y = r_info["c_y"] / im_height * 2.0 - 1.0
-        f_x = r_info["f_x"] / im_width * 2.0
+        f_x = r_info["f_x"] * 2 * 810 / 1920
+        f_x = f_x / im_width * 2.0
         f_y = r_info["f_y"] / im_height * 2.0
 
         extrinsic = np.array(r_info["extrinsic"])
