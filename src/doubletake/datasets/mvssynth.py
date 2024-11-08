@@ -338,7 +338,7 @@ class MVSSynthDataset(GenericMVSDataset):
         depth = torch.tensor(depth).float().unsqueeze(0)
 
         # # Get the float valid mask
-        mask_b = (depth > 0.0) & (depth < torch.quantile(depth, 0.95))
+        mask_b = (depth > 0.0) & (depth < torch.quantile(depth[torch.isfinite(depth)], 0.95))
         mask = mask_b.float()
 
         # set invalids to nan
