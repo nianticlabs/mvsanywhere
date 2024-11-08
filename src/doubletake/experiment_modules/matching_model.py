@@ -1,0 +1,703 @@
+import logging
+
+import lightning as pl
+import timm
+import torch
+import torch.nn.functional as F
+from torch import nn
+import numpy as np
+import time
+import einops
+
+from doubletake.losses import (
+    MSGradientLoss,
+    MVDepthLoss,
+    NormalsLoss,
+    ScaleInvariantLoss,
+)
+from doubletake.modules.cost_volume import CostVolumeManager, EfficientCostVolumeManager
+from doubletake.modules.depth_anything_blocks import DPTHead
+from doubletake.modules.feature_volume import FeatureVolumeManager
+from doubletake.modules.layers import TensorFormatter
+from doubletake.modules.networks import (
+    CVEncoder,
+    DepthDecoderPP,
+    ResnetMatchingEncoder,
+    UNetMatchingEncoder,
+)
+from doubletake.modules.networks_fast import SkipDecoderRegression
+from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder 
+from doubletake.utils.augmentation_utils import CustomColorJitter, CustomColorJitterNoise
+from doubletake.utils.generic_utils import (
+    reverse_imagenet_normalize,
+    tensor_B_to_bM,
+    tensor_bM_to_B,
+)
+from doubletake.utils.geometry_utils import NormalGenerator
+from doubletake.utils.metrics_utils import compute_depth_metrics
+from doubletake.utils.visualization_utils import colormap_image
+
+logger = logging.getLogger(__name__)
+
+
+class MatchingModel(pl.LightningModule):
+    """Class for SimpleRecon depth estimators.
+
+    This class handles training and inference for SimpleRecon models.
+
+    Depth maps will be predicted
+
+    It houses experiments for a vanilla cost volume that uses dot product
+    reduction and the full feature volume.
+
+    It also allows for experimentation on the type of image encoder.
+
+    The opts the model is first initialized with will be saved as part of
+    hparams. On load from checkpoint the model will use those stores
+    options. It's generally a good idea to use those directly, unless you
+    want to do something fancy with changing resolution, since some
+    projective modules use initialized spatial grids for
+    projection/backprojection.
+
+    Attributes:
+        run_opts: options object with flags.
+        matching_model: the model used for generating image features for
+            matching in the cost volume.
+        cost_volume: the cost volume module.
+        encoder: the image encoder used to enforce an image prior.
+        cost_volume_net: the first half of the U-Net for encoding cost
+            volume features and image prior features.
+        depth_decoder: second half of the U-Net for decoding feautures into
+            depth maps at multiple resolutions.
+        si_loss: scale invariant loss module.
+        grad_loss: multi scale gradient loss module.
+        abs_loss: L1 loss module
+        ms_loss_fn: type of loss to use at multiple scales
+        normals_loss: module for computing normal losses
+        mv_depth_loss: multi view depth loss.
+        compute_normals: module for computing normals
+        tensor_formatter: helper class for reshaping tensors - batching and
+            unbatching views.
+
+    A note on losses: we report more losses than we actually use for
+    backprop.
+
+    We use the term cur/current for the refernce frame (from the paper)whose
+    depth we predict and src/soruce for source (neighborhood) frames used
+    for matching.
+
+    """
+
+    def __init__(self, opts):
+        """Inits a depth model.
+
+        Args: opts: Options config object with:
+
+        opts.image_encoder_name: the type of image encoder used for the
+            image prior. Supported in this version is EfficientNet.
+        opts.cv_encoder_type: the type of cost volume encoder to use. The
+            only supported version here is a multi_scale encoder that takes
+            in features from the cost volume and features at multiple scales
+            from the encoder used for image priors.
+        opts.matching_num_depth_bins: number of depth planes used for
+            MVS in the cost volume.
+        opts.matching_scale: w.r.t to the predicted depth map, this the
+            scale at which we match in the cost volume. 0 indicates matching
+            at the resolution of the depth map. 1 indicates matching at half
+            that resolution.
+        opts.depth_decoder_name: the type of decoder to use for decoding
+            features into depth. We're using a U-Net++ like architure in
+            doubletake.
+        opts.image_width, opts.image_height: incoming image width and
+            height.
+        opts.loss_type: type of loss to use at multiple scales. Final
+            supported verison here is log_l1.
+        opts.feature_volume_type: the type of cost volume to use. Supported
+            types are simple_cost_volume for a dot product based reduction
+            or an mlp_feature_volume for metadata laced feature reduction.
+        opts.matching_model: type of matching model to use. 'resnet' and
+            'fpn' are supported.
+        opts.matching_feature_dims: number of features dimensions output
+            from the matching encoder.
+        opts.model_num_views: number of views to expect in each tuple of
+            frames (refernece/current frame + source frames)
+
+        """
+        super().__init__()
+        self.save_hyperparameters()
+
+        self.run_opts = opts
+
+        # all the losses
+        self.si_loss = ScaleInvariantLoss()
+        self.grad_loss = MSGradientLoss()
+        self.abs_loss = nn.L1Loss()
+        self.normals_loss = NormalsLoss()
+        self.mv_depth_loss = MVDepthLoss(
+            int(self.run_opts.image_height * self.run_opts.prediction_scale),
+            int(self.run_opts.image_width * self.run_opts.prediction_scale),
+        )
+
+        # Pick the multiscale loss
+        if self.run_opts.loss_type == "log_l1":
+            self.ms_loss_fn = self.abs_loss
+        else:
+            raise ValueError(f"loss_type: {self.run_opts.loss_type} unknown")
+
+        # used for normals loss
+        self.compute_normals = NormalGenerator(
+            int(self.run_opts.image_height * self.run_opts.prediction_scale),
+            int(self.run_opts.image_width * self.run_opts.prediction_scale),
+        )
+
+        # what type of cost volume are we using?
+        if self.run_opts.feature_volume_type == "simple_cost_volume":
+            cost_volume_class = CostVolumeManager
+            cost_volume_class = EfficientCostVolumeManager
+        elif self.run_opts.feature_volume_type == "mlp_feature_volume":
+            cost_volume_class = FeatureVolumeManager
+        else:
+            raise ValueError(
+                f"Unrecognized option {self.run_opts.feature_volume_type} "
+                f"for feature volume type!"
+            )
+
+        self.cost_volume = cost_volume_class(
+            matching_height=int(self.run_opts.image_height * self.run_opts.matching_scale),
+            matching_width=int(self.run_opts.image_width * self.run_opts.matching_scale),
+            num_depth_bins=self.run_opts.matching_num_depth_bins,
+            matching_dim_size=self.run_opts.matching_feature_dims,
+            num_source_views=opts.model_num_views - 1,
+        )
+
+        # init the matching encoder. resnet is fast and is the default for
+        # results in the paper, fpn is more accurate but much slower.
+        if "resnet" == self.run_opts.matching_encoder_type:
+            self.matching_model = ResnetMatchingEncoder(18, self.run_opts.matching_feature_dims)
+        elif "unet_encoder" == self.run_opts.matching_encoder_type:
+            self.matching_model = UNetMatchingEncoder()
+        elif "vit_encoder" == self.run_opts.matching_encoder_type:
+            self.matching_model = ViTMatchingEncoder(
+                num_ch_out=self.run_opts.matching_feature_dims,
+            )
+            if self.run_opts.da_weights_path is not None:
+                weights_path = self.run_opts.da_weights_path.replace('depth_anything_v2_vitb.pth', 'depth_anything_v2_vits.pth')
+                self.matching_model.load_da_weights(weights_path)
+        else:
+            raise ValueError(
+                f"Unrecognized option {self.run_opts.matching_encoder_type} "
+                f"for matching encoder type!"
+            )
+
+        self.tensor_formatter = TensorFormatter()
+
+        self.color_aug = CustomColorJitterNoise(0.025, 0.025, 0.025, 0.025)
+
+        self.automatic_optimization = False
+
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')
+
+    def compute_matching_feats(
+        self,
+        cur_image,
+        src_image,
+        unbatched_matching_encoder_forward,
+    ):
+        """
+        Computes matching features for the current image (reference) and
+        source images.
+
+        Unfortunately on this PyTorch branch we've noticed that the output
+        of our ResNet matching encoder is not numerically consistent when
+        batching. While this doesn't affect training (the changes are too
+        small), it does change and will affect test scores. To combat this
+        we disable batching through this module when testing and instead
+        loop through images to compute their feautures. This is stable and
+        produces exact repeatable results.
+
+        Args:
+            cur_image: image tensor of shape B3HW for the reference image.
+            src_image: images tensor of shape BM3HW for the source images.
+            unbatched_matching_encoder_forward: disable batching and loops
+                through iamges to compute feaures.
+        Returns:
+            matching_cur_feats: tensor of matching features of size bchw for
+                the reference current image.
+            matching_src_feats: tensor of matching features of size BMcHW
+                for the source images.
+        """
+        if unbatched_matching_encoder_forward:
+            all_frames_bm3hw = torch.cat([cur_image.unsqueeze(1), src_image], dim=1)
+            batch_size, num_views = all_frames_bm3hw.shape[:2]
+            all_frames_B3hw = tensor_bM_to_B(all_frames_bm3hw)
+            matching_feats = [self.matching_model(f) for f in all_frames_B3hw.split(1, dim=0)]
+
+            matching_feats = torch.cat(matching_feats, dim=0)
+            matching_feats = tensor_B_to_bM(
+                matching_feats,
+                batch_size=batch_size,
+                num_views=num_views,
+            )
+
+        else:
+            # Compute matching features and batch them to reduce variance from
+            # batchnorm when training.
+            matching_feats = self.tensor_formatter(
+                torch.cat([cur_image.unsqueeze(1), src_image], dim=1),
+                apply_func=self.matching_model,
+            )
+
+        matching_cur_feats = matching_feats[:, 0]
+        matching_src_feats = matching_feats[:, 1:].contiguous()
+
+        return matching_cur_feats, matching_src_feats
+
+    def forward(
+        self,
+        phase,
+        cur_data,
+        src_data,
+        unbatched_matching_encoder_forward=False,
+        return_mask=False,
+    ):
+        """
+        Computes a forward pass through the depth model.
+
+        This function is used for both training and inference.
+
+        During training, a flip horizontal augmentation is used on images
+        with a random chance of 50%. If you do plan on changing this flip,
+        be careful on where its done. When we do need to flip, we only want
+        it to apply through image encoders, but not through the cost volume.
+        When we use a flip, we apply it to images before the matching
+        encoder, flipping back when we pass those feautres through the cost
+        volume, and then flip the cost volume's output so that they align
+        with the current image's features (flipped when we use the image
+        prior encoder) when we use our final U-Net.
+
+        Args:
+            phase: str defining phase of training. When phase is "train,"
+                flip augmentation is used on images.
+            cur_data: a dictionary with tensors for the current view. These
+                include
+                    "image_b3hw" for an RGB image,
+                    "K_si_b44" intrinsics tensor for projecting points to
+                        image space where i starts at 0 and goes up to the
+                        maximum divisor scale,
+                    "cam_T_world_b44" a camera extrinsics matrix for
+                        transforming world points to camera coordinates,
+                    and "world_T_cam_b44" a camera pose matrix for
+                        transforming camera points to world coordinates.
+            src_data: also a dictionary with elements similar to cur_data.
+                All tensors here are expected to have batching shape B...
+                instead of bM where M is the number of source images.
+            unbatched_matching_encoder_forward: disable batching and loops
+                through iamges to compute matching feaures, used for stable
+                inference when testing. See compute_matching_feats for more
+                information.
+            return_mask: return a 2D mask from the cost volume for areas
+                where there is source view information.
+        Returns:
+            depth_outputs: a dictionary with outputs including
+                "log_depth_pred_s{i}_b1hw" log depths where i is the
+                resolution at which this depth map is. 0 represents the
+                highest resolution depth map predicted at opts.depth_width,
+                opts.depth_height,
+                "log_depth_pred_s{i}_b1hw" depth maps in linear scale where
+                    is the resolution at which this depth map is. 0
+                    represents the highest resolution depth map predicted at
+                    opts.depth_width, opts.depth_height,
+                "lowest_cost_bhw" the argmax for likelihood along depth
+                    planes from the cost volume, representing the best
+                    matched depth plane at each spatial resolution,
+                and "overall_mask_bhw" returned when return_mask is True and
+                    is a 2D mask from the cost volume for areas where there
+                    is source view information from the current view's point
+                    of view.
+
+        """
+
+        # if self.run_opts.matching_encoder_type == "vit_encoder":
+        #     unbatched_matching_encoder_forward = True
+
+        # get all tensors from the batch dictioanries.
+        cur_image = cur_data["image_b3hw"]
+        src_image = src_data["image_b3hw"]
+        src_K = src_data[f"K_matching_b44"]
+        cur_invK = cur_data[f"invK_matching_b44"]
+        src_cam_T_world = src_data["cam_T_world_b44"]
+        src_world_T_cam = src_data["world_T_cam_b44"]
+
+        cur_cam_T_world = cur_data["cam_T_world_b44"]
+        cur_world_T_cam = cur_data["world_T_cam_b44"]
+
+
+        # src_cam_T_world = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
+        # cur_world_T_cam = torch.stack([torch.eye(4) for _ in range(len(cur_world_T_cam))]).cuda()
+
+        # uid = np.random.randint(1e7)
+        # for idx in range(1):
+        #     self.mv_depth_loss._check_warped_image(
+        #         f"debug/debug_{uid}_{idx}",
+        #         cur_data["depth_b1hw"],
+        #         cur_image,
+        #         src_image[:, idx],
+        #         cur_data[f"invK_s0_b44"],
+        #         src_data[f"K_s0_b44"][:, idx],
+        #         cur_world_T_cam,
+        #         src_cam_T_world[:, idx]
+        #     )
+        # kujansfkjan
+
+        with torch.cuda.amp.autocast(False):
+            # Compute src_cam_T_cur_cam, a transformation for going from 3D
+            # coords in current view coordinate frame to source view coords
+            # coordinate frames.
+            src_cam_T_cur_cam = src_cam_T_world @ cur_world_T_cam.unsqueeze(1)
+
+            # Compute cur_cam_T_src_cam the opposite of src_cam_T_cur_cam. From
+            # source view to current view.
+            cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(1) @ src_world_T_cam
+
+        # flip transformation! Figure out if we're flipping. Should be true if
+        # we are training and a coin flip says we should.
+        flip_threshold = 0.5 if phase == "train" else 0.0
+        flip = torch.rand(1).item() < flip_threshold
+
+        if flip:
+            # flip all images.
+            cur_image = torch.flip(cur_image, (-1,))
+            src_image = torch.flip(src_image, (-1,))
+
+        # Compute matching features
+        matching_cur_feats, matching_src_feats = self.compute_matching_feats(
+            cur_image, src_image, unbatched_matching_encoder_forward
+        )
+
+        # Compute the cost volume
+        if flip:
+            # now (carefully) flip matching features back for correct MVS.
+            matching_cur_feats = torch.flip(matching_cur_feats, (-1,))
+            matching_src_feats = torch.flip(matching_src_feats, (-1,))
+
+        if matching_cur_feats.shape[1] > self.run_opts.matching_feature_dims:
+            matching_cur_conf = matching_cur_feats[:, 0:1]
+            matching_cur_feats = matching_cur_feats[:, 1:]
+            matching_src_feats = matching_src_feats[:, :, 1:]
+        else:
+            matching_cur_conf = None
+
+        # Get min and max depth to the right shape, device and dtype
+        min_depth = torch.tensor(cur_data["min_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        max_depth = torch.tensor(cur_data["max_depth"]).type_as(src_K).view(-1, 1, 1, 1)
+        
+        # cat the gt depth to the depth planes
+        batch_size = cur_image.shape[0]
+        depth_planes_bdhw = self.cost_volume.generate_depth_planes(batch_size, min_depth, max_depth)
+        
+        gt_depth_b1hw = cur_data["depth_b1hw"].clone()
+        mask_valid_b1hw = cur_data["mask_b_b1hw"]
+        gt_depth_b1hw[~mask_valid_b1hw] = 100.
+        to_resize = torch.cat((gt_depth_b1hw, mask_valid_b1hw.float()), dim=1)
+        resized = F.interpolate(
+            to_resize, (self.cost_volume.matching_height, self.cost_volume.matching_width),
+            mode="nearest",
+        )
+        gt_depth_b1hw = resized[:, 0:1]
+        mask_valid_b1hw = resized[:, 1:2].bool()
+
+        depth_planes_bdhw = depth_planes_bdhw + 0. * gt_depth_b1hw  # me being lazy - expanding
+        depth_planes_bdhw = torch.cat((gt_depth_b1hw, depth_planes_bdhw), dim=1)
+
+        # cat the src depths to the src features
+        src_depths_b11hw = src_data["depth_b1hw"].clone()
+        src_depths_b11hw[torch.isnan(src_depths_b11hw)] = 0.
+        src_depths_b11hw = F.interpolate(
+            src_depths_b11hw, (1, self.cost_volume.matching_height, self.cost_volume.matching_width),
+            mode="nearest",
+        )
+        matching_src_feats = torch.cat([src_depths_b11hw, matching_src_feats], dim=2)
+
+        # warp src onto current
+        uv_scale = torch.tensor(
+            [1 / self.cost_volume.matching_width, 1 / self.cost_volume.matching_height],
+            dtype=matching_src_feats.dtype,
+            device=matching_src_feats.device,
+        ).view(1, 1, 1, 2)
+
+        num_src_frames = src_image.shape[1]
+        num_feat_channels = matching_src_feats.shape[2]
+
+        world_points_brk4hw, depths_brkhw, src_feat_warped_brkfhw, mask_brkhw, pix_coords_brk2hw, = self.cost_volume.warp_features(
+            src_feats=matching_src_feats,
+            src_extrinsics=src_cam_T_cur_cam,
+            src_Ks=src_K,
+            cur_invK=cur_invK,
+            depth_plane_bkhw=depth_planes_bdhw,
+            num_src_frames=num_src_frames,
+            num_feat_channels=num_feat_channels,
+            uv_scale=uv_scale,
+        )        
+
+        # print(src_feat_warped_brkfhw.shape, depths_brkhw.shape)
+        src_depths_warped_brkhw = src_feat_warped_brkfhw[:, :, :, 0]
+        src_feat_warped_brkfhw = src_feat_warped_brkfhw[:, :, :, 1:]
+
+        # compute valid correspondences
+        diffs = torch.abs(src_depths_warped_brkhw - depths_brkhw)
+        valid_correspondences_brkhw = diffs / depths_brkhw < 0.05 
+        known_correspondences_brkhw = mask_valid_b1hw.unsqueeze(1) | (src_depths_warped_brkhw > 0.)
+        valid_correspondences_brkhw = valid_correspondences_brkhw & mask_brkhw.bool() & mask_valid_b1hw.unsqueeze(1)
+
+        # compute cost volume
+        cur_feats_b11fhw = matching_cur_feats.unsqueeze(1).unsqueeze(1)
+
+        dists_brkhw = (src_feat_warped_brkfhw - cur_feats_b11fhw).norm(dim=3)
+        sim_brkhw = 1 / (1 + dists_brkhw) / 0.07
+
+        # sim_brkhw = (src_feat_warped_brkfhw * cur_feats_b11fhw).sum(dim=3)
+        sim_brkhw = sim_brkhw.exp_()  # save peak memory
+        sim_brkhw = sim_brkhw * known_correspondences_brkhw.float()  # ignore missing values in GT depth maps
+
+        loss = -torch.log((sim_brkhw / (sim_brkhw.sum(2, True) + 1e-5)).clip(1e-5))
+        loss = loss[valid_correspondences_brkhw]
+        if matching_cur_conf is not None:
+            matching_cur_conf = 1 + torch.exp(matching_cur_conf)
+            matching_cur_conf_valid = matching_cur_conf.unsqueeze(1).expand_as(valid_correspondences_brkhw)[valid_correspondences_brkhw]
+            loss = (loss * matching_cur_conf_valid - 10.0 * matching_cur_conf_valid).mean()
+        else:
+            loss = loss.mean()
+
+        # ignore the gt depth bin for viz
+        sim_brkhw = sim_brkhw[:, :, 1:].clone().detach()
+        # indices_bhw = sim_brkhw.sum(1).argmax(1)
+        indices_bhw = (torch.log(sim_brkhw.sum(1)) * 0.07).argmax(1)
+        lowest_cost_bhw = self.cost_volume.indices_to_disparity(indices_bhw, depth_planes_bdhw[:, 1:])
+
+        return loss, lowest_cost_bhw, valid_correspondences_brkhw[:, 0, 0], matching_cur_conf[:, 0] if matching_cur_conf is not None else None
+
+    def compute_losses(self, cur_data, src_data, outputs):
+        """Compute losses for the current view's depth.
+
+        We compute more losses than we actually use for backprop here. The
+        final loss cocktail is stored in 'loss'.
+
+        Args:
+            cur_data: current view's data from the dataloader.
+            src_data: source view data from the dataloader. Should also
+                include GT depth for the multi view loss.
+            outputs: outputs from the model, see forward for details. Should
+                also include "normals_pred_b3hw" an estimate of normals from
+                predicted depth.
+        Returns:
+            losses: a dictionary with losses for this batch. This includes:
+                "loss": the final combined loss for backprop as defined in
+                Equation 6 in the SimpleRecon paper,
+                "si_loss": a scale invariant loss,
+                "grad_loss": a multi scale gradient loss, Equation 3 in the
+                    paper,
+                "abs_loss": absolute difference L1 loss,
+                "normals_loss": loss on estimated normals from depth,
+                    Equation 4 in the paper,
+                "ms_loss": multi scale regression loss, Equation 2 from the
+                    paper.
+                "mv_loss": multi-view depth regression loss as defined by
+                    Equation 5,
+                "inv_abs_loss": absolute difference on inverted depths,
+                and "log_l1_loss": absolute difference on logged depths.
+        """
+        target = outputs["mast3r_cost_volume_bchw"]
+        pred = outputs["cost_volume_bchw"]
+
+        loss = F.mse_loss(pred, target)
+
+        losses = {
+            "loss": loss,
+        }
+        return losses
+
+    def step(self, phase, batch, batch_idx):
+        """Takes a training/validation step through the model.
+
+        phase: "train" or "val". "train" will signal this function and
+            others log results and use flip augmentation.
+        batch: (cur_data, src_data) where cur_data is a dict with data on
+            the current (reference) view and src_data is a dict with data on
+            source views.
+        """
+        cur_data, src_data = batch
+
+        if phase == "train":
+            cur_data["image_b3hw"] = self.color_aug(cur_data["image_b3hw"], denormalize_first=True)
+            for src_ind in range(src_data["image_b3hw"].shape[1]):
+                src_data["image_b3hw"][:, src_ind] = self.color_aug(
+                    src_data["image_b3hw"][:, src_ind], denormalize_first=True
+                )
+
+        a = (cur_data["image_b3hw"].sum(dim=(1, 2, 3)) == 0).any().item()
+        b = (src_data["image_b3hw"].sum(dim=(2, 3, 4)) == 0).any().item()
+        if a or b:
+            return 0.0
+
+        # forward pass through the model.
+        loss, dists, valid, conf = self(phase, cur_data, src_data)
+
+        # # compute losses
+        # losses = self.compute_losses(cur_data, src_data, outputs)
+        # cv_min = outputs["lowest_cost_bhw"]
+        # mast3r_cv_min = outputs["mast3r_lowest_cost_bhw"]
+
+        # for key, val in outputs.items():
+        #     print(key, val.shape)
+
+        depth_gt = cur_data["depth_b1hw"]
+        mask = cur_data["mask_b1hw"]
+        mask_b = cur_data["mask_b_b1hw"]
+
+        losses = {'loss': loss}
+
+        if phase == "train":
+            self.manual_backward(losses["loss"] / 2.0)
+
+            if (batch_idx + 1) % 2 == 0:
+                optimizer_sr = self.optimizers()
+            
+                optimizer_sr.step()
+                optimizer_sr.zero_grad()
+
+                # multiple schedulers
+                scheduler_sr = self.lr_schedulers()
+                scheduler_sr.step()
+
+        #
+        is_train = phase == "train"
+        global_step = self.global_step // 2
+
+        if batch_idx % 2 == 0:
+            # logging and validation
+            with torch.inference_mode():
+        #         # log images for train.
+                if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
+
+                    prefix = "train" if is_train else "val"
+                    for i in range(min(4, cur_data["image_b3hw"].shape[0])):
+                        mask_i = mask[i].float().cpu()
+                        mask_valid_i = valid[i].float().cpu()
+                        depth_gt_viz_i, vmin, vmax = colormap_image(
+                            depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
+                        )
+                        cv_min_viz_i = colormap_image(
+                            dists[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
+                        )
+                        cv_min_masked_viz_i = colormap_image(
+                            dists[i].unsqueeze(0).float().cpu(), mask_valid_i.unsqueeze(0), vmin=vmin, vmax=vmax
+                        )
+        #                 mast3r_min_viz_i = colormap_image(
+        #                     mast3r_cv_min[i].unsqueeze(0).float().cpu(), vmin=vmin, vmax=vmax
+        #                 )
+
+                        image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
+
+                        import torchvision
+                        grid = torchvision.utils.make_grid(
+                            src_data["image_b3hw"][i], nrow=3
+                        )
+                        grid = F.interpolate(grid[None], image_i.shape[-2:], mode="bilinear")[0]
+                        grid = reverse_imagenet_normalize(grid)
+
+                        self.logger.experiment.add_image(f"{prefix}_image/{i}", image_i, global_step)
+                        self.logger.experiment.add_image(f"{prefix}_src_images/{i}", grid, global_step)
+                        self.logger.experiment.add_image(
+                                f"{prefix}_depth_gt/{i}", depth_gt_viz_i, global_step
+                        )
+                
+                        self.logger.experiment.add_image(f"{prefix}_cv_min/{i}", cv_min_viz_i, global_step)
+                        self.logger.experiment.add_image(f"{prefix}_cv_min_masked/{i}", cv_min_masked_viz_i, global_step)
+
+                        if conf is not None:
+                            conf_viz_i = colormap_image(
+                            conf[i].unsqueeze(0).float().cpu(),
+                        )
+                            self.logger.experiment.add_image(f"{prefix}_conf/{i}", conf_viz_i, global_step)
+        #                 self.logger.experiment.add_image(f"{prefix}_mast3r_cv_min/{i}", mast3r_min_viz_i, global_step)
+
+        #             self.logger.experiment.flush()
+
+                # log losses
+                for loss_name, loss_val in losses.items():
+                    self.log(
+                        f"{phase}/{loss_name}",
+                        loss_val,
+                        sync_dist=True,
+                        on_step=is_train,
+                        on_epoch=not is_train,
+                        prog_bar=True
+                    )
+
+                # high_res_validation: it isn't always wise to load in high
+                # resolution depth maps so this is an optional flag.
+                # if phase == "train" or not self.run_opts.high_res_validation:
+                #     # compute metrics at low res depth resolution for train or if
+                #     # validation isn't set to use high res depth
+                #     metrics = compute_depth_metrics(depth_gt[mask_b], depth_pred[mask_b])
+                # else:
+                #     # if we are validating or testing, we want to upscale our
+                #     # predictions to full-size and compare against the GT depth map,
+                #     # so that metrics are comparable across resolutions
+                #     full_size_depth_gt = cur_data["full_res_depth_b1hw"]
+                #     full_size_mask_b = cur_data["full_res_mask_b_b1hw"]
+                #     # this should be nearest to reflect test, but keeping it for
+                #     # backwards comparison reasons.
+                #     full_size_pred = F.interpolate(
+                #         depth_pred,
+                #         full_size_depth_gt.size()[-2:],
+                #         mode="bilinear",
+                #         align_corners=False,
+                #     )
+                #     metrics = compute_depth_metrics(
+                #         full_size_depth_gt[full_size_mask_b],
+                #         full_size_pred[full_size_mask_b],
+                #     )
+
+                # for metric_name, metric_val in metrics.items():
+                #     self.log(
+                #         f"{phase}_metrics/{metric_name}",
+                #         metric_val,
+                #         sync_dist=True,
+                #         on_step=is_train,
+                #         on_epoch=not is_train,
+                #     )
+
+        # return losses["loss"]
+
+    def training_step(self, batch, batch_idx):
+        """Runs a training step."""
+        return self.step("train", batch, batch_idx)
+
+    def validation_step(self, batch, batch_idx):
+        """Runs a validation step."""
+        return self.step("val", batch, batch_idx)
+
+    def configure_optimizers(self):
+        """Configuring optmizers and learning rate schedules.
+
+        By default we use a stepped learning rate schedule with steps at
+        70000 and 80000.
+
+        """
+        optimizer_sr = torch.optim.AdamW(
+            list(self.cost_volume.parameters()) + 
+            list(self.matching_model.parameters()),
+            lr=self.run_opts.lr, weight_decay=self.run_opts.wd
+        )
+
+        def lr_lambda(step):
+            if step < self.run_opts.lr_steps[0]:
+                return 1
+            elif step < self.run_opts.lr_steps[1]:
+                return 0.1
+            else:
+                return 0.01
+
+        lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
+        return [optimizer_sr], [lr_scheduler_sr]
