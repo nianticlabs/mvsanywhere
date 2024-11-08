@@ -557,6 +557,14 @@ class DepthModel(pl.LightningModule):
         log_depth_gt = torch.log(depth_gt)
         found_scale = False
         ms_loss = 0
+        # Mask sparse arrays
+        with torch.no_grad():
+            sparsity = torch.isnan(depth_gt).sum(dim=[1, 2, 3]) / np.prod(depth_gt.shape[-2:])
+            l1_loss = torch.abs(log_depth_gt - log_depth_pred)
+            top_20_err = torch.stack([torch.quantile(l1_loss[i][mask_b[i]], 0.8) for i in range(mask_b.shape[0])])
+            mask_b_top20 = mask_b & (l1_loss < torch.where(sparsity > 0.5, top_20_err, torch.inf)[:, None, None, None])
+            mask_b_dense = mask_b & (sparsity < 0.5)[:, None, None, None]
+
         for i in range(4):
             if f"log_depth_pred_s{i}_b1hw" in outputs:
                 log_depth_pred_resized = F.interpolate(
@@ -565,14 +573,13 @@ class DepthModel(pl.LightningModule):
                     mode="nearest",
                 )
                 ms_loss += (
-                    self.ms_loss_fn(log_depth_gt[mask_b], log_depth_pred_resized[mask_b]) / 2**i
+                    self.ms_loss_fn(log_depth_gt[mask_b_top20], log_depth_pred_resized[mask_b_top20]) / 2**i
                 )
                 found_scale = True
 
         if not found_scale:
             raise Exception("Could not find a valid scale to compute si loss!")
 
-        grad_loss = self.grad_loss(depth_gt, depth_pred)
         abs_loss = self.abs_loss(depth_gt[mask_b], depth_pred[mask_b])
         si_loss = self.si_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
 
@@ -580,7 +587,13 @@ class DepthModel(pl.LightningModule):
         inv_abs_loss = self.abs_loss(1 / depth_gt[mask_b_limit], 1 / depth_pred[mask_b_limit])
 
         log_l1_loss = self.abs_loss(log_depth_gt[mask_b], log_depth_pred[mask_b])
-        normals_loss = self.normals_loss(normals_gt, normals_pred)
+        
+        depth_gt_grad = depth_gt.clone()
+        depth_gt_grad[~mask_b_dense] = torch.nan
+        grad_loss = torch.nan_to_num(self.grad_loss(depth_gt, depth_pred))
+
+        normals_gt[~mask_b_dense.expand(-1, 3, -1, -1)] = torch.nan
+        normals_loss = torch.nan_to_num(self.normals_loss(normals_gt, normals_pred))
 
         loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
 
