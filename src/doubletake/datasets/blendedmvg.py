@@ -263,13 +263,13 @@ class BlendedMVGDataset(GenericMVSDataset):
         # optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
             output_dict[f"K_full_depth_b44"] = K.clone()
-            output_dict[f"invK_full_depth_b44"] = torch.tensor(np.linalg.inv(K))
+            output_dict[f"invK_full_depth_b44"] = torch.linalg.inv(K)
 
         K_matching = K.clone()
         K_matching[0] *= self.matching_width / float(data['depthWidth'])
         K_matching[1] *= self.matching_height / float(data["depthHeight"])
         output_dict["K_matching_b44"] = K_matching
-        output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
+        output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         # scale intrinsics to the dataset's configured depth resolution.
         K[0] *= self.depth_width / float(data['depthWidth'])
@@ -279,7 +279,7 @@ class BlendedMVGDataset(GenericMVSDataset):
         for i in range(self.prediction_num_scales):
             K_scaled = K.clone()
             K_scaled[:2] /= 2 ** i
-            invK_scaled = np.linalg.inv(K_scaled)
+            invK_scaled = torch.linalg.inv(K_scaled)
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
