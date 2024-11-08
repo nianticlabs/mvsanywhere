@@ -10,6 +10,9 @@ import h5py
 import scipy
 import json
 import cv2
+import OpenEXR
+import Imath
+
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 from doubletake.utils.geometry_utils import rotx
@@ -397,8 +400,6 @@ class MVSSynthDataset(GenericMVSDataset):
         # try to get the translation from CAM_TO_WORLD into WORLD_TO_CAM to match the rotation
         pose_mat[:3, -1] = np.linalg.inv(pose_mat[:3, :3]) @ pose_mat[:3, -1]
 
-        # gl_to_cv = np.array([[1, -1, -1, 1], [-1, 1, 1, -1], [-1, 1, 1, -1], [1, 1, 1, 1]])
-        # world_T_cam *= gl_to_cv
         cam_T_world = pose_mat
 
         world_T_cam = np.linalg.inv(cam_T_world)
