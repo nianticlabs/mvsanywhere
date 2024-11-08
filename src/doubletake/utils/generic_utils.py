@@ -242,6 +242,7 @@ def read_image_file(
         value_scale_factor: value to scale image values with, default is 1.0
         resampling_mode: resampling method when resizing using PIL. Default
             is PIL.Image.BILINEAR
+        crop: Optional PIL cropping parameters as a tuple: (left, upper, right, lower)
         target_aspect_ratio: if not None, will crop the image to match this
         aspect ratio. Default is None
 
@@ -278,9 +279,9 @@ def read_image_file(
 
 def read_pfm_file(
     filename,
-    height=None, 
-    width=None, 
-    value_scale_factor=1.0, 
+    height=None,
+    width=None,
+    value_scale_factor=1.0,
     resampling_mode=Image.BILINEAR,
     crop=None,
     disable_warning=False,
@@ -331,7 +332,7 @@ def read_pfm_file(
         # do we really need to resize? If not, skip.
         if (img_width, img_height) != (width, height):
             # warn if it doesn't make sense.
-            if ((width > img_width or height > img_height) and 
+            if ((width > img_width or height > img_height) and
                     not disable_warning):
                 logger.warning(
                     f"WARNING: target size ({width}, {height}) has a "
@@ -340,7 +341,7 @@ def read_pfm_file(
             img = img.resize((width, height), resample=resampling_mode)
 
     img = TF.to_tensor(img).float() * value_scale_factor
-    
+
     return img
 
 

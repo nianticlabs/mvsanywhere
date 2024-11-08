@@ -1,18 +1,18 @@
-"""Script for generating DeeoVideoMVS multiview lists in the split folder 
-    indicated. It will export these frame tuples in this format line by line in 
-    the output file: 
+"""Script for generating DeeoVideoMVS multiview lists in the split folder
+    indicated. It will export these frame tuples in this format line by line in
+    the output file:
 
     scan_id frame_id_0 frame_id_1 ... frame_id_N-1
 
     where frame_id_0 is the reference image.
 
     Run like so for generating a list of train tuples of eight frames (default):
-    
-    python ./data_scripts/generate_train_tuples.py 
-        --data_config configs/data/scannet/scannet_default_train.yaml
-        --num_workers 16 
 
-    where scannet_default_train.yaml looks like: 
+    python ./data_scripts/generate_train_tuples.py
+        --data_config configs/data/scannet/scannet_default_train.yaml
+        --num_workers 16
+
+    where scannet_default_train.yaml looks like:
         !!python/object:doubletake.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: $tuples_directory$
@@ -31,7 +31,7 @@
     This file uses the defaults for frame distances from DVMVS.
 
     This module also borrows the main tuple generation function from
-    the DeepVideoMVS repo https://github.com/ardaduz/deep-video-mvs 
+    the DeepVideoMVS repo https://github.com/ardaduz/deep-video-mvs
 """
 
 import copy

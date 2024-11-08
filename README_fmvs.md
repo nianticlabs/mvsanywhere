@@ -1,7 +1,11 @@
 ## Create conda environment
 
 ```
-conda env create -f environment.yml
+make install-mamba
+
+make create-mamba-env
+mamba activate fmvs
+python -m pip install -e .
 ```
 
 ## Branches
@@ -19,6 +23,30 @@ The double img encoder implementation ready to train on multiple datasets and to
 
 ### more_datasets
 Branch where I keep implementing dataloaders, tuple generators, .... for the different datasets
+
+
+### Waymo preprocessing
+
+First run
+```
+python dust3r_waymo_preprocess.py 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+```
+The whole dataset is huge; the numbers after the command let you preprocess 1/16th at a time, e.g. if you want to split across different machines.
+Inside that script there is a `do_extract_frames` parameter which you can set to False if you just want to do the final step of preprocessing. You can also up the number of workers but personally I found it didn't really speed things up.
+
+```
+> /mnt/nas3/personal/mfirman/fmvs/data_splits/waymo/train_scans.txt
+for file in $(ls /mnt/nas3/shared/datasets/waymo/preprocessed/training/ | grep -v tmp); do
+  for i in {1..5}; do
+    echo "${file}^${i}" >> /mnt/nas3/personal/mfirman/fmvs/data_splits/waymo/train_scans.txt
+  done
+done
+
+python -m scripts.data_scripts.generate_train_tuples_geometry \
+    --data_config configs/data/waymo/waymo_default_train.yaml \
+    --num_workers 16 \
+    --num_images_in_tuple 8
+```
 
 ## Train:
 
@@ -43,7 +71,7 @@ python src/doubletake/ray/train.py --name regression_multids_double_img_encoder_
 ```
 
 To test on scannet:
-python3 ./src/doubletake/test.py --name my_model_name --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/scannet/scannet_default_test.yaml --load_weights_from_checkpoint  /path/to/ckpt/ --fast_cost_volume --gpus 1 --num_workers 8 --batch_size 4 
+python3 ./src/doubletake/test.py --name my_model_name --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/scannet/scannet_default_test.yaml --load_weights_from_checkpoint  /path/to/ckpt/ --fast_cost_volume --gpus 1 --num_workers 8 --batch_size 4
 
 ### Sections of the code that are relevant?
 
@@ -66,3 +94,8 @@ Training logs
 ```
 /mnt/nas3/shared/projects/fmvs/fmvs/logs/ray
 ```
+
+
+## Evaluation on the robust benchmark
+
+See [src/rmvd/models/README.md](src/rmvd/models/README.md).

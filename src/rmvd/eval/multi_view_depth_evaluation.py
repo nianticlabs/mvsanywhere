@@ -366,7 +366,7 @@ class MultiViewDepthEvaluation:
             columns = pd.Index(x, name="frac_removed")
             index = pd.MultiIndex.from_tuples([], names=("sample_idx", "curve"))
             self.sparsification_curves = pd.DataFrame(columns=columns, index=index)
-            
+
         self.dataset_updates = {}
 
     def _get_source_view_ordering(self, sample_inputs, sample_gt):
@@ -521,6 +521,9 @@ class MultiViewDepthEvaluation:
         gpu_mem_alloc = int(torch.cuda.max_memory_allocated() / 1024 / 1024) if time_and_mem_valid else np.nan
         gpu_mem_reserved = int(torch.cuda.max_memory_reserved() / 1024 / 1024) if time_and_mem_valid else np.nan
         gpu_mem = {'gpu_mem_alloc_in_mib': gpu_mem_alloc, 'gpu_mem_alloc_in_mib': gpu_mem_reserved}
+
+        # Check the shape of the prediction to prevent downstream bugs
+        assert pred['depth'].ndim == 4
 
         return pred, runtimes, gpu_mem
 

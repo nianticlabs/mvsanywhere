@@ -8,6 +8,9 @@ from .wrappers.patchmatchnet import patchmatchnet_wrapped
 from .wrappers.fmvs import fmvs_wrapped
 from .wrappers.mvsformerpp import mvsformerpp_wrapped
 from .wrappers.depthanything import depthanything_wrapped
+from .wrappers.depthpro import depthpro_wrapped
+from .wrappers.metric3d import metric3d_wrapped
+from .wrappers.unidepth import unidepth_wrapped
 from .wrappers.mast3r import mast3r_wrapped
 
 from .factory import create_model, prepare_custom_model

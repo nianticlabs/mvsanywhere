@@ -1,18 +1,18 @@
-"""Script for generating DeeoVideoMVS multiview lists in the split folder 
-    indicated. It will export these frame tuples in this format line by line in 
-    the output file: 
+"""Script for generating geometry-based multiview lists in the split folder
+    indicated. It will export these frame tuples in this format line by line in
+    the output file:
 
     scan_id frame_id_0 frame_id_1 ... frame_id_N-1
 
     where frame_id_0 is the reference image.
 
     Run like so for generating a list of train tuples of eight frames (default):
-    
-    python ./data_scripts/generate_train_tuples.py 
-        --data_config configs/data/scannet/scannet_default_train.yaml
-        --num_workers 16 
 
-    where scannet_default_train.yaml looks like: 
+    python ./data_scripts/generate_train_tuples_geometry.py
+        --data_config configs/data/scannet/scannet_default_train.yaml
+        --num_workers 16
+
+    where scannet_default_train.yaml looks like:
         !!python/object:doubletake.options.Options
         dataset_path: SCANNET_PATH/
         tuple_info_file_location: $tuples_directory$
@@ -28,10 +28,6 @@
     It will output a tuples file with a tuple list at:
     {tuple_info_file_location}/{split}{mv_split_filesuffix}
 
-    This file uses the defaults for frame distances from DVMVS.
-
-    This module also borrows the main tuple generation function from
-    the DeepVideoMVS repo https://github.com/ardaduz/deep-video-mvs 
 """
 
 import copy
@@ -115,6 +111,10 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
 
     valid_frames = ds.get_valid_frame_ids(opts.datasets[0].split, scan)
 
+    if len(valid_frames) == 0:
+        print("No valid frames; exiting")
+        return []
+
     frame_ind_to_frame_id = {}
     for frame_ind, frame_line in enumerate(valid_frames):
         frame_ind_to_frame_id[frame_ind] = frame_line.strip().split(" ")[1]
@@ -135,7 +135,6 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
         world_T_cams_b44.append(world_T_cam_44)
         cam_T_worlds_b44.append(cam_T_world_44)
 
-    import torch
     depths_b1hw = torch.stack(depths_b1hw).cuda()
     Ks_b44 = torch.stack(Ks_b44).cuda()
     invKs_b44 = torch.tensor(np.stack(invKs_b44)).cuda()
@@ -171,16 +170,24 @@ def crawl_subprocess_long(opts_temp_filepath, scan, count, progress):
             src_cam_T_world = cam_T_worlds_b44[source_indices] @ world_T_cams_b44[current_index, None]
             cur_world_T_cam = torch.eye(4).unsqueeze(0).cuda()
 
+            current_depths_b1hw = depths_b1hw[current_index, None]
+
             # Reproject current geometry into source and count valid pixels
             valid_mask, _ = loss.get_valid_mask(
-                depths_b1hw[current_index, None],
+                current_depths_b1hw,
                 depths_b1hw[source_indices],
                 invKs_b44[current_index, None],
                 Ks_b44[source_indices],
                 cur_world_T_cam,
                 src_cam_T_world
             )
-            check_2 = (valid_mask.sum(dim=(1, 2, 3)) / np.prod(valid_mask.shape[-2:]) > 0.25).cpu().numpy()
+
+            # For each source frame, count the fraction of the current points which reprojected
+            # into that frame. Only keep those source frames which are above a threshold.
+            num_inlier_pixels = valid_mask.sum(dim=(1, 2, 3))
+            num_total_pixels = torch.isfinite(current_depths_b1hw).sum(dim=(1, 2, 3))
+            check_2 = ((num_inlier_pixels / num_total_pixels) > 0.25).cpu().numpy()
+
             try:
                 check = check_1 & check_2
             except:

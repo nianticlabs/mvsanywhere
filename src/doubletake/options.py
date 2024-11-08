@@ -352,7 +352,7 @@ class OptionsHandler:
                     OptionsHandler.load_options_from_yaml(data_config)
                     for data_config in cl_args.val_data_config_file.split(":")
                 ]
-                self.config_filepaths.append(cl_args.val_data_config_file)                
+                self.config_filepaths.append(cl_args.val_data_config_file)
         else:
             # no config has been supplied. Let's hope that we have required
             # arguments through command line.
