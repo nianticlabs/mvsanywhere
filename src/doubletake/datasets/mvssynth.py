@@ -283,18 +283,18 @@ class MVSSynthDataset(GenericMVSDataset):
 
         # Store intrinsics in output_dict
         output_dict["K_b44"] = K.clone()
-        output_dict["invK_b44"] = torch.inverse(K)
+        output_dict["invK_b44"] = torch.linalg.inv(K)
 
         # optionally include the intrinsics matrix for the full res depth map.
         if self.include_full_depth_K:
             output_dict[f"K_full_depth_b44"] = K.clone()
-            output_dict[f"invK_full_depth_b44"] = torch.tensor(np.linalg.inv(K))
+            output_dict[f"invK_full_depth_b44"] = torch.linalg.inv(K)
 
         K_matching = K.clone()
         K_matching[0] *= self.matching_width / float(width_pixels)
         K_matching[1] *= self.matching_height / float(height_pixels)
         output_dict["K_matching_b44"] = K_matching
-        output_dict["invK_matching_b44"] = np.linalg.inv(K_matching)
+        output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         K_depth = K.clone()
         K_depth[0, 0] *= self.depth_width / float(width_pixels)
