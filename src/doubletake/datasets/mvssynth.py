@@ -1,13 +1,11 @@
 import os
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+import json
 from pathlib import Path
 
 import numpy as np
-
 import torch
-
-import json
 
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 
@@ -24,33 +22,33 @@ class MVSSynthDataset(GenericMVSDataset):
     """
 
     def __init__(
-            self,
-            dataset_path,
-            split,
-            mv_tuple_file_suffix="_tuples.txt",
-            include_full_res_depth=False,
-            limit_to_scan_id=None,
-            num_images_in_tuple=None,
-            tuple_info_file_location=None,
-            image_height=384,
-            image_width=512,
-            high_res_image_width=640,
-            high_res_image_height=480,
-            image_depth_ratio=2,
-            shuffle_tuple=False,
-            include_full_depth_K=False,
-            include_high_res_color=False,
-            pass_frame_id=False,
-            skip_frames=None,
-            skip_to_frame=None,
-            verbose_init=True,
-            min_valid_depth=1e-3,
-            max_valid_depth=1e3,
-            disable_flip=False,
-            rotate_images=False,
-            matching_scale=0.25,
-            prediction_scale=0.5,
-            prediction_num_scales=5,
+        self,
+        dataset_path,
+        split,
+        mv_tuple_file_suffix="_tuples.txt",
+        include_full_res_depth=False,
+        limit_to_scan_id=None,
+        num_images_in_tuple=None,
+        tuple_info_file_location=None,
+        image_height=384,
+        image_width=512,
+        high_res_image_width=640,
+        high_res_image_height=480,
+        image_depth_ratio=2,
+        shuffle_tuple=False,
+        include_full_depth_K=False,
+        include_high_res_color=False,
+        pass_frame_id=False,
+        skip_frames=None,
+        skip_to_frame=None,
+        verbose_init=True,
+        min_valid_depth=1e-3,
+        max_valid_depth=1e3,
+        disable_flip=False,
+        rotate_images=False,
+        matching_scale=0.25,
+        prediction_scale=0.5,
+        prediction_num_scales=5,
     ):
         super().__init__(
             dataset_path=dataset_path,
@@ -279,9 +277,9 @@ class MVSSynthDataset(GenericMVSDataset):
 
         # Construct the intrinsic matrix in pixel coordinates
         K = torch.eye(4, dtype=torch.float32)
-        K[:3, :3] = torch.tensor([[f_x_new, 0, c_x_new],
-                                  [0, f_y_new, c_y_new],
-                                  [0, 0, 1]], dtype=torch.float32)
+        K[:3, :3] = torch.tensor(
+            [[f_x_new, 0, c_x_new], [0, f_y_new, c_y_new], [0, 0, 1]], dtype=torch.float32
+        )
 
         # Store intrinsics in output_dict
         output_dict["K_b44"] = K.clone()
@@ -305,10 +303,10 @@ class MVSSynthDataset(GenericMVSDataset):
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
             K_scaled = K_depth.clone()
-            K_scaled[0, 0] /= 2 ** i
-            K_scaled[1, 1] /= 2 ** i
-            K_scaled[0, 2] /= 2 ** i
-            K_scaled[1, 2] /= 2 ** i
+            K_scaled[0, 0] /= 2**i
+            K_scaled[1, 1] /= 2**i
+            K_scaled[0, 2] /= 2**i
+            K_scaled[1, 2] /= 2**i
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = torch.linalg.inv(K_scaled)
 
@@ -370,7 +368,7 @@ class MVSSynthDataset(GenericMVSDataset):
 
         pose_data = json.load(open(pose_path))
 
-        pose_mat = np.array(pose_data['extrinsic']).astype(np.float32)
+        pose_mat = np.array(pose_data["extrinsic"]).astype(np.float32)
         cam_T_world = pose_mat
 
         world_T_cam = np.linalg.inv(cam_T_world)
@@ -381,21 +379,24 @@ class MVSSynthDataset(GenericMVSDataset):
 if __name__ == "__main__":
     tuple_info_file_location = Path("tmp")
     tuple_info_file_location.mkdir(exist_ok=True)
-    with open(tuple_info_file_location / "train_tuples.txt", 'w') as f:
+    with open(tuple_info_file_location / "train_tuples.txt", "w") as f:
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
         f.write("0105 0045 0046 0047 0046 0045 0046 0047 0046\n")
 
-    dataset = MVSSynthDataset("/mnt/nas3/shared/datasets/mvssynth/GTAV_540", split='train',
-                              tuple_info_file_location=tuple_info_file_location)
+    dataset = MVSSynthDataset(
+        "/mnt/nas3/shared/datasets/mvssynth/GTAV_540",
+        split="train",
+        tuple_info_file_location=tuple_info_file_location,
+    )
     import cv2
 
     for idx in range(5):
         print(f"Loading {idx}")
         _, item = dataset[idx]
-        depth = item['depth_b1hw']
+        depth = item["depth_b1hw"]
 
         no_nan_depth = depth[~np.isnan(depth)]
 
@@ -405,7 +406,7 @@ if __name__ == "__main__":
         d /= d.max()
         d = (d * 255).astype(np.uint8)
 
-        image = item['image_b3hw'][0].transpose(1, 2, 0)
+        image = item["image_b3hw"][0].transpose(1, 2, 0)
         image += 2.117904
         image /= image.max()
         image = (cv2.resize(image, (256, 192)) * 255).astype(np.uint8)

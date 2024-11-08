@@ -1,23 +1,24 @@
-import os
 import json
+import os
 from pathlib import Path
 
 from doubletake.datasets.arkitscenes_dataset import ARKitScenesDataset
 from doubletake.datasets.blendedmvg import BlendedMVGDataset
+from doubletake.datasets.dtu_dataset import DTUDataset
 from doubletake.datasets.dynamic_replica import DynamicReplicaDataset
+from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.kitti import KITTIDataset
 from doubletake.datasets.matrix_city import MatrixCityDataset
+from doubletake.datasets.mvssynth import MVSSynthDataset
+from doubletake.datasets.nuscenes_dataset import NuScenesDataset
+from doubletake.datasets.sailvos3d import SAILVOS3DDataset
 from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.seven_scenes_dataset import SevenScenesDataset
+from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
 from doubletake.datasets.vdr_dataset import VDRDataset
-from doubletake.datasets.dtu_dataset import DTUDataset
-from doubletake.datasets.hypersim import HypersimDataset
-from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.vkitti import VirtualKITTIDataset
-from doubletake.datasets.nuscenes_dataset import NuScenesDataset
 from doubletake.datasets.waymo_dataset import WaymoDataset
-from doubletake.datasets.mvssynth import MVSSynthDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -310,6 +311,22 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             print(f"".center(80, "#"))
             print("")
 
+    elif dataset_name == "sailvos3d":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
+
+        dataset_class = SAILVOS3DDataset
+
+        if verbose:
+            print(f"".center(80, "#"))
+            print(f" SAILVOS3D Dataset, number of scans: {len(scans)} ".center(80, "#"))
+            print(f"".center(80, "#"))
+            print("")
+
     elif dataset_name == "mvssynth":
         with open(split_filepath) as file:
             scans = file.readlines()
@@ -324,7 +341,6 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             print(f" MVSSynth Dataset, number of scans: {len(scans)} ".center(80, "#"))
             print(f"".center(80, "#"))
             print("")
-
 
     else:
         raise ValueError(f"Not a recognized dataset: {dataset_name}")
