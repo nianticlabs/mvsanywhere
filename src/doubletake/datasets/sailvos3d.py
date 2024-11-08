@@ -497,10 +497,11 @@ class SAILVOS3DDataset(GenericMVSDataset):
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
 
+        depth = torch.tensor(depth).float().unsqueeze(0)
         mask_b = depth > 0 & (depth < torch.quantile(depth, 0.95))
 
-        mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
-        depth = torch.tensor(depth).float().unsqueeze(0)
+        # mask_b = torch.tensor(mask_b).bool().unsqueeze(0)
+        # depth = torch.tensor(depth).float().unsqueeze(0)
 
         # # Get the float valid mask
         mask = mask_b.float()

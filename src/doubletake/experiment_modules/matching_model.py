@@ -412,6 +412,7 @@ class MatchingModel(pl.LightningModule):
         # cat the src depths to the src features
         src_depths_b11hw = src_data["depth_b1hw"].clone()
         src_depths_b11hw[torch.isnan(src_depths_b11hw)] = 0.
+
         src_depths_b11hw = F.interpolate(
             src_depths_b11hw, (1, self.cost_volume.matching_height, self.cost_volume.matching_width),
             mode="nearest",

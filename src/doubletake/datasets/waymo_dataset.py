@@ -299,6 +299,17 @@ class WaymoDataset(GenericMVSDataset):
         # TODO – deal with collisions. Currently we are just hoping they don't exist.
         depthmap = np.zeros((height, width))
         depthmap[y, x] = d
+
+        # expand using max pooling
+        padded_depthmap = depthmap.copy()
+        padded_depthmap[padded_depthmap == 0] = 10000.
+        padded_depthmap = -torch.tensor(padded_depthmap).float().unsqueeze(0).unsqueeze(0)
+        padded_depthmap = -torch.nn.functional.max_pool2d(padded_depthmap, kernel_size=5, stride=1, padding=2)
+        padded_depthmap = padded_depthmap.squeeze(0).squeeze(0).numpy()
+        padded_depthmap[padded_depthmap == 10000.] = 0
+        
+        depthmap[depthmap == 0] = padded_depthmap[depthmap == 0]
+
         return depthmap
 
     def load_pose(self, scan_id, frame_id):
