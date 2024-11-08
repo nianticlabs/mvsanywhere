@@ -361,7 +361,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         if self.include_full_depth_K:
             output_dict[f"K_full_depth_b44"] = K.clone()
-            output_dict[f"invK_full_depth_b44"] = torch.inverse(K)
+            output_dict[f"invK_full_depth_b44"] = torch.linalg.inv(K)
 
         K_matching = K.clone()
         K_matching[0, 0] *= self.matching_width / float(width_pixels)
@@ -369,7 +369,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
         K_matching[0, 2] *= self.matching_width / float(width_pixels)
         K_matching[1, 2] *= self.matching_height / float(height_pixels)
         output_dict["K_matching_b44"] = K_matching
-        output_dict["invK_matching_b44"] = torch.inverse(K_matching)
+        output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         # Scale intrinsics to the dataset's configured depth resolution.
         K_depth = K.clone()
@@ -384,7 +384,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
             K_scaled[0, 2] /= 2**i
             K_scaled[1, 2] /= 2**i
             output_dict[f"K_s{i}_b44"] = K_scaled
-            output_dict[f"invK_s{i}_b44"] = torch.inverse(K_scaled)
+            output_dict[f"invK_s{i}_b44"] = torch.linalg.inv(K_scaled)
 
         return output_dict, None
 
