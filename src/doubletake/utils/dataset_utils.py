@@ -16,6 +16,7 @@ from doubletake.datasets.hypersim import HypersimDataset
 from doubletake.datasets.tartanair import TartanAirDataset
 from doubletake.datasets.vkitti import VirtualKITTIDataset
 from doubletake.datasets.nuscenes_dataset import NuScenesDataset
+from doubletake.datasets.waymo_dataset import WaymoDataset
 
 
 def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose=True):
@@ -279,6 +280,19 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
     elif dataset_name == "nuscenes":
         dataset_class = NuScenesDataset
         scans = None
+
+    elif dataset_name == "waymo":
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        dataset_class = WaymoDataset
+        with open(split_filepath) as file:
+            scans = file.readlines()
+            scans = [scan.strip() for scan in scans]
+
+        if single_debug_scan_id is not None:
+            scans = [single_debug_scan_id]
 
     elif dataset_name == "arkitscenes":
         with open(split_filepath) as file:
