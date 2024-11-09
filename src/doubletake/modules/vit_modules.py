@@ -230,6 +230,8 @@ class DINOv2(nn.Module):
             f (torch.Tensor): The feature map [B, C, H // 14, W // 14].
             t (torch.Tensor): The token [B, C]. This is only returned if return_token is True.
         """
+        scale_factor = 14 / 16 
+        x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
         return self.model.get_intermediate_layers(x, self.num_intermediate_layers, return_class_token=True)
 
 
@@ -324,8 +326,8 @@ class CostVolumePatchEmbed(nn.Module):
         # resize such that 2 downsamples will give 1/14th resolution 
         B, C, H, W = x.shape
 
-        scale_factor = 16 / 14 
-        x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
+        # scale_factor = 16 / 14 
+        # x = F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
 
         for i in range(3):
 
@@ -333,7 +335,7 @@ class CostVolumePatchEmbed(nn.Module):
             x = self.convs[f"ds_conv_{i}"](x)
 
             if i < 2:
-                img_feat = img_feats[i][0].reshape((B, H * 4 // 14, W * 4 // 14, self.num_feats))
+                img_feat = img_feats[i][0].reshape((B, H * 4 // 16, W * 4 // 16, self.num_feats))
                 img_feat = img_feat.permute(0, 3, 1, 2)
                 img_feat = self.projects[i](img_feat)
                 img_feat = self.resize_layers[i](img_feat)
@@ -415,7 +417,7 @@ class ViTCVEncoder(nn.Module):
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
 
         x = torch.cat((self.model.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + self.model.interpolate_pos_encoding(x, w * 4, h * 4)
+        x = x + self.model.interpolate_pos_encoding(x, w * 4 * 14 / 16, h * 4 * 14 / 16)
 
         if self.model.register_tokens is not None:
             x = torch.cat(

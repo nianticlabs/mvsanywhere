@@ -1,0 +1,10 @@
+!!python/object:doubletake.options.DataOptions
+dataset_path: /mnt/nas3/shared/datasets/sailovos3d/sailvos3d
+tuple_info_file_location: data_splits/sailvos3d/
+dataset_scan_split_file: data_splits/sailvos3d/split_train.txt 
+dataset: sailvos3d
+mv_tuple_file_suffix: _eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: train
+train_maximum_pose_distance: 1.00

@@ -16,7 +16,7 @@ install-mamba:
 	@./$(MAMBA_INSTALL_SCRIPT)
 	@rm "$(MAMBA_INSTALL_SCRIPT)"
 
-# HELP: create-mamba-env: Create a new Mamba environment 
+# HELP: create-mamba-env: Create a new Mamba environment
 .PHONY: create-mamba-env
 create-mamba-env:
 	@mamba env create -f environment.yml -n "$(MAMBA_ENV_NAME)"

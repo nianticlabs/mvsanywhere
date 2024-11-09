@@ -1,5 +1,5 @@
 """
-Most of this is a modified version of code from the DeepVideoMVS repository 
+Most of this is a modified version of code from the DeepVideoMVS repository
 at https://github.com/ardaduz/deep-video-mvs/blob/master/dvmvs/keyframe_buffer.py
 """
 
@@ -65,6 +65,7 @@ def is_valid_pair(
     return_measure=False,
 ):
     combined_measure, _, t_measure = pose_distance(reference_pose, measurement_pose)
+    print(t_measure, combined_measure, pose_dist_max, pose_dist_min)
 
     if pose_dist_min <= combined_measure <= pose_dist_max and t_measure >= t_norm_threshold:
         result = True

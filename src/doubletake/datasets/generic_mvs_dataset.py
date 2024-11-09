@@ -143,7 +143,7 @@ class GenericMVSDataset(Dataset):
 
             # check if this file exists
             assert os.path.exists(tuple_information_filepath), (
-                f"Tuple file {tuple_information_filepath}"
+                f"Tuple file {tuple_information_filepath} "
                 "doesn't exist! Pass none for mv_tuple_file_suffix if you don't"
                 " actually need a tuple file, otherwise check your paths."
             )
@@ -460,7 +460,6 @@ class GenericMVSDataset(Dataset):
             self.image_width resolution.
 
         """
-
         color_filepath = self.get_color_filepath(scan_id, frame_id)
         try:
             image = read_image_file(
@@ -616,11 +615,6 @@ class GenericMVSDataset(Dataset):
                 depth = torch.flip(depth, (-1,))
                 mask = torch.flip(mask, (-1,))
                 mask_b = torch.flip(mask_b, (-1,))
-
-            # try:
-            #     depth[torch.isfinite(depth)].max()
-            # except:
-            #     pass
 
             max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
             min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
