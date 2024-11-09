@@ -748,15 +748,27 @@ class GenericMVSDataset(Dataset):
         # src_data contains data for all source frames
         src_data = self.stack_src_data(src_data_list)
 
+        src_world_T_cam = torch.tensor(src_data["world_T_cam_b44"])
+        cur_cam_T_world = torch.tensor(cur_data["cam_T_world_b44"])
+
+        # Compute cur_cam_T_src_cam
+        cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(0) @ src_world_T_cam
+
+
+        if torch.rand(1).item() < 0.5 and self.split == "train":
+            cur_data["max_depth"] = cur_data["max_depth"] * torch.exp(torch.randn(1)).item()
+            cur_data["min_depth"] = cur_data["min_depth"] * torch.exp(torch.randn(1)).item()
+        else:
+            cam_dists = torch.linalg.norm(cur_cam_T_src_cam[..., :3, 3], dim=1)
+            cur_data["min_depth"] = (torch.min(cam_dists) * cur_data["K_matching_b44"][0, 0]) * 4 / (1.0 * cur_data["image_b3hw"].shape[-1])
+            cur_data["max_depth"] = (torch.max(cam_dists) * cur_data["K_matching_b44"][0, 0] * 4 ) / (0.01 * cur_data["image_b3hw"].shape[-1])
+            
+
         # now sort all source frames (src_data) according to pose penalty w.r.t
         # to the refernce frame (cur_data)
         if not self.shuffle_tuple:
             # order source images based on pose penalty
-            src_world_T_cam = torch.tensor(src_data["world_T_cam_b44"])
-            cur_cam_T_world = torch.tensor(cur_data["cam_T_world_b44"])
 
-            # Compute cur_cam_T_src_cam
-            cur_cam_T_src_cam = cur_cam_T_world.unsqueeze(0) @ src_world_T_cam
 
             # get penalties.
             frame_penalty_k, _, _ = pose_distance(cur_cam_T_src_cam)

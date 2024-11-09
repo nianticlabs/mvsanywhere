@@ -520,6 +520,6 @@ class EfficientCostVolumeManager(CostVolumeManager):
         dot_product_brkhw = torch.sum(src_feat_warped_brkfhw * cur_feats_b1kfhw, dim=3) * mask_brkhw
 
         # Sum over the frames
-        dot_product_bkhw = dot_product_brkhw.sum(dim=1)
+        dot_product_bkhw = dot_product_brkhw.mean(dim=1) * 7.0
 
         return dot_product_bkhw, depth_planes_bdhw, None

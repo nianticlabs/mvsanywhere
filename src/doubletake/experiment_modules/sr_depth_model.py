@@ -265,6 +265,13 @@ class DepthModel(pl.LightningModule):
             num_source_views=opts.model_num_views - 1,
         )
 
+        self.range_predictor = nn.Sequential(
+            nn.Linear(768, 128),
+            nn.ReLU(),
+            nn.Linear(128, 2),
+            # nn.Sigmoid(),
+        )
+
         # init the matching encoder. resnet is fast and is the default for
         # results in the paper, fpn is more accurate but much slower.
         if "resnet" == self.run_opts.matching_encoder_type:
@@ -486,7 +493,12 @@ class DepthModel(pl.LightningModule):
             cur_feats = self.cost_volume_net(
                         cost_volume, 
                         cur_feats,
-                    )     
+                    )
+
+        range = self.range_predictor(cur_feats[-1][0].mean(dim=1))
+        a = range[:, 0].view(-1, 1, 1, 1)
+        b = range[:, 1].view(-1, 1, 1, 1)
+        
         # Decode into depth at multiple resolutions.
         if "depth_anything" in self.run_opts.depth_decoder_name:
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
@@ -498,7 +510,10 @@ class DepthModel(pl.LightningModule):
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
-            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
+            log_depth = torch.sigmoid(log_depth)
+
+
+            # log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
             # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
@@ -506,6 +521,13 @@ class DepthModel(pl.LightningModule):
                 # now flip the depth map back after final prediction
                 log_depth = torch.flip(log_depth, (-1,))
 
+            true_min_depth = torch.nan_to_num(cur_data["depth_b1hw"], nan=torch.inf).amin(dim=(1, 2, 3), keepdim=True)
+            true_max_depth = torch.nan_to_num(cur_data["depth_b1hw"], nan=-torch.inf).amax(dim=(1, 2, 3), keepdim=True)
+            scaled_log_depth = torch.log(true_min_depth) + torch.log(true_max_depth / true_min_depth) * log_depth
+            depth_outputs[k.replace("log_", "log_scaled_")] = scaled_log_depth
+            depth_outputs[k.replace("log_", "scaled_")] = torch.exp(scaled_log_depth)
+
+            log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * (a + (b - a) * log_depth.detach())
             depth_outputs[k] = log_depth
             depth_outputs[k.replace("log_", "")] = torch.exp(log_depth)
 
@@ -557,6 +579,7 @@ class DepthModel(pl.LightningModule):
         log_depth_gt = torch.log(depth_gt)
         found_scale = False
         ms_loss = 0
+        ms_scaled_loss = 0
         # Mask sparse arrays
         with torch.no_grad():
             sparsity = torch.isnan(depth_gt).sum(dim=[1, 2, 3]) / np.prod(depth_gt.shape[-2:])
@@ -568,6 +591,19 @@ class DepthModel(pl.LightningModule):
             mask_b_dense = mask_b & (sparsity < 0.5)[:, None, None, None]
 
         for i in range(4):
+
+            # Metric loss
+            if f"log_scaled_depth_pred_s{i}_b1hw" in outputs:
+                log_depth_pred_resized = F.interpolate(
+                    outputs[f"log_scaled_depth_pred_s{i}_b1hw"],
+                    size=depth_gt.shape[-2:],
+                    mode="nearest",
+                )
+                ms_scaled_loss += (
+                    self.ms_loss_fn(log_depth_gt[mask_b_top20], log_depth_pred_resized[mask_b_top20]) / 2**i
+                )
+                found_scale = True
+
             if f"log_depth_pred_s{i}_b1hw" in outputs:
                 log_depth_pred_resized = F.interpolate(
                     outputs[f"log_depth_pred_s{i}_b1hw"],
@@ -577,7 +613,6 @@ class DepthModel(pl.LightningModule):
                 ms_loss += (
                     self.ms_loss_fn(log_depth_gt[mask_b_top20], log_depth_pred_resized[mask_b_top20]) / 2**i
                 )
-                found_scale = True
 
         if not found_scale:
             raise Exception("Could not find a valid scale to compute si loss!")
@@ -592,12 +627,12 @@ class DepthModel(pl.LightningModule):
         
         depth_gt_grad = depth_gt.clone()
         depth_gt_grad[~mask_b_dense] = torch.nan
-        grad_loss = torch.nan_to_num(self.grad_loss(depth_gt, depth_pred))
+        grad_loss = torch.nan_to_num(self.grad_loss(depth_gt, outputs["scaled_depth_pred_s0_b1hw"]))
 
         normals_gt[~mask_b_dense.expand(-1, 3, -1, -1)] = torch.nan
         normals_loss = torch.nan_to_num(self.normals_loss(normals_gt, normals_pred))
 
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
+        loss = ms_scaled_loss + ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
 
         losses = {
             "loss": loss,
@@ -606,6 +641,7 @@ class DepthModel(pl.LightningModule):
             "abs_loss": abs_loss,
             "normals_loss": normals_loss,
             "ms_loss": ms_loss,
+            "ms_scaled_loss": ms_scaled_loss,
             "inv_abs_loss": inv_abs_loss,
             "log_l1_loss": log_l1_loss,
         }
@@ -655,7 +691,7 @@ class DepthModel(pl.LightningModule):
         cur_data["normals_b3hw"] = normals_gt
 
         # estimate normals for depth
-        normals_pred = self.compute_normals(depth_pred, cur_data["invK_s0_b44"])
+        normals_pred = self.compute_normals(outputs["scaled_depth_pred_s0_b1hw"], cur_data["invK_s0_b44"])
         outputs["normals_pred_b3hw"] = normals_pred
 
         # compute losses
@@ -801,7 +837,8 @@ class DepthModel(pl.LightningModule):
         """
         optimizer_sr = torch.optim.AdamW(
             list(self.cost_volume.parameters()) + 
-            list(self.matching_model.parameters()),
+            list(self.matching_model.parameters()) +
+            list(self.range_predictor.parameters()),
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
