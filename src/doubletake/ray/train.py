@@ -59,7 +59,8 @@ class RayRunner:
                     "data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs_offline.txt",
                     "data_splits/ScanNetv2/standard_split/test_eight_view_deepvmvs.txt",
                     "data_splits/arkitscenes/train_landscape_eight_view_deepvmvs.txt",
-                    "data_splits/arkitscenes/train_portrait_eight_view_deepvmvs.txt"
+                    "data_splits/arkitscenes/train_portrait_eight_view_deepvmvs.txt",
+                    "data_splits/waymo/train_eight_view_deepvmvs.txt"
                 ],
             },
         )

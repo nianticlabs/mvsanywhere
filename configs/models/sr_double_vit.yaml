@@ -1,5 +1,5 @@
 !!python/object:doubletake.options.Options
-feature_volume_type: simple_cost_volume
+feature_volume_type: view_agnostic_mlp_feature_volume
 batch_size: 16
 val_batch_size: 4
 cost_volume_aggregation: dot
@@ -20,10 +20,10 @@ num_sanity_val_steps: 0
 num_workers: 12
 precision: 16
 random_seed: 0
-image_width: 512
-image_height: 384
-val_image_width: 512
-val_image_height: 384
-matching_scale: 0.25
+image_width: 640
+image_height: 480
+val_image_width: 640
+val_image_height: 480
+matching_scale: 0.50
 prediction_scale: 0.875
 model_type: depth_model

@@ -167,7 +167,7 @@ class ResnetMatchingEncoder(nn.Module):
             encoder.conv1,
             encoder.bn1,
             encoder.relu,
-            encoder.maxpool,
+            # encoder.maxpool,
             encoder.layer1,
         ]
 

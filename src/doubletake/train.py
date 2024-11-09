@@ -163,7 +163,7 @@ def prepare_model(opts: options.Options) -> torch.nn.Module:
         model = model_class_to_use(opts)
         state_dict = torch.load(opts.lazy_load_weights_from_checkpoint)["state_dict"]
         available_keys = list(state_dict.keys())
-        for param_key, param in model.named_parameters():
+        for param_key, param in model.cost_volume.named_parameters():
             if param_key in available_keys:
                 try:
                     if isinstance(state_dict[param_key], torch.nn.Parameter):

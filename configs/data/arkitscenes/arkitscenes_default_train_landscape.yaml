@@ -1,4 +1,4 @@
-!!python/object:options.DataOptions
+!!python/object:doubletake.options.DataOptions
 dataset_path: /mnt/arkitscenes4b/
 tuple_info_file_location: data_splits/arkitscenes/
 dataset_scan_split_file: /mnt/arkitscenes4b/Training_landscape.txt
