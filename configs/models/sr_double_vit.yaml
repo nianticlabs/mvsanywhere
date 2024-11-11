@@ -1,5 +1,5 @@
 !!python/object:doubletake.options.Options
-feature_volume_type: simple_cost_volume
+feature_volume_type: view_agnostic_mlp_feature_volume
 batch_size: 16
 val_batch_size: 4
 cost_volume_aggregation: dot
