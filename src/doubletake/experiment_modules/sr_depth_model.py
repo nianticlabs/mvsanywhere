@@ -17,6 +17,7 @@ from doubletake.losses import (
 from doubletake.modules.cost_volume import CostVolumeManager, EfficientCostVolumeManager
 from doubletake.modules.depth_anything_blocks import DPTHead
 from doubletake.modules.feature_volume import FeatureVolumeManager
+from doubletake.modules.view_agnostic_feature_volume import ViewAgnosticFeatureVolumeManager
 from doubletake.modules.layers import TensorFormatter
 from doubletake.modules.networks import (
     CVEncoder,
@@ -251,6 +252,8 @@ class DepthModel(pl.LightningModule):
             cost_volume_class = EfficientCostVolumeManager
         elif self.run_opts.feature_volume_type == "mlp_feature_volume":
             cost_volume_class = FeatureVolumeManager
+        elif self.run_opts.feature_volume_type == "view_agnostic_mlp_feature_volume":
+            cost_volume_class = ViewAgnosticFeatureVolumeManager
         else:
             raise ValueError(
                 f"Unrecognized option {self.run_opts.feature_volume_type} "
@@ -621,6 +624,7 @@ class DepthModel(pl.LightningModule):
             source views.
         """
         cur_data, src_data = batch
+        batch_size = cur_data["image_b3hw"].shape[0]
 
         if phase == "train":
             cur_data["image_b3hw"] = self.color_aug(cur_data["image_b3hw"], denormalize_first=True)
@@ -692,7 +696,7 @@ class DepthModel(pl.LightningModule):
                 if (global_step % self.trainer.log_every_n_steps == 0 and is_train) or (not is_train and batch_idx == 0):
 
                     prefix = "train" if is_train else "val"
-                    for i in range(4):
+                    for i in range(min(4, batch_size)):
                         mask_i = mask[i].float().cpu()
                         depth_gt_viz_i, vmin, vmax = colormap_image(
                             depth_gt[i].float().cpu(), mask_i, return_vminvmax=True
