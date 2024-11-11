@@ -13,6 +13,7 @@ from rmvd.data.transforms import ResizeInputs
 
 CKPT_PATH =  '/mnt/nas3/shared/projects/fmvs/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
 
+
 class MAST3R_Wrapped(nn.Module):
     def __init__(self):
         super().__init__()
@@ -120,7 +121,6 @@ class MAST3R_Wrapped(nn.Module):
         keyview_idx,
         **_
     ):
-
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
         images_source = exclude_index(images, keyview_idx)
@@ -143,7 +143,6 @@ class MAST3R_Wrapped(nn.Module):
     def output_adapter(self, model_output):
         pred, aux = model_output
         return to_numpy(pred), to_numpy(aux)
-
 
 
 class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
