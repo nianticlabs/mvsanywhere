@@ -373,8 +373,8 @@ class SAILVOS3DDataset(GenericMVSDataset):
 
         # Scale intrinsics to the dataset's configured depth resolution.
         K_depth = K.clone()
-        K_depth[0, 0] *= self.depth_width / float(width_pixels)
-        K_depth[1, 1] *= self.depth_height / float(height_pixels)
+        K_depth[0] *= self.depth_width / float(width_pixels)
+        K_depth[1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
