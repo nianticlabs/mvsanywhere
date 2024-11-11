@@ -5,6 +5,8 @@ import torch
 from torchvision import transforms as T
 import torch.nn as nn
 import numpy as np
+import kornia
+from pathlib import Path
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
@@ -25,6 +27,9 @@ class MAST3R_Wrapped(nn.Module):
         sys.path.insert(0, repo_path + '/dust3r')
         from mast3r.model import AsymmetricMASt3R
         from dust3r.inference import inference
+        from mast3r.fast_nn import fast_reciprocal_NNs
+
+        self.fast_reciprocal_NNs = fast_reciprocal_NNs
 
         model = AsymmetricMASt3R.from_pretrained(CKPT_PATH)
         model.eval()
@@ -49,8 +54,6 @@ class MAST3R_Wrapped(nn.Module):
         intrinsics = resized['intrinsics']
 
         # Input transform
-        print(len(images))
-        sds
         for idx, image_batch in enumerate(images):
             tmp_images = []
             image_batch = image_batch.transpose(0, 2, 3, 1)
@@ -121,20 +124,79 @@ class MAST3R_Wrapped(nn.Module):
         keyview_idx,
         **_
     ):
+
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
         images_source = exclude_index(images, keyview_idx)
-        images_source = images_source + [images_source[-1]] * max(0, (7 - len(images_source)))
-        images_source = images_source[:7]
         images = [image_key] + images_source
 
-        batch = [{'img': images[i], 'idx': i, 'instance': str(i)} for i in range(2)]
-        pts1, pts2 = self.model(batch[0], batch[1])
+        poses_key = select_by_index(poses, keyview_idx)
+        poses_source = exclude_index(poses, keyview_idx)
 
-        pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+        intrinsics_key = select_by_index(intrinsics, keyview_idx)
+        intrinsics_source = exclude_index(intrinsics, keyview_idx)
+
+        all_preds = []
+        all_confidences = []
+        for i in range(len(images_source)):
+            _poses_source = poses_source[i]
+            _intrinsics_source = intrinsics_source[i]
+            batch = [{'img': image_key, 'idx': 0, 'instance': str(0)}]
+            batch.append({'img': images_source[i], 'idx': i, 'instance': str(i)})
+
+            pts1, pts2 = self.model(batch[0], batch[1])
+
+            pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+
+            # triangulate the depth using GT cameras
+            desc1, desc2 = pts1['desc'].squeeze(0).detach(), pts2['desc'].squeeze(0).detach()
+
+            print(desc1.shape, desc2.shape, image_key.shape)
+
+            matches_im0, matches_im1 = self.fast_reciprocal_NNs(desc1, desc2, subsample_or_initxy1=8,
+                                                        device=pred_depth.device, dist='dot', block_size=2**13)
+
+            poses_key_inv = torch.linalg.inv(poses_key.float())
+            P1 = kornia.geometry.projection_from_KRt(
+            intrinsics_key[..., :3, :3].float() * torch.tensor([4.0, 4.0, 1.0])[None, :, None].cuda(),
+            poses_key_inv[..., :3, :3].float(),
+            poses_key_inv[..., :3, 3:4].float()
+            )
+            poses_source_inv = torch.linalg.inv(_poses_source.float())
+            P2 = kornia.geometry.projection_from_KRt(
+            _intrinsics_source[..., :3, :3].float() * torch.tensor([4.0, 4.0, 1.0])[None, :, None].cuda(),
+            poses_source_inv[..., :3, :3].float(),
+            poses_source_inv[..., :3, 3:4].float()
+            )
+
+            matches_im0 = torch.tensor(matches_im0.copy()).unsqueeze(0).cuda()
+            matches_im1 = torch.tensor(matches_im1.copy()).unsqueeze(0).cuda()
+            matches_depth = kornia.geometry.epipolar.triangulate_points(
+                P1, P2, matches_im0.float(), matches_im1.float()
+            )[..., 2]
+
+            # gather the predicted depth values at the matches
+            xs, ys = matches_im0[..., 0], matches_im0[..., 1]
+            pred_matches_depth = pred_depth[0, 0, ys, xs]
+
+            scale = torch.median(matches_depth) / torch.median(pred_matches_depth)
+            pred_depth = pred_depth * scale
+
+            all_preds.append(pred_depth)
+            all_confidences.append(pts1['conf'])
+
+        all_preds = torch.stack(all_preds, dim=0)
+        all_confidences = torch.stack(all_confidences, dim=0).unsqueeze(1)
+
+        # torch.save(all_preds, 'all_preds.pth')
+        # torch.save(all_confidences, 'all_confidences.pth')
+
+        pred_depth = (all_preds * all_confidences).sum(dim=0) / all_confidences.sum(dim=0)
 
         pred = {
             'depth': pred_depth,
+            'matches_depth': matches_depth,
+            'matches_im0': matches_im0,
         }
         aux = {}
 
@@ -146,6 +208,7 @@ class MAST3R_Wrapped(nn.Module):
 
 
 class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
+
     def forward(
         self,
         phase: str,
