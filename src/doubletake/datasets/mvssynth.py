@@ -293,8 +293,8 @@ class MVSSynthDataset(GenericMVSDataset):
         output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         K_depth = K.clone()
-        K_depth[0, 0] *= self.depth_width / float(width_pixels)
-        K_depth[1, 1] *= self.depth_height / float(height_pixels)
+        K_depth[0] *= self.depth_width / float(width_pixels)
+        K_depth[1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
