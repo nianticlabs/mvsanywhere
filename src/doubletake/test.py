@@ -1,66 +1,66 @@
-""" 
-    Predicts depth maps using a DepthModel model. Uses an MVS dataset from 
+"""
+    Predicts depth maps using a DepthModel model. Uses an MVS dataset from
     datasets.
-    
+
     All results will be stored at a base results folder (results_path) at:
         opts.output_base_path/opts.name/opts.dataset/opts.frame_tuple_type/
 
-    frame_tuple_type is the type of image tuple used for MVS. A selection should 
-    be provided in the data_config file you used. 
+    frame_tuple_type is the type of image tuple used for MVS. A selection should
+    be provided in the data_config file you used.
 
-    By default will compute depth scores for each frame and provide both frame 
-    averaged and scene averaged metrics. The script will save these scores (per 
+    By default will compute depth scores for each frame and provide both frame
+    averaged and scene averaged metrics. The script will save these scores (per
     scene and totals) under:
         results_path/scores
 
-    We've done our best to ensure that a torch batching bug through the matching 
-    encoder is fixed for (<10^-4) accurate testing by disabling image batching 
-    through that encoder. Run `--batch_size 4` at most if in doubt, and if 
-    you're looking to get as stable as possible numbers and avoid PyTorch 
+    We've done our best to ensure that a torch batching bug through the matching
+    encoder is fixed for (<10^-4) accurate testing by disabling image batching
+    through that encoder. Run `--batch_size 4` at most if in doubt, and if
+    you're looking to get as stable as possible numbers and avoid PyTorch
     gremlins, use `--batch_size 1`  for comparison evaluation.
 
 
     If you want to use this for speed, set --fast_cost_volume to True. This will
-    enable batching through the matching encoder and will enable an einops 
+    enable batching through the matching encoder and will enable an einops
     optimized feature volume.
 
-    This script can also be used to perform a few different auxiliary tasks, 
+    This script can also be used to perform a few different auxiliary tasks,
     including:
 
     ### TSDF Fusion
-    To run TSDF fusion provide the --run_fusion flag. You have two choices for 
+    To run TSDF fusion provide the --run_fusion flag. You have two choices for
     fusers
-    1) '--depth_fuser ours' (default) will use our fuser, whose meshes are used 
-        in most visualizations and for scores. This fuser does not support 
-        color. You must use the provided version of skimage for our custom 
-        measure.marching_cubes implementation that allows exporting a single 
+    1) '--depth_fuser ours' (default) will use our fuser, whose meshes are used
+        in most visualizations and for scores. This fuser does not support
+        color. You must use the provided version of skimage for our custom
+        measure.marching_cubes implementation that allows exporting a single
         walled mesh.
-    2) '--depth_fuser open3d' will use the open3d depth fuser. This fuser 
-        supports color and you can enable this by using the '--fuse_color' flag. 
-    
-    By default, depth maps will be clipped to 3m for fusion and a tsdf 
-    resolution of 0.04m3 will be used, but you can change that by changing both 
+    2) '--depth_fuser open3d' will use the open3d depth fuser. This fuser
+        supports color and you can enable this by using the '--fuse_color' flag.
+
+    By default, depth maps will be clipped to 3m for fusion and a tsdf
+    resolution of 0.04m3 will be used, but you can change that by changing both
     '--max_fusion_depth' and '--fusion_resolution'
 
-    You can optionnally ask for predicted depths used for fusion to be masked 
-    when no vaiid MVS information exists using '--mask_pred_depths'. This is not 
+    You can optionnally ask for predicted depths used for fusion to be masked
+    when no vaiid MVS information exists using '--mask_pred_depths'. This is not
     enabled by default.
 
-    You can also fuse the best guess depths from the cost volume before the 
-    U-Net that fuses the strong image prior. You can do this by using 
+    You can also fuse the best guess depths from the cost volume before the
+    U-Net that fuses the strong image prior. You can do this by using
     --fusion_use_raw_lowest_cost.
 
     Meshes will be stored under results_path/meshes/mesh_options/
 
     ### Cache depths
-    You can optionally store depths by providing the '--cache_depths' flag. 
+    You can optionally store depths by providing the '--cache_depths' flag.
     They will be stored at
         results_path/depths
 
     ### Quick viz
-    There are other scripts for deeper visualizations of output depths and 
-    fusion, but for quick export of depth map visualization you can use 
-    '--dump_depth_visualization'. Visualizations will be stored at 
+    There are other scripts for deeper visualizations of output depths and
+    fusion, but for quick export of depth map visualization you can use
+    '--dump_depth_visualization'. Visualizations will be stored at
         results_path/viz/quick_viz/
 
 
@@ -111,6 +111,7 @@
 import os
 from pathlib import Path
 
+from rmvd.models.wrappers.mast3r import MAST3R_WrappedForMeshing
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -196,7 +197,8 @@ def main(opts):
     # be dragons if you're not careful.
 
     model_class_to_use = get_model_class(opts)
-    model = load_model_inference(opts, model_class_to_use)
+    model = MAST3R_WrappedForMeshing()
+    #load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
     # setting up overall result averagers

@@ -68,8 +68,9 @@ class OurFuser(DepthFuser):
         )
 
     def export_mesh(self, path, export_single_mesh=True):
+        print("Warning – not exporting single mesh")
         _ = trimesh.exchange.export.export_mesh(
-            self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh),
+            self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=False),
             path,
         )
 
@@ -94,7 +95,8 @@ class OurFuser(DepthFuser):
         )
 
     def get_mesh(self, export_single_mesh=True, convert_to_trimesh=True):
-        return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=export_single_mesh)
+        print("Warning – not exporting single mesh")
+        return self.tsdf_fuser_pred.tsdf.to_mesh(export_single_mesh=False)
 
     def get_mesh_pytorch3d(self, scale_to_world=True, min_bounds_3=None, max_bounds_3=None):
         return self.tsdf_fuser_pred.tsdf.to_mesh_pytorch3d(

@@ -45,9 +45,11 @@ class MAST3R_Wrapped(nn.Module):
         # Resize to 336x448
         resized = ResizeInputs(size=(384, 512))({'images': images, 'intrinsics': intrinsics})
         images = resized['images']
-        intrinsics = resized['intrinsics']   
+        intrinsics = resized['intrinsics']
 
         # Input transform
+        print(len(images))
+        sds
         for idx, image_batch in enumerate(images):
             tmp_images = []
             image_batch = image_batch.transpose(0, 2, 3, 1)
@@ -81,7 +83,7 @@ class MAST3R_Wrapped(nn.Module):
 
             poses_list.append(np.stack(poses_batch_list))
             intrinsic_list.append(np.stack(intrinsic_batch_list))
-        
+
         if depth_range is None:
             min_depth = 0.25
             max_depth = 100
@@ -118,7 +120,7 @@ class MAST3R_Wrapped(nn.Module):
         keyview_idx,
         **_
     ):
-        
+
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
         images_source = exclude_index(images, keyview_idx)
@@ -141,6 +143,32 @@ class MAST3R_Wrapped(nn.Module):
     def output_adapter(self, model_output):
         pred, aux = model_output
         return to_numpy(pred), to_numpy(aux)
+
+
+
+class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
+    def forward(
+        self,
+        phase: str,
+        cur_data: dict,
+        src_data: dict,
+        unbatched_matching_encoder_forward: bool,
+        return_mask:bool,
+    ):
+        assert phase == 'test'
+
+        batch = [
+            {'img': cur_data['image_b3hw'], 'idx': 0, 'instance': '0'},
+            {'img': src_data['image_b3hw'][:, 0], 'idx': 1, 'instance': '1'},
+        ]
+        pts1, pts2 = self.model(batch[0], batch[1])
+
+        pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+
+        pred = {
+            'depth_pred_s0_b1hw': pred_depth,
+        }
+        return pred
 
 
 @register_model(trainable=False)

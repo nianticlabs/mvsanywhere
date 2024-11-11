@@ -4,7 +4,7 @@ SYSTEM_NAME := $(shell uname)
 SYSTEM_ARCHITECTURE := $(shell uname -m)
 MAMBA_INSTALL_SCRIPT := Mambaforge-$(SYSTEM_NAME)-$(SYSTEM_ARCHITECTURE).sh
 
-MAMBA_ENV_NAME := fmvs
+MAMBA_ENV_NAME := fmvs2
 PACKAGE_FOLDER := src/fmvs
 
 # HELP: install-mamba: Install Mamba
