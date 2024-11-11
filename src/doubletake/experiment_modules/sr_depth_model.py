@@ -193,7 +193,7 @@ class DepthModel(pl.LightningModule):
 
         # iniitalize the final depth decoder
         if self.run_opts.depth_decoder_name == "unet_pp":
-            self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
+            self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=1)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
         elif self.run_opts.depth_decoder_name == "dpt":
@@ -492,7 +492,7 @@ class DepthModel(pl.LightningModule):
             depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
         else:
             B, C, H, W = cur_image.shape
-            depth_outputs = self.depth_decoder(cur_feats, H // 14, W // 14)
+            depth_outputs = self.depth_decoder(cur_feats)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
@@ -822,6 +822,6 @@ class DepthModel(pl.LightningModule):
                 return 0.01
 
         lr_scheduler_sr = torch.optim.lr_scheduler.LambdaLR(optimizer_sr, lr_lambda)
-        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_encoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
-        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LinearLR(optimizer_da_decoder, start_factor=1.0, end_factor=0.001, total_iters=70000)
+        lr_scheduler_da_encoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_encoder, lr_lambda)
+        lr_scheduler_da_decoder = torch.optim.lr_scheduler.LambdaLR(optimizer_da_decoder, lr_lambda)
         return [optimizer_sr, optimizer_da_encoder, optimizer_da_decoder], [lr_scheduler_sr, lr_scheduler_da_encoder, lr_scheduler_da_decoder]
