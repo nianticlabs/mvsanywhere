@@ -50,7 +50,6 @@ def get_dataset(dataset_name, split_filepath, single_debug_scan_id=None, verbose
             scans = file.readlines()
             scans = [scan.strip() for scan in scans]
 
-        print(single_debug_scan_id)
         if single_debug_scan_id is not None:
             scans = [single_debug_scan_id]
 
