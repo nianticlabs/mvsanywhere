@@ -12,7 +12,7 @@ import json
 
 from doubletake.utils.volume_utils import SimpleVolume
 
-""" 
+"""
 ```
 CUDA_VISIBLE_DEVICES=0 python scripts/evals/mesh_eval.py \
     --groundtruth_dir SCANNET_TEST_FOLDER_PATH  \
@@ -52,7 +52,7 @@ def main():
         help="Provide root directory and file format of prediction data. SCAN_NAME will be replaced with the scan name.",
     )
     parser.add_argument(
-        "--single_scene", type=str, default=None, help="Optional flag to eval only one scan."
+        "--single_scene", type=str, default=None, help="Optional flag to eval only the one specified scan."
     )
     parser.add_argument(
         "--wait_for_scan",
@@ -63,12 +63,17 @@ def main():
         "--visibility_volume_path",
         action="store",
         help="Provide path to the visibility volume.",
-        default="/mnt/nas/personal/mohameds/scannet_test_occlusion_masks/",
+        default="/mnt/nas3/shared/datasets/scannet/scannet_test_occlusion_masks/",
     )
     parser.add_argument(
         "--dont_save_scores",
         action="store_true",
         help="Don't save scores as jsons",
+    )
+    parser.add_argument(
+        "--allow_missing_scenes",
+        action="store_true",
+        help="Don't throw an error if a scene is missing; instead use the maximum score possible",
     )
 
     args = parser.parse_args()
@@ -76,6 +81,7 @@ def main():
     groundtruth_dir = args.groundtruth_dir
     prediction_dir = args.prediction_dir
     assert os.path.exists(groundtruth_dir)
+    assert "SCAN_NAME" in prediction_dir
 
     #####################################################################################
     # Evaluate every scene.
@@ -111,6 +117,8 @@ def main():
 
         if not os.path.exists(mesh_pred_path):
             # We have no extracted geometry, so we use default metrics for missing scene.
+            if not args.allow_missing_scenes:
+                raise FileNotFoundError(f"Failed to find mesh {mesh_pred_path}")
 
             missing_scene = True
 
@@ -303,7 +311,7 @@ def main():
     )
 
     # save json file
-    scores_save_path = os.path.join(prediction_dir.strip("SCAN_NAME.ply"), "scores_our_masks.json")
+    scores_save_path = os.path.join(prediction_dir.removesuffix("SCAN_NAME.ply"), "scores_our_masks.json")
     if not args.dont_save_scores:
         with open(scores_save_path, "w") as f:
             json.dump(scene_scores, f, indent=4)
