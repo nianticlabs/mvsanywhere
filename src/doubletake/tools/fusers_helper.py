@@ -1,7 +1,10 @@
 import numpy as np
+from open3d import core as o3c
 import open3d as o3d
 import torch
 import trimesh
+from pytorch3d.renderer import TexturesVertex
+from pytorch3d.structures import Meshes
 
 from doubletake.datasets.scannet_dataset import ScannetDataset
 from doubletake.datasets.threer_scan_dataset import ThreeRScanDataset
@@ -244,5 +247,264 @@ def get_fuser(opts, scan):
             max_fusion_depth=opts.fusion_max_depth,
             fuse_color=opts.fuse_color,
         )
+    elif opts.depth_fuser == "custom_open3d":
+        return CustomOpen3dFuser(
+            gt_path=gt_path,
+            fusion_resolution=opts.fusion_resolution,
+            max_fusion_depth=opts.fusion_max_depth,
+            fuse_color=opts.fuse_color,
+            extended_neg_truncation=opts.extended_neg_truncation,
+        )
     else:
         raise ValueError(f"Unrecognized fuser {opts.depth_fuser}!")
+
+
+class CustomOpen3dFuser(Open3DFuser):
+    def __init__(self, extended_neg_truncation=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.sdf_trunc = 3 * self.fusion_resolution
+        self.weight_threshold = 0.00000001
+
+        attr_names = ("tsdf", "weight", "color")
+        attr_dtypes = (o3c.float32, o3c.float32, o3c.float32)
+        attr_channels = ((1), (1), (3))
+
+        self.volume = o3d.t.geometry.VoxelBlockGrid(
+            attr_names=attr_names,
+            attr_dtypes=attr_dtypes,
+            attr_channels=attr_channels,
+            voxel_size=self.fusion_resolution,
+            block_resolution=16,
+            block_count=1000,
+            device=o3c.Device("cuda:0"),
+        )
+
+        self.counts = 0
+        self.cached_colors = None
+        self.prev_voxel_coords = []
+
+        self.extended_neg_truncation = extended_neg_truncation
+
+    def fuse_frames(
+        self,
+        depths_b1hw,
+        K_b44,
+        cam_T_world_b44,
+        color_b3hw,
+        hint_b1hw=None,
+    ):
+        width = depths_b1hw.shape[-1]
+        height = depths_b1hw.shape[-2]
+
+        if self.fuse_color:
+            color_b3hw = torch.nn.functional.interpolate(
+                color_b3hw,
+                size=(height, width),
+            )
+            color_b3hw = reverse_imagenet_normalize(color_b3hw)
+
+        # convert to open3d tensors
+        depths_b1hw = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(depths_b1hw))
+        K_b33 = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(K_b44[:, :3, :3]))
+        cam_T_world_b44 = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(cam_T_world_b44))
+        if self.fuse_color:
+            color_bhw3 = o3c.Tensor.from_dlpack(
+                torch.utils.dlpack.to_dlpack(color_b3hw.permute(0, 2, 3, 1))
+            )
+        else:
+            color_bhw3 = None
+
+        if hint_b1hw is not None:
+            if hint_b1hw.max() <= 0.0 or hint_b1hw.min() >= self.max_fusion_depth or True:
+                hint_b1hw = None
+            else:
+                hint_b1hw = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(hint_b1hw))
+
+        for batch_index in range(depths_b1hw.shape[0]):
+            depth_pred_hw = depths_b1hw[batch_index, 0]
+            depth_pred_img = o3d.t.geometry.Image(depth_pred_hw)
+            K_33 = K_b33[batch_index]
+            cam_T_world_44 = cam_T_world_b44[batch_index]
+
+            # Find which voxels are to be updated and activate in the hashmap ready for update
+            # For some reason even if the depth map and volume are on the gpu, we need the
+            # camera intrinsics and extrinsics on the cpu
+            frustum_block_coords = self.volume.compute_unique_block_coordinates(
+                depth_pred_img,
+                K_33.to(o3c.Device("cpu:0")).to(o3c.float64),
+                cam_T_world_44.to(o3c.Device("cpu:0")).to(o3c.float64),
+                1.0,
+                self.max_fusion_depth,
+                trunc_voxel_multiplier=3.0,
+            )
+            self.volume.hashmap().activate(frustum_block_coords)
+
+            # Ideally we'd use the following piece of code to find the indices of the activated
+            # voxels and use that in the call to `voxel_coordinates_and_flattened_indices`. Unfortunately,
+            # `compute_unique_block_coordinates` only returns those blocks at the depth map, so we can't
+            # clean up free space with those indices. We'll update all voxels that have ever been seen instead.
+            # That means not passing in `buf_indices`.
+
+            # # Find indices of the activated voxels in the hashmap
+            # buf_indices, masks = self.volume.hashmap().find(frustum_block_coords)
+
+            # Extract voxel coordinates and indices of the activated voxels
+            voxel_coords, voxel_indices = self.volume.voxel_coordinates_and_flattened_indices()
+            o3d.core.cuda.synchronize()
+
+            self.update_tsdf_for_voxels(
+                voxel_coords,
+                voxel_indices,
+                depth_pred_hw,
+                K_33,
+                cam_T_world_44,
+                color_bhw3,
+                batch_index,
+                width,
+                height,
+            )
+
+        o3d.core.cuda.release_cache()
+        # torch.cuda.empty_cache()
+
+    def update_tsdf_for_voxels(
+        self,
+        voxel_coords,
+        voxel_indices,
+        depth_pred_hw,
+        K_33,
+        cam_T_world_44,
+        color_bhw3,
+        batch_index,
+        width,
+        height,
+    ):
+        # project the voxel coordinates to the camera frame
+        cam_coords = cam_T_world_44[:3, :3] @ voxel_coords.T() + cam_T_world_44[:3, 3:]
+        cam_coords = K_33[:3, :3] @ cam_coords
+
+        proj_depth = cam_coords[2]
+        x_pix = (cam_coords[0] / proj_depth).round().to(o3c.int64)
+        y_pix = (cam_coords[1] / proj_depth).round().to(o3c.int64)
+        o3d.core.cuda.synchronize()
+
+        mask_proj = (
+            (proj_depth > 0) & (x_pix >= 0) & (y_pix >= 0) & (x_pix < width) & (y_pix < height)
+        )
+
+        # sample the depth map to get new tsdf values
+        x_pix = x_pix[mask_proj]
+        y_pix = y_pix[mask_proj]
+        proj_depth = proj_depth[mask_proj]
+        sampled_depths = depth_pred_hw[y_pix, x_pix]
+        tsdf_vals = sampled_depths - proj_depth
+
+        min_sdf_value = -self.sdf_trunc * 1.5 if self.extended_neg_truncation else -self.sdf_trunc
+        mask_inlier = (
+            (sampled_depths > 0)
+            & (sampled_depths < self.max_fusion_depth)
+            & (tsdf_vals >= min_sdf_value)
+        )
+
+        tsdf_vals[tsdf_vals >= self.sdf_trunc] = self.sdf_trunc
+        tsdf_vals = tsdf_vals / self.sdf_trunc
+        o3d.core.cuda.synchronize()
+
+        # infinTAM confidence
+        confidence = (
+            1.0 - (sampled_depths[mask_inlier] - 0.5) / (self.max_fusion_depth - 0.5)
+        ).clip(0.25, 1.0)
+        confidence = (confidence * confidence).reshape((-1, 1))
+
+        voxel_weights = self.volume.attribute("weight").reshape((-1, 1))
+        voxel_tsdf_vals = self.volume.attribute("tsdf").reshape((-1, 1))
+
+        valid_voxel_indices = voxel_indices[mask_proj][mask_inlier]
+        old_weights = voxel_weights[valid_voxel_indices]
+
+        # More infiniTAM magic: update faster when the new samples are more confident
+        update_rate = 2.5
+
+        # Compute the new weight and the normalization factor
+        new_weights = confidence * update_rate / 100.0
+        total_weights = old_weights + new_weights
+
+        voxel_tsdf_vals[valid_voxel_indices] = (
+            voxel_tsdf_vals[valid_voxel_indices] * old_weights
+            + tsdf_vals[mask_inlier].reshape(old_weights.shape) * new_weights
+        ) / total_weights
+
+        if self.fuse_color:
+            color_hw3 = color_bhw3[batch_index]
+            sampled_colors = color_hw3[y_pix, x_pix].to(o3c.float32)
+
+            voxel_colors = self.volume.attribute("color").reshape((-1, 3))
+            voxel_colors[valid_voxel_indices] = (
+                voxel_colors[valid_voxel_indices] * old_weights
+                + sampled_colors[mask_inlier] * new_weights
+            ) / total_weights
+
+        voxel_weights[valid_voxel_indices] = total_weights.clip(0.0, 1.0)
+        o3d.core.cuda.synchronize()
+
+    def export_mesh(self, path, use_marching_cubes_mask=None, trim_tsdf_using_confience=False):
+        mesh = self.get_mesh(
+            convert_to_trimesh=False, trim_tsdf_using_confience=trim_tsdf_using_confience
+        )
+        o3d.t.io.write_triangle_mesh(path, mesh)
+
+    def get_mesh(
+        self,
+        export_single_mesh=None,
+        convert_to_trimesh=False,
+        get_confidence=False,
+        trim_tsdf_using_confience=False,
+    ):
+        voxel_weights = self.volume.attribute("weight")
+        voxel_sdfs = self.volume.attribute("tsdf")
+
+        if trim_tsdf_using_confience:
+            voxel_sdfs[voxel_weights < 0.02] = 0
+
+        if get_confidence:
+            voxel_colors = self.volume.attribute("color").reshape((-1, 3))
+            voxel_weights = self.volume.attribute("weight").reshape((-1, 1))
+
+            # save the colors so we can get them back if required
+            self.cached_colors = voxel_colors.clone()
+            voxel_colors[:, 0:1] = voxel_weights
+        elif self.cached_colors is not None:
+            voxel_colors = self.cached_colors
+
+        mesh = self.volume.extract_triangle_mesh(weight_threshold=self.weight_threshold)  # .cpu()
+
+        # Open3D MC assumes TSDF colors are in [0-255] so divides by 255 -> undo this
+        mesh.vertex.colors = mesh.vertex.colors * 255.0
+
+        if convert_to_trimesh:
+            mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.triangles)
+
+        return mesh
+
+    def get_mesh_pytorch3d(self, scale_to_world=True):
+        mesh = self.get_mesh(convert_to_trimesh=False, get_confidence=True)
+
+        # convert to pytorch3d mesh
+        verts = torch.from_dlpack(o3c.Tensor.to_dlpack(mesh.vertex.positions)).clone()
+        faces = torch.from_dlpack(o3c.Tensor.to_dlpack(mesh.triangle.indices)).clone()
+        textures = TexturesVertex(
+            torch.from_dlpack(o3c.Tensor.to_dlpack(mesh.vertex.colors))  # .cpu()
+            .unsqueeze(0)
+            .clone()
+        )
+
+        pytorch3d_mesh = Meshes(verts=[verts], faces=[faces], textures=textures).cuda()
+
+        self.counts += 1
+        if self.counts % 25 == 0:
+            self.counts = 0
+            o3d.core.cuda.release_cache()
+            torch.cuda.empty_cache()
+
+        return pytorch3d_mesh, verts, faces
