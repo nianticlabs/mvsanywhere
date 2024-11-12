@@ -10,7 +10,6 @@ import torch
 from doubletake.datasets.generic_mvs_dataset import GenericMVSDataset
 import cv2
 
-
 class MVSSynthDataset(GenericMVSDataset):
     """
     MVS MVSSynth Dataset class.
