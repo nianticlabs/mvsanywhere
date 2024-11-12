@@ -24,4 +24,3 @@ val_image_height: 336
 matching_scale: 0.25
 prediction_scale: 1.0
 model_type: depth_model
-lr_steps: [70000, 80000]
