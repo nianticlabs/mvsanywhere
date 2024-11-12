@@ -478,7 +478,7 @@ class DepthModel(pl.LightningModule):
             )
             cur_feats = cur_feats[:1] + cost_volume_features
         elif self.run_opts.cv_encoder_type == "vit_encoder":
-            cur_feats = self.cost_volume_net(
+            cur_feats, depth_range = self.cost_volume_net(
                         cost_volume, 
                         cur_feats,
                     )
@@ -511,6 +511,8 @@ class DepthModel(pl.LightningModule):
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
+        depth_outputs["depth_range"] = depth_range
+        depth_outputs["depth_bins"] = (torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]).squeeze(2, 3)
         depth_outputs["lowest_cost_bhw"] = lowest_cost
         depth_outputs["overall_mask_bhw"] = overall_mask_bhw
 
@@ -594,20 +596,38 @@ class DepthModel(pl.LightningModule):
         depth_gt_grad[~mask_b_dense] = torch.nan
         grad_loss = torch.nan_to_num(self.grad_loss(depth_gt, depth_pred))
 
+
+
+
+        depth_bins = outputs["depth_bins"]
+        depth_range = outputs["depth_range"].mean(dim=(2, 3))
+
+        min_log_depths = torch.quantile(torch.nan_to_num(log_depth_gt, nan=torch.inf).flatten(1), q=0.05, dim=1, keepdim=True)
+        max_log_depths = torch.quantile(torch.nan_to_num(log_depth_gt, nan=-torch.inf).flatten(1), q=0.95, dim=1, keepdim=True)
+        # print(max_log_depths.shape, min_log_depths.shape, depth_bins.shape)
+        target = (min_log_depths < depth_bins) & (depth_bins < max_log_depths)
+
+        # print('LOSS', depth_range.shape, target.shape)
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            depth_range,
+            target.float()
+        )
+        accuracy = ((torch.sigmoid(depth_range) > 0.5) == target).float().mean()
+
+
         normals_gt[~mask_b_dense.expand(-1, 3, -1, -1)] = torch.nan
         normals_loss = torch.nan_to_num(self.normals_loss(normals_gt, normals_pred))
 
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
-
         losses = {
             "loss": loss,
-            "si_loss": si_loss,
-            "grad_loss": grad_loss,
-            "abs_loss": abs_loss,
-            "normals_loss": normals_loss,
-            "ms_loss": ms_loss,
-            "inv_abs_loss": inv_abs_loss,
-            "log_l1_loss": log_l1_loss,
+            'accuracy': accuracy,
+            # "si_loss": si_loss,
+            # "grad_loss": grad_loss,
+            # "abs_loss": abs_loss,
+            # "normals_loss": normals_loss,
+            # "ms_loss": ms_loss,
+            # "inv_abs_loss": inv_abs_loss,
+            # "log_l1_loss": log_l1_loss,
         }
         return losses
 
@@ -800,16 +820,23 @@ class DepthModel(pl.LightningModule):
 
         """
         optimizer_sr = torch.optim.AdamW(
-            list(self.cost_volume.parameters()) + 
-            list(self.matching_model.parameters()),
+            list(self.cost_volume_net.patch_embed.range_predictor.parameters()),
             lr=self.run_opts.lr, weight_decay=self.run_opts.wd
         )
         optimizer_da_encoder = torch.optim.AdamW(
-            self.encoder.parameters(),
+            list(self.cost_volume.parameters()) + 
+            list(self.matching_model.parameters()) +
+            list(self.encoder.parameters()),
             lr=self.run_opts.lr_da_encoder, weight_decay=self.run_opts.wd
         )
         optimizer_da_decoder = torch.optim.AdamW(
-            list(self.depth_decoder.parameters()) + list(self.cost_volume_net.parameters()), 
+            list(self.depth_decoder.parameters()) + 
+            list(self.cost_volume_net.patch_embed.convs.parameters()) +
+            list(self.cost_volume_net.patch_embed.projects.parameters()) + 
+            list(self.cost_volume_net.patch_embed.resize_layers.parameters()) +
+            list(self.cost_volume_net.cv_feat_fusers.parameters()) +
+            list(self.cost_volume_net.model.parameters()),
+            
             lr=self.run_opts.lr_da_decoder, weight_decay=self.run_opts.wd
         )
 
