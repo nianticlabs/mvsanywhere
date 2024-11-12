@@ -115,6 +115,7 @@ from rmvd.models.wrappers.mast3r import MAST3R_WrappedForMeshing
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+import pickle
 
 import doubletake.options as options
 from doubletake.utils.dataset_utils import get_dataset
@@ -276,13 +277,31 @@ def main(opts):
                 # use unbatched (looping) matching encoder image forward passes
                 # for numerically stable testing. If opts.fast_cost_volume, then
                 # batch.
-                outputs = model(
-                    phase="test",
-                    cur_data=cur_data,
-                    src_data=src_data,
-                    unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
-                    return_mask=True,
-                )
+
+                if False:
+                    load_dir = os.path.join(depth_output_dir, scan)
+
+                    depth_preds = []
+                    for frame_id in cur_data['frame_id_string']:
+                        with open(os.path.join(load_dir, f"{frame_id}.pickle"), 'rb') as f:
+                            pred_dict = pickle.load(f)
+
+                        depth_preds.append(pred_dict['depth_pred_s0_b1hw'])
+
+                    print(load_dir)
+                    breakpoint()
+                    outputs = {'depth_pred_s0_b1hw': torch.vstack(depth_preds)}
+                    print(outputs['depth_pred_s0_b1hw'].shape)
+
+                else:
+                    outputs = model(
+                        phase="test",
+                        cur_data=cur_data,
+                        src_data=src_data,
+                        unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
+                        return_mask=True,
+                    )
+
                 end_time.record()
                 torch.cuda.synchronize()
 

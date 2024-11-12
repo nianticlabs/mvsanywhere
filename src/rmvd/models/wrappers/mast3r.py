@@ -214,16 +214,52 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
         src_data: dict,
         unbatched_matching_encoder_forward: bool,
         return_mask:bool,
+        raw_mast3r_pred: bool = False,
     ):
         assert phase == 'test'
 
-        batch = [
-            {'img': cur_data['image_b3hw'], 'idx': 0, 'instance': '0'},
-            {'img': src_data['image_b3hw'][:, 0], 'idx': 1, 'instance': '1'},
-        ]
-        pts1, pts2 = self.model(batch[0], batch[1])
+        if raw_mast3r_pred:
+            batch = [
+                {'img': cur_data['image_b3hw'], 'idx': 0, 'instance': '0'},
+                {'img': src_data['image_b3hw'][:, 0], 'idx': 1, 'instance': '1'},
+            ]
+            pts1, pts2 = self.model(batch[0], batch[1])
 
-        pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+            pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+
+        else:
+            batch_size = cur_data['image_b3hw'].shape[0]
+
+            pred_depths = []
+            for batch_idx in range(batch_size):
+                images = torch.vstack((
+                    cur_data['image_b3hw'][batch_idx][None, ...],
+                    src_data['image_b3hw'][batch_idx]
+                ))
+
+                # Take 1/4 scale as these are multiplied by 4 above
+                intrinsics = torch.vstack((cur_data['K_s2_b44'][batch_idx][None, ...], src_data['K_s2_b44'][batch_idx],))
+
+                # Do all poses relative to the cur frame
+                poses = [torch.eye(4).cuda()]
+                cur_frame_pose = cur_data['world_T_cam_b44'][batch_idx]
+                for _pose in src_data['cam_T_world_b44'][batch_idx]:
+                    poses.append(torch.inverse(_pose @ cur_frame_pose))
+                poses = torch.stack(poses)
+
+                pred, _ = super().forward(
+                    images=images.unsqueeze(1),
+                    intrinsics=intrinsics.unsqueeze(1),
+                    poses=poses.unsqueeze(1),
+                    min_depth=None,
+                    max_depth=None,
+                    previous_shape=None,
+                    keyview_idx=0,
+                )
+
+                pred_depths.append(pred['depth'])
+
+            pred_depth = torch.vstack(pred_depths)
 
         pred = {
             'depth_pred_s0_b1hw': pred_depth,
