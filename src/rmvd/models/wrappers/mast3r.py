@@ -151,8 +151,6 @@ class MAST3R_Wrapped(nn.Module):
             # triangulate the depth using GT cameras
             desc1, desc2 = pts1['desc'].squeeze(0).detach(), pts2['desc'].squeeze(0).detach()
 
-            print(desc1.shape, desc2.shape, image_key.shape)
-
             matches_im0, matches_im1 = self.fast_reciprocal_NNs(desc1, desc2, subsample_or_initxy1=8,
                                                         device=pred_depth.device, dist='dot', block_size=2**13)
 

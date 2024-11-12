@@ -407,7 +407,9 @@ def cache_model_outputs(
         elem_output_dict["depth_pred_s0_b1hw"] = outputs["depth_pred_s0_b1hw"][elem_ind].unsqueeze(
             0
         )
-        elem_output_dict["overall_mask_bhw"] = outputs["overall_mask_bhw"][elem_ind].unsqueeze(0)
+
+        if "overall_mask_bhw" in outputs:
+            elem_output_dict["overall_mask_bhw"] = outputs["overall_mask_bhw"][elem_ind].unsqueeze(0)
 
         if "cv_confidence_b1hw" in outputs:
             elem_output_dict["cv_confidence_b1hw"] = outputs["cv_confidence_b1hw"][

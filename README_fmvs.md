@@ -71,7 +71,9 @@ python src/doubletake/ray/train.py --name regression_multids_double_img_encoder_
 ```
 
 To test on scannet:
+```
 python3 ./src/doubletake/test.py --name my_model_name --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/scannet/scannet_default_test.yaml --load_weights_from_checkpoint  /path/to/ckpt/ --fast_cost_volume --gpus 1 --num_workers 8 --batch_size 4
+```
 
 ### Sections of the code that are relevant?
 

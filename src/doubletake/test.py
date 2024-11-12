@@ -129,13 +129,15 @@ from doubletake.utils.visualization_utils import quick_viz_export
 
 def main(opts):
     # get dataset
+    assert len(opts.datasets) == 1, f"Expected only one dataset but got {len(opts.datasets)}"
+    dataset_opts = opts.datasets[0]
     dataset_class, scans = get_dataset(
-        opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id
+        dataset_opts.dataset, dataset_opts.dataset_scan_split_file, opts.single_debug_scan_id
     )
 
     # path where results for this model, dataset, and tuple type are.
     results_path = os.path.join(
-        opts.output_base_path, opts.name, opts.dataset, opts.frame_tuple_type
+        opts.output_base_path, opts.name, dataset_opts.dataset, dataset_opts.frame_tuple_type
     )
 
     # set up directories for fusion
@@ -190,15 +192,18 @@ def main(opts):
     scores_output_dir = os.path.join(results_path, "scores")
     Path(scores_output_dir).mkdir(parents=True, exist_ok=True)
 
-    # Set up model. Note that we're not passing in opts as an argument, although
-    # we could. We're being pretty stubborn with using the options the model had
-    # used when training, saved internally as part of hparams in the checkpoint.
-    # You can change this at inference by passing in 'opts=opts,' but there
-    # be dragons if you're not careful.
+    if opts.model_type == "mast3r_baseline":
+        # Load a baseline model for meshing
+        model = MAST3R_WrappedForMeshing()
+    else:
+        # Set up model. Note that we're not passing in opts as an argument, although
+        # we could. We're being pretty stubborn with using the options the model had
+        # used when training, saved internally as part of hparams in the checkpoint.
+        # You can change this at inference by passing in 'opts=opts,' but there
+        # be dragons if you're not careful.
+        model_class_to_use = get_model_class(opts)
+        model = load_model_inference(opts, model_class_to_use)
 
-    model_class_to_use = get_model_class(opts)
-    model = MAST3R_WrappedForMeshing()
-    #load_model_inference(opts, model_class_to_use)
     model = model.cuda().eval()
 
     # setting up overall result averagers
@@ -221,12 +226,12 @@ def main(opts):
 
             # set up dataset with current scan
             dataset = dataset_class(
-                opts.dataset_path,
-                split=opts.split,
-                mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
+                dataset_opts.dataset_path,
+                split=dataset_opts.split,
+                mv_tuple_file_suffix=dataset_opts.mv_tuple_file_suffix,
                 limit_to_scan_id=scan,
                 include_full_res_depth=True,
-                tuple_info_file_location=opts.tuple_info_file_location,
+                tuple_info_file_location=dataset_opts.tuple_info_file_location,
                 num_images_in_tuple=None,
                 shuffle_tuple=opts.shuffle_tuple,
                 include_high_res_color=(
@@ -442,7 +447,7 @@ def main(opts):
             print_running_metrics=False,
         )
         all_scene_metrics.output_json(
-            os.path.join(scores_output_dir, f"all_scene_avg_metrics_{opts.split}.json")
+            os.path.join(scores_output_dir, f"all_scene_avg_metrics_{dataset_opts.split}.json")
         )
 
         print("")
@@ -452,7 +457,7 @@ def main(opts):
             include_metrics_names=True, print_running_metrics=False
         )
         all_frame_metrics.output_json(
-            os.path.join(scores_output_dir, f"all_frame_avg_metrics_{opts.split}.json")
+            os.path.join(scores_output_dir, f"all_frame_avg_metrics_{dataset_opts.split}.json")
         )
 
 

@@ -210,11 +210,13 @@ class Open3DFuser(DepthFuser):
 def get_fuser(opts, scan):
     """Returns the depth fuser required. Our fuser doesn't allow for"""
 
-    if opts.dataset == "scannet":
-        gt_path = ScannetDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
-    elif opts.dataset == "3rscan":
-        gt_path = ThreeRScanDataset.get_gt_mesh_path(opts.dataset_path, opts.split, scan)
-    elif opts.dataset == "7scenes":
+    dataset_opts = opts.datasets[0]
+
+    if dataset_opts.dataset == "scannet":
+        gt_path = ScannetDataset.get_gt_mesh_path(dataset_opts.dataset_path, dataset_opts.split, scan)
+    elif dataset_opts.dataset == "3rscan":
+        gt_path = ThreeRScanDataset.get_gt_mesh_path(dataset_opts.dataset_path, dataset_opts.split, scan)
+    elif dataset_opts.dataset == "7scenes":
         gt_path = "/outputs/fused_gt/7scenes/default/meshes/0.04_8.0_ours/SCAN_NAME.ply".replace(
             "SCAN_NAME", scan.replace("/", "_")
         )
@@ -245,4 +247,4 @@ def get_fuser(opts, scan):
             fuse_color=opts.fuse_color,
         )
     else:
-        raise ValueError("Unrecognized fuser!")
+        raise ValueError(f"Unrecognized fuser {opts.depth_fuser}!")
