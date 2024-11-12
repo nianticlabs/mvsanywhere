@@ -503,7 +503,7 @@ class GenericMVSDataset(Dataset):
         )
 
         # Remove alpha channel for PNGs
-        image = image[:3]
+        high_res_color = high_res_color[:3]
 
         return high_res_color
 

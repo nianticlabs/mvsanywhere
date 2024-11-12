@@ -238,7 +238,10 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
                 ))
 
                 # Take 1/4 scale as these are multiplied by 4 above
-                intrinsics = torch.vstack((cur_data['K_s2_b44'][batch_idx][None, ...], src_data['K_s2_b44'][batch_idx],))
+                intrinsics = torch.vstack((
+                    cur_data['K_s1_b44'][batch_idx][None, ...],
+                    src_data['K_s1_b44'][batch_idx],
+                ))
 
                 # Do all poses relative to the cur frame
                 poses = [torch.eye(4).cuda()]
@@ -260,6 +263,7 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
                 pred_depths.append(pred['depth'])
 
             pred_depth = torch.vstack(pred_depths)
+            assert pred_depth.shape[0] == batch_size
 
         pred = {
             'depth_pred_s0_b1hw': pred_depth,
