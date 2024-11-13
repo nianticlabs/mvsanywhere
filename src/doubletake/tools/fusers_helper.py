@@ -240,6 +240,7 @@ def get_fuser(opts, scan):
         )
         fuser.tsdf_fuser_pred.tsdf.cuda()
         return fuser
+
     if opts.depth_fuser == "open3d":
         return Open3DFuser(
             gt_path=gt_path,

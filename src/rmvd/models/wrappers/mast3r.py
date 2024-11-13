@@ -17,8 +17,10 @@ CKPT_PATH =  '/mnt/nas3/shared/projects/fmvs/mast3r/MASt3R_ViTLarge_BaseDecoder_
 
 
 class MAST3R_Wrapped(nn.Module):
-    def __init__(self):
+    def __init__(self, all_pairs: bool, triangulate: bool):
         super().__init__()
+        self.all_pairs = all_pairs
+        self.triangulate = triangulate
 
         import sys
         paths_file = osp.join(osp.dirname(osp.realpath(__file__)), 'paths.toml')
@@ -113,7 +115,13 @@ class MAST3R_Wrapped(nn.Module):
         }
         return sample
 
-    def forward(
+    def forward(self, *args, **kwargs):
+        if self.triangulate:
+            return self.forward_triangulate(*args, **kwargs)
+        else:
+            return self.forward_basic(*args, **kwargs)
+
+    def forward_basic(
         self,
         images,
         intrinsics,
@@ -124,6 +132,51 @@ class MAST3R_Wrapped(nn.Module):
         keyview_idx,
         **_
     ):
+
+        # TODO: move this to input_adapter
+        image_key = select_by_index(images, keyview_idx)
+        images_source = exclude_index(images, keyview_idx)
+
+        # We don't want to repeat final image if we don't have enough, so we avoid that step
+        images_source = images_source[:7]
+        images = [image_key] + images_source
+
+
+        if self.all_pairs:
+            batch = [{'img': images[i], 'idx': i, 'instance': str(i)} for i in range(8)]
+
+            all_preds = []
+            for src_idx in range(1, len(images_source) + 1):
+                pts1, pts2 = self.model(batch[0], batch[src_idx])
+                this_pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+                all_preds.append(this_pred_depth)
+            pred_depth = torch.vstack(all_preds).mean(0)
+
+            # Check our final prediction is the same shape as a single prediction
+            assert pred_depth.shape == this_pred_depth.shape
+        else:
+            # Just a single pair
+            batch = [{'img': images[i], 'idx': i, 'instance': str(i)} for i in range(2)]
+            pts1, pts2 = self.model(batch[0], batch[1])
+            pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
+
+        pred = {'depth': pred_depth}
+        aux = {}
+
+        return pred, aux
+
+    def forward_triangulate(
+        self,
+        images,
+        intrinsics,
+        poses,
+        min_depth,
+        max_depth,
+        previous_shape,
+        keyview_idx,
+        **_
+    ):
+        assert self.all_pairs, "We haven't implemented single-pair triangulation yet. This shoudn't be too hard though"
 
         # TODO: move this to input_adapter
         image_key = select_by_index(images, keyview_idx)
@@ -275,6 +328,22 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
 def mast3r_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
     cfg = {}
-    model = build_model_with_cfg(model_cls=MAST3R_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus)
+    model = build_model_with_cfg(model_cls=MAST3R_Wrapped, cfg=cfg, triangulate=True, all_pairs=True, weights=None, train=train, num_gpus=num_gpus)
+    return model
+
+
+@register_model(trainable=False)
+def mast3r_wrapped_no_triangulation_one_pair(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+    assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
+    cfg = {}
+    model = build_model_with_cfg(model_cls=MAST3R_Wrapped, cfg=cfg, triangulate=False, all_pairs=False, weights=None, train=train, num_gpus=num_gpus)
+    return model
+
+
+@register_model(trainable=False)
+def mast3r_wrapped_no_triangulation_all_pairs(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+    assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
+    cfg = {}
+    model = build_model_with_cfg(model_cls=MAST3R_Wrapped, cfg=cfg, triangulate=False, all_pairs=True, weights=None, train=train, num_gpus=num_gpus)
     return model
 
