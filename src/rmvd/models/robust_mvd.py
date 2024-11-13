@@ -147,11 +147,19 @@ class RobustMVD_WrappedForMeshing(RobustMVD):
                 src_data['image_b3hw'][batch_idx]
             ))
 
+            images = images / 255.0 - 0.4
+
+            # print(cur_data.keys())
             # Take 'full' scale intrinsics
             intrinsics = torch.vstack((
                 cur_data['K_s0_b44'][batch_idx][None, ...],
                 src_data['K_s0_b44'][batch_idx],
             ))
+
+            intrinsics[:, 0, :] /= 256
+            intrinsics[:, 1, :] /= 192
+
+            print(intrinsics[0])
 
             # Do all poses relative to the cur frame
             poses = [torch.eye(4).cuda()]
@@ -159,6 +167,8 @@ class RobustMVD_WrappedForMeshing(RobustMVD):
             for _pose in src_data['cam_T_world_b44'][batch_idx]:
                 poses.append(torch.inverse(_pose @ cur_frame_pose))
             poses = torch.stack(poses)
+
+            # _images, _intrinsics,
 
             pred, _ = super().forward(
                 images=images.unsqueeze(1),
