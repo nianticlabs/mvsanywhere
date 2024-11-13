@@ -112,6 +112,7 @@ import os
 from pathlib import Path
 
 from rmvd.models.wrappers.mast3r import MAST3R_WrappedForMeshing
+from rmvd.models.robust_mvd import RobustMVD_WrappedForMeshing
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -196,6 +197,8 @@ def main(opts):
     if opts.model_type == "mast3r_baseline":
         # Load a baseline model for meshing
         model = MAST3R_WrappedForMeshing()
+    elif opts.model_type == "rmvd_baseline":
+        model = RobustMVD_WrappedForMeshing()
     else:
         # Set up model. Note that we're not passing in opts as an argument, although
         # we could. We're being pretty stubborn with using the options the model had

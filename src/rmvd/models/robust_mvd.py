@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.hub import load_state_dict_from_url
 
 from .registry import register_model
 from .helpers import build_model_with_cfg
@@ -109,6 +110,75 @@ class RobustMVD(nn.Module):
     def output_adapter(self, model_output):
         pred, aux = model_output
         return to_numpy(pred), to_numpy(aux)
+
+
+class RobustMVD_WrappedForMeshing(RobustMVD):
+
+    def __init__(self):
+        super().__init__()
+        pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd.pt'
+
+        state_dict = load_state_dict_from_url(
+            pretrained_weights, map_location='cpu',
+            progress=True,
+            check_hash=True)
+
+        self.load_state_dict(state_dict, strict=True)
+        self.eval()
+        self = self.cuda()
+
+    def forward(
+        self,
+        phase: str,
+        cur_data: dict,
+        src_data: dict,
+        unbatched_matching_encoder_forward: bool,
+        return_mask:bool,
+        raw_mast3r_pred: bool = False,
+    ):
+        batch_size = cur_data['image_b3hw'].shape[0]
+
+        pred_depths = []
+
+        # do each item in the batch separately for ease
+        for batch_idx in range(batch_size):
+            images = torch.vstack((
+                cur_data['image_b3hw'][batch_idx][None, ...],
+                src_data['image_b3hw'][batch_idx]
+            ))
+
+            # Take 'full' scale intrinsics
+            intrinsics = torch.vstack((
+                cur_data['K_s0_b44'][batch_idx][None, ...],
+                src_data['K_s0_b44'][batch_idx],
+            ))
+
+            # Do all poses relative to the cur frame
+            poses = [torch.eye(4).cuda()]
+            cur_frame_pose = cur_data['world_T_cam_b44'][batch_idx]
+            for _pose in src_data['cam_T_world_b44'][batch_idx]:
+                poses.append(torch.inverse(_pose @ cur_frame_pose))
+            poses = torch.stack(poses)
+
+            pred, _ = super().forward(
+                images=images.unsqueeze(1),
+                intrinsics=intrinsics.unsqueeze(1),
+                poses=poses.unsqueeze(1),
+                min_depth=None,
+                max_depth=None,
+                previous_shape=None,
+                keyview_idx=0,
+            )
+
+            pred_depths.append(pred['depth'])
+
+        pred_depth = torch.vstack(pred_depths)
+        assert pred_depth.shape[0] == batch_size
+
+        pred = {
+            'depth_pred_s0_b1hw': pred_depth,
+        }
+        return pred
 
 
 @register_model(trainable=False)
