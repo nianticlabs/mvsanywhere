@@ -150,10 +150,10 @@ class MAST3R_Wrapped(nn.Module):
                 pts1, pts2 = self.model(batch[0], batch[src_idx])
                 this_pred_depth = pts1['pts3d'][:, ..., 2].unsqueeze(1)
                 all_preds.append(this_pred_depth)
-            pred_depth = torch.vstack(all_preds).mean(0)
+            pred_depth = torch.stack(all_preds).mean(0)
 
             # Check our final prediction is the same shape as a single prediction
-            assert pred_depth.shape == this_pred_depth.shape
+            assert pred_depth.shape == this_pred_depth.shape, (pred_depth.shape, this_pred_depth.shape)
         else:
             # Just a single pair
             batch = [{'img': images[i], 'idx': i, 'instance': str(i)} for i in range(2)]
@@ -289,6 +289,8 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
                     cur_data['image_b3hw'][batch_idx][None, ...],
                     src_data['image_b3hw'][batch_idx]
                 ))
+
+                # self.input_transform(image.astype(np.uint8)).float()
 
                 # Take 1/4 scale as these are multiplied by 4 above
                 intrinsics = torch.vstack((
