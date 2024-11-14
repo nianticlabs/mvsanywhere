@@ -260,6 +260,14 @@ class MAST3R_Wrapped(nn.Module):
 
 class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.input_transform = T.Compose([
+            T.Normalize(mean=[-2.11790393, -2.03571429, -1.80444444], std=[4.36681223, 4.46428571, 4.44444444]),
+            T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ])
+
     def forward(
         self,
         phase: str,
@@ -270,6 +278,9 @@ class MAST3R_WrappedForMeshing(MAST3R_Wrapped):
         raw_mast3r_pred: bool = False,
     ):
         assert phase == 'test'
+
+        cur_data['image_b3hw'] = self.input_transform(cur_data['image_b3hw'])
+        src_data['image_b3hw'] = self.input_transform(src_data['image_b3hw'])
 
         if raw_mast3r_pred:
             batch = [

@@ -196,7 +196,7 @@ def main(opts):
 
     if opts.model_type == "mast3r_baseline":
         # Load a baseline model for meshing
-        model = MAST3R_WrappedForMeshing()
+        model = MAST3R_WrappedForMeshing(all_pairs=True, triangulate=True)
     elif opts.model_type == "rmvd_baseline":
         model = RobustMVD_WrappedForMeshing()
     else:
