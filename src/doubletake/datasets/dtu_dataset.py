@@ -250,6 +250,15 @@ class DTUDataset(GenericMVSDataset):
         K = torch.eye(4, dtype=torch.float32)
         K[:3, :3] = torch.tensor(np.fromstring(' '.join(lines[7:10]), dtype=np.float32, sep=' ').reshape((3, 3)))
 
+        top, left, h, w = self.random_resize_crop.get_params(
+            torch.empty((data['depthHeight'], data['depthWidth'])),
+            self.random_resize_crop.scale,
+            self.random_resize_crop.ratio
+        )
+        K[0, 2] = K[0, 2] - left
+        K[1, 2] = K[1, 2] - top
+        width_pixels = w
+        height_pixels = h
 
         if flip:
             K[0, 2] = float(data['depthWidth']) - K[0, 2]
@@ -260,14 +269,14 @@ class DTUDataset(GenericMVSDataset):
             output_dict[f"invK_full_depth_b44"] = torch.linalg.inv(K)
 
         K_matching = K.clone()
-        K_matching[0] *= self.matching_width / float(data['depthWidth'])
-        K_matching[1] *= self.matching_height / float(data["depthHeight"])
+        K_matching[0] *= self.matching_width / float(width_pixels)
+        K_matching[1] *= self.matching_height / float(height_pixels)
         output_dict["K_matching_b44"] = K_matching
         output_dict["invK_matching_b44"] = torch.linalg.inv(K_matching)
 
         # scale intrinsics to the dataset's configured depth resolution.
-        K[0] *= self.depth_width / float(data['depthWidth'])
-        K[1] *= self.depth_height / float(data['depthHeight'])
+        K[0] *= self.depth_width / float(width_pixels)
+        K[1] *= self.depth_height / float(height_pixels)
 
         # Get the intrinsics of all scales at various resolutions.
         for i in range(self.prediction_num_scales):
@@ -277,9 +286,9 @@ class DTUDataset(GenericMVSDataset):
             output_dict[f"K_s{i}_b44"] = K_scaled
             output_dict[f"invK_s{i}_b44"] = invK_scaled
 
-        return output_dict
+        return output_dict, (left, top, left+width_pixels, top+height_pixels)
 
-    def load_target_size_depth_and_mask(self, scan_id, frame_id):
+    def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """ Loads a depth map at the resolution the dataset is configured for.
 
             Internally, if the loaded depth map isn't at the target resolution,
@@ -310,6 +319,7 @@ class DTUDataset(GenericMVSDataset):
             width=self.depth_width,
             value_scale_factor=1e-3,
             resampling_mode=pil.NEAREST,
+            crop=crop,
         )
         
         depth_mask = read_image_file(
@@ -318,6 +328,7 @@ class DTUDataset(GenericMVSDataset):
             width=self.depth_width,
             value_scale_factor=1.0,
             resampling_mode=pil.NEAREST,
+            crop=crop,
         )
 
         # Get the float valid mask

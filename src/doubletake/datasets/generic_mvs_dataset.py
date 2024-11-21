@@ -616,11 +616,15 @@ class GenericMVSDataset(Dataset):
                 mask = torch.flip(mask, (-1,))
                 mask_b = torch.flip(mask_b, (-1,))
 
-            max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
-            min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
-
-            max_depth = max_depth * (torch.rand(1)[0] + 1.0)
-            min_depth = min_depth * (torch.rand(1)[0] * 0.5 + 0.5)
+            if "min_depth" in output_dict:
+                min_depth = output_dict["min_depth"]
+            else:
+                min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
+            
+            if "max_depth" in output_dict:
+                max_depth = output_dict["max_depth"]
+            else:
+                max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
 
             output_dict.update(
                 {
@@ -737,7 +741,7 @@ class GenericMVSDataset(Dataset):
                 self.get_frame(
                     scan_id,
                     frame_id,
-                    load_depth=(frame_ind == 0),
+                    load_depth=True,
                     flip=flip,
                     load_depth_hint=(frame_ind == 0 and self.fill_depth_hints),
                 )
