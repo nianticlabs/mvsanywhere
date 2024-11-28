@@ -214,7 +214,7 @@ class FMVS_Wrapped(nn.Module):
             # intrinsics_source = intrinsics_source + [intrinsics_source[-1]] * max(0, (7 - len(intrinsics_source)))
             # intrinsics_source = intrinsics_source[:7]
 
-            self.model.module.depth_decoder.output_convs[0][1].size = tuple(image_key.shape[-2:])
+            # self.model.module.depth_decoder.output_convs[0][1].size = tuple(image_key.shape[-2:])
 
             if self.use_sift_range:
                 # Use sift max_depth
@@ -290,6 +290,8 @@ class FMVS_Wrapped(nn.Module):
             )
 
             pred_depth = outputs["depth_pred_s0_b1hw"]
+
+            print('SHAPE: ', pred_depth.shape)
 
             if self.use_refinement:
                 num_near_max = (pred_depth > max_depth * 0.95).sum()

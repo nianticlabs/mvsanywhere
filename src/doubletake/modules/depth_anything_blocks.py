@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from doubletake.modules.networks import double_basic_block
-
-
 model_configs = {
     'dinov2_vits14': {'in_channels': 384, 'features': 64, 'out_channels': [48, 96, 192, 384]},
     'dinov2_vitb14': {'in_channels': 768, 'features': 128, 'out_channels': [96, 192, 384, 768]},
@@ -259,11 +256,10 @@ class DPTHead(nn.Module):
             [
                 nn.Sequential(
                     nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                    nn.Upsample(size=(int(420 // 2 ** i), int(560 // 2 ** i)), mode='bilinear', align_corners=True),
+                    nn.Upsample(scale_factor=(14 / 2 ** i) / 8, mode='bilinear', align_corners=True),
                     nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
                     nn.ReLU(True),
                     nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),
-                    # nn.ReLU(True),
                     nn.Identity(),
                 ) for i in range(4)
             ]
@@ -285,12 +281,6 @@ class DPTHead(nn.Module):
             x = self.projects[i](x)
             x = self.resize_layers[i](x)
 
-            # x = torch.cat([
-            #     x,
-            #     F.interpolate(cv_features[i], x.shape[2:], mode='bilinear')
-            # ], dim=1)
-            # x = self.cv_feat_fusers[i](x)
-            
             out.append(x)
         
         layer_1, layer_2, layer_3, layer_4 = out

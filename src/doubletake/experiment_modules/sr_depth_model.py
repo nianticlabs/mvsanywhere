@@ -3,10 +3,11 @@ import logging
 import lightning as pl
 import timm
 import torch
-import torch.nn.functional as F
 from torch import nn
+import torch.nn.functional as F
+import torchvision
+
 import numpy as np
-import time
 
 from doubletake.losses import (
     MSGradientLoss,
@@ -26,7 +27,7 @@ from doubletake.modules.networks import (
     UNetMatchingEncoder,
 )
 from doubletake.modules.networks_fast import SkipDecoderRegression
-from doubletake.modules.vit_modules import CNNCVEncoder, DINOv2, DepthAnything, ViTCVEncoder
+from doubletake.modules.vit_modules import DINOv2, ViTCVEncoder
 from doubletake.utils.augmentation_utils import CustomColorJitter
 from doubletake.utils.generic_utils import (
     reverse_imagenet_normalize,
@@ -180,15 +181,6 @@ class DepthModel(pl.LightningModule):
                 feat_fuser_layers_idx=intermediate_layers_idx,
                 intermediate_layers_idx=intermediate_layers_idx
             )
-        elif self.run_opts.cv_encoder_type == "cnn_encoder":
-            self.cost_volume_net = CNNCVEncoder(
-                model_name=self.run_opts.image_encoder_name,
-                num_ch_cv=self.run_opts.matching_num_depth_bins,
-                num_ch_outs=[64, 128, 256, 384]
-            )
-            dec_num_input_ch = [32, 64, 128, 256, 384]
-            if self.run_opts.da_weights_path is not None:
-                self.cost_volume_net.load_da_weights(self.run_opts.da_weights_path)
         else:
             raise ValueError("Unrecognized option for cost volume encoder type!")
 
@@ -197,28 +189,8 @@ class DepthModel(pl.LightningModule):
             self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
-        elif self.run_opts.depth_decoder_name == "dpt":
+        elif self.run_opts.depth_decoder_name == "dpt" or "dpt" in self.run_opts.depth_decoder_name :
             self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
-            if self.run_opts.da_weights_path is not None:
-                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
-        elif "depth_anything" in self.run_opts.depth_decoder_name:
-            intermediate_layer_idx = {
-                'dinov2_vits14': [2, 5, 8, 11],
-                'dinov2_vitb14': [2, 5, 8, 11], 
-                'dinov2_vitl14': [4, 11, 17, 23], 
-                'dinov2_vitg14': [9, 19, 29, 39]
-            }[self.run_opts.depth_decoder_name.split(".")[1]]
-            self.depth_decoder = DepthAnything(
-                dec_num_input_ch[1:],
-                model_name=self.run_opts.depth_decoder_name.split(".")[1],
-                intermediate_layers=intermediate_layer_idx
-            )
-            if self.run_opts.da_weights_path is not None:
-                self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
-        elif "dpt" in self.run_opts.depth_decoder_name:
-            self.depth_decoder = DPTHead(
-                model_name=self.run_opts.depth_decoder_name.split(".")[1],
-            )
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:
@@ -485,25 +457,19 @@ class DepthModel(pl.LightningModule):
                         cost_volume, 
                         cur_feats,
                     )
-        elif self.run_opts.cv_encoder_type == "cnn_encoder":
-            cur_feats = self.cost_volume_net(
-                        cost_volume, 
-                        cur_feats,
-                    )     
+ 
         # Decode into depth at multiple resolutions.
-        if "depth_anything" in self.run_opts.depth_decoder_name:
-            depth_outputs = self.depth_decoder(cur_image, cur_feats[1:])
-        else:
+        if "dpt" in self.run_opts.depth_decoder_name:
             B, C, H, W = cur_image.shape
             depth_outputs = self.depth_decoder(cur_feats, H // 16, W // 16)
+        else:
+            depth_outputs = self.depth_decoder(cur_feats)
 
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
         for k in list(depth_outputs.keys()):
             log_depth = depth_outputs[k].float()
             log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
-            # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
-            # log_depth = (F.softmax(log_depth, dim=1) * bins).sum(dim=1, keepdim=True)
 
             if flip:
                 # now flip the depth map back after final prediction
@@ -626,17 +592,18 @@ class DepthModel(pl.LightningModule):
         cur_data, src_data = batch
         batch_size = cur_data["image_b3hw"].shape[0]
 
+        empty_cur = (cur_data["image_b3hw"].sum(dim=(1, 2, 3)) == 0).any().item()
+        empty_src = (src_data["image_b3hw"].sum(dim=(2, 3, 4)) == 0).any().item()
+        if empty_cur or empty_src:
+            # Corrupted image within the batch, skip
+            return 0.0
+
         if phase == "train":
             cur_data["image_b3hw"] = self.color_aug(cur_data["image_b3hw"], denormalize_first=True)
             for src_ind in range(src_data["image_b3hw"].shape[1]):
                 src_data["image_b3hw"][:, src_ind] = self.color_aug(
                     src_data["image_b3hw"][:, src_ind], denormalize_first=True
                 )
-
-        a = (cur_data["image_b3hw"].sum(dim=(1, 2, 3)) == 0).any().item()
-        b = (src_data["image_b3hw"].sum(dim=(2, 3, 4)) == 0).any().item()
-        if a or b:
-            return 0.0
 
         # forward pass through the model.
         outputs = self(phase, cur_data, src_data)
@@ -679,7 +646,6 @@ class DepthModel(pl.LightningModule):
                 optimizer_da_enc.zero_grad()
                 optimizer_da_dec.zero_grad()
 
-                # multiple schedulers
                 scheduler_sr, scheduler_da_enc, scheduler_da_dec = self.lr_schedulers()
                 scheduler_sr.step()
                 scheduler_da_enc.step()
@@ -713,7 +679,6 @@ class DepthModel(pl.LightningModule):
 
                         image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
 
-                        import torchvision
                         grid = torchvision.utils.make_grid(
                             src_data["image_b3hw"][i], nrow=3
                         )
@@ -785,8 +750,6 @@ class DepthModel(pl.LightningModule):
                         on_step=is_train,
                         on_epoch=not is_train,
                     )
-
-        # return losses["loss"]
 
     def training_step(self, batch, batch_idx):
         """Runs a training step."""

@@ -4,7 +4,7 @@ batch_size: 16
 val_batch_size: 4
 cost_volume_aggregation: dot
 cv_encoder_type: vit_encoder
-depth_decoder_name: dpt.dinov2_vitb14
+depth_decoder_name: dpt
 gpus: 2
 image_encoder_name: dinov2_vitb14
 log_interval: 100

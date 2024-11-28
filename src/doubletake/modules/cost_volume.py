@@ -307,7 +307,7 @@ class CostVolumeManager(nn.Module):
             )
 
             # Sum over the frames
-            dot_product_b1hw = dot_product_bkhw.sum(dim=1, keepdim=True)
+            dot_product_b1hw = dot_product_bkhw.mean(dim=1, keepdim=True)
 
             all_dps.append(dot_product_b1hw)
 
