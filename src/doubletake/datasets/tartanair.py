@@ -325,8 +325,29 @@ class TartanAirDataset(GenericMVSDataset):
             / f"{frame_id}_depth.npy"
         )
 
+        return str(path)
+    
+    def get_full_res_classgt_filepath(self, scan_id, frame_id):
+        """returns the filepath for a frame's seg file at the native
+        resolution in the dataset.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+
+        Returns:
+            The full size seg frame from the dataset.
+
+        """
+        path = (
+            Path(self.dataset_path)
+            / scan_id
+            / "seg_left"
+            / f"{frame_id}_seg.npy"
+        )
 
         return str(path)
+
 
     def get_pose_filepath(self, scan_id, frame_id):
         """returns the filepath for a frame's pose file.
@@ -431,19 +452,37 @@ class TartanAirDataset(GenericMVSDataset):
             mask_b: like mask but boolean.
         """
         depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
+        classgt_filepath = self.get_full_res_classgt_filepath(scan_id, frame_id)
         depth = np.load(depth_filepath)
+        classgt = np.load(classgt_filepath)
+        
+        max_depth = depth.max()
+        if max_depth > 10000:
+            skyclass = classgt.flatten()[np.argmax(depth)]
+            skymask = (classgt == skyclass).astype(np.uint8)
+        else:
+            skymask = np.zeros(classgt.shape, np.uint8)
+        
         if crop:
             depth = depth[
                 crop[1]:crop[3],
                 crop[0]:crop[2]
+            ]
+            skymask = skymask[
+                crop[1]:crop[3],
+                crop[0]:crop[2]                
             ]
 
 
         depth = cv2.resize(
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
+        skymask = cv2.resize(
+            skymask, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST 
+        )
 
         depth = torch.tensor(depth).float().unsqueeze(0)
+        skymask = torch.tensor(skymask).bool().unsqueeze(0)
 
         # # Get the float valid mask
         mask_b = (depth > self.min_valid_depth) & (depth < self.max_valid_depth)
@@ -455,7 +494,7 @@ class TartanAirDataset(GenericMVSDataset):
         # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        return depth, mask, mask_b
+        return depth, mask, mask_b, skymask
 
     def load_full_res_depth_and_mask(self, scan_id, frame_id):
         """Loads a depth map at the native resolution the dataset provides.

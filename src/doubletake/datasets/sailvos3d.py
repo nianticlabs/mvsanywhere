@@ -486,18 +486,25 @@ class SAILVOS3DDataset(GenericMVSDataset):
         rage_matrices = self._load_rage_matrices(scan_id, frame_id)
 
         depth = np.load(depth_filepath)
+
+        skymask = (depth == 24e-5).astype(np.uint8)
         depth = self.convert_ndc_depth_to_cam(
             depth, rage_matrices["P_inv"], depth.shape[0], depth.shape[1]
         )
 
         if crop:
             depth = depth[crop[1] : crop[3], crop[0] : crop[2]]
+            skymask = skymask[crop[1] : crop[3], crop[0] : crop[2]]
 
         depth = cv2.resize(
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
+        skymask = cv2.resize(
+            skymask, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
+        )
 
         depth = torch.tensor(depth).float().unsqueeze(0)
+        skymask = torch.tensor(skymask).bool().unsqueeze(0)
 
         # # Get the float valid mask
         mask_b = (depth > 0.0) & (depth < np.quantile(depth[torch.isfinite(depth)], 0.95))
@@ -510,7 +517,7 @@ class SAILVOS3DDataset(GenericMVSDataset):
         # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        return depth, mask, mask_b
+        return depth, mask, mask_b, skymask
 
     @staticmethod
     def pixels_to_ndcs(

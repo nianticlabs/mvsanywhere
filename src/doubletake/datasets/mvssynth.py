@@ -337,6 +337,8 @@ class MVSSynthDataset(GenericMVSDataset):
 
         depth = torch.tensor(depth).float().unsqueeze(0)
 
+        skymask = (depth == torch.inf)
+
         # # Get the float valid mask
         mask_b = (depth > 0.0) & (depth < torch.quantile(depth[torch.isfinite(depth)], 0.95))
         mask = mask_b.float()
@@ -344,7 +346,7 @@ class MVSSynthDataset(GenericMVSDataset):
         # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        return depth, mask, mask_b
+        return depth, mask, mask_b, skymask
 
     def load_pose(self, scan_id, frame_id):
         """Loads a frame's pose file.

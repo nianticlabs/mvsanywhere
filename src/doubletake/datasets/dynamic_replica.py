@@ -505,7 +505,7 @@ class DynamicReplicaDataset(GenericMVSDataset):
         # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        return depth, mask, mask_b
+        return depth, mask, mask_b, torch.zeros_like(mask_b)
 
     def load_full_res_depth_and_mask(self, scan_id, frame_id):
         """Loads a depth map at the native resolution the dataset provides.

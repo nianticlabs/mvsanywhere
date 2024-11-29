@@ -604,17 +604,24 @@ class GenericMVSDataset(Dataset):
 
         if load_depth:
             # get depth
-            depth, mask, mask_b = self.load_target_size_depth_and_mask(scan_id, frame_id, crop)
+            depth_outputs = self.load_target_size_depth_and_mask(scan_id, frame_id, crop)
+            if len(depth_outputs) == 3:
+                depth, mask, mask_b = depth_outputs
+                skymask = torch.full_like(mask, torch.nan)
+            else:
+                depth, mask, mask_b, skymask = depth_outputs
 
             if self.rotate_images:
                 depth = torch.rot90(depth, 3, [1, 2])
                 mask = torch.rot90(mask, 3, [1, 2])
                 mask_b = torch.rot90(mask_b, 3, [1, 2])
+                skymask = torch.rot90(skymask, 3, [1, 2])
 
             if flip:
                 depth = torch.flip(depth, (-1,))
                 mask = torch.flip(mask, (-1,))
                 mask_b = torch.flip(mask_b, (-1,))
+                skymask = torch.flip(skymask, (-1,))
 
             max_depth = depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
             min_depth = depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(10.0)
@@ -629,6 +636,7 @@ class GenericMVSDataset(Dataset):
                     "mask_b_b1hw": mask_b,
                     "max_depth": max_depth, #depth[torch.isfinite(depth)].max() if torch.isfinite(depth).any().item() else torch.tensor(10.0),
                     "min_depth": min_depth, #depth[torch.isfinite(depth)].min() if torch.isfinite(depth).any().item() else torch.tensor(1.0),
+                    "skymask_b1hw": skymask,
                 }
             )
 

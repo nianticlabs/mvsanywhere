@@ -269,6 +269,20 @@ class DPTHead(nn.Module):
             ]
         )
 
+        self.sky_convs = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
+                    nn.Upsample(size=(int(420 // 2 ** i), int(560 // 2 ** i)), mode='bilinear', align_corners=True),
+                    nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
+                    nn.ReLU(True),
+                    nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),
+                    # nn.ReLU(True),
+                    nn.Identity(),
+                ) for i in range(4)
+            ]
+        )
+
             
     def forward(self, out_features, patch_h, patch_w):
         out = []
@@ -309,7 +323,11 @@ class DPTHead(nn.Module):
             "log_depth_pred_s0_b1hw": self.output_convs[0](path_1),
             "log_depth_pred_s1_b1hw": self.output_convs[1](path_2),
             "log_depth_pred_s2_b1hw": self.output_convs[2](path_3),
-            "log_depth_pred_s3_b1hw": self.output_convs[3](path_4)
+            "log_depth_pred_s3_b1hw": self.output_convs[3](path_4),
+            "sky_pred_s0_b1hw": self.output_convs[0](path_1),
+            "sky_pred_s1_b1hw": self.output_convs[1](path_2),
+            "sky_pred_s2_b1hw": self.output_convs[2](path_3),
+            "sky_pred_s3_b1hw": self.output_convs[3](path_4)
         }
   
         return depth_outputs

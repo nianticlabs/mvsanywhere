@@ -500,6 +500,10 @@ class DepthModel(pl.LightningModule):
         # loop through depth outputs, flip them if we need to and get linear
         # scale depths.
         for k in list(depth_outputs.keys()):
+
+            if 'sky' in k:
+                continue
+
             log_depth = depth_outputs[k].float()
             log_depth = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.sigmoid(log_depth)
             # bins = torch.log(min_depth) + torch.log(max_depth / min_depth) * torch.linspace(0, 1, self.run_opts.matching_num_depth_bins, device=min_depth.device, dtype=min_depth.dtype)[None, :, None, None]
@@ -511,6 +515,16 @@ class DepthModel(pl.LightningModule):
 
             depth_outputs[k] = log_depth
             depth_outputs[k.replace("log_", "")] = torch.exp(log_depth)
+
+        for k in list(depth_outputs.keys()):
+            if 'sky' not in k:
+                continue
+
+            skymask = depth_outputs[k]
+            if flip:
+                skymask = torch.flip(skymask, (-1,))
+
+            depth_outputs[k.replace("log_depth", "sky")] = skymask
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
@@ -553,6 +567,7 @@ class DepthModel(pl.LightningModule):
         normals_gt = cur_data["normals_b3hw"]
         mask_b = cur_data["mask_b_b1hw"]
         mask = cur_data["mask_b1hw"]
+        skymask = cur_data["skymask_b1hw"]
         depth_pred = outputs["depth_pred_s0_b1hw"]
         log_depth_pred = outputs["log_depth_pred_s0_b1hw"]
         normals_pred = outputs["normals_pred_b3hw"]
@@ -560,6 +575,7 @@ class DepthModel(pl.LightningModule):
         log_depth_gt = torch.log(depth_gt)
         found_scale = False
         ms_loss = 0
+        sky_loss = 0.0
         # Mask sparse arrays
         with torch.no_grad():
             sparsity = torch.isnan(depth_gt).sum(dim=[1, 2, 3]) / np.prod(depth_gt.shape[-2:])
@@ -579,6 +595,17 @@ class DepthModel(pl.LightningModule):
                 )
                 ms_loss += (
                     self.ms_loss_fn(log_depth_gt[mask_b_top20], log_depth_pred_resized[mask_b_top20]) / 2**i
+                )
+                found_scale = True
+
+            if f"sky_pred_s{i}_b1hw" in outputs:
+                sky_pred_resized = F.interpolate(
+                    outputs[f"sky_pred_s{i}_b1hw"],
+                    size=skymask.shape[-2:],
+                    mode="nearest",
+                )
+                sky_loss += torch.nan_to_num(
+                    nn.functional.binary_cross_entropy_with_logits(sky_pred_resized[torch.isfinite(skymask)], skymask[torch.isfinite(skymask)].float()) / 2**i
                 )
                 found_scale = True
 
@@ -648,10 +675,12 @@ class DepthModel(pl.LightningModule):
 
         depth_pred = outputs["depth_pred_s0_b1hw"]
         depth_pred_lr = outputs["depth_pred_s3_b1hw"]
+        skymask_pred = torch.sigmoid(outputs["sky_pred_s0_b1hw"])
         cv_min = outputs["lowest_cost_bhw"]
 
         depth_gt = cur_data["depth_b1hw"]
         mask = cur_data["mask_b1hw"]
+        skymask_gt = cur_data["skymask_b1hw"].float()
         mask_b = cur_data["mask_b_b1hw"]
 
         # estimate normals for groundtruth
@@ -710,6 +739,12 @@ class DepthModel(pl.LightningModule):
                         depth_pred_lr_viz_i = colormap_image(
                             depth_pred_lr[i].float().cpu(), vmin=vmin, vmax=vmax
                         )
+                        skymask_gt_viz_i, vmin, vmax = colormap_image(
+                            skymask_gt[i].float().cpu(), return_vminvmax=True
+                        )
+                        skymask_pred_viz_i = colormap_image(
+                            skymask_pred[i].float().cpu(), vmin=vmin, vmax=vmax
+                        )
 
                         image_i = reverse_imagenet_normalize(cur_data["image_b3hw"][i])
 
@@ -738,6 +773,13 @@ class DepthModel(pl.LightningModule):
                             f"{prefix}_normals_pred/{i}", 0.5 * (1 + normals_pred[i]), global_step
                         )
                         self.logger.experiment.add_image(f"{prefix}_cv_min/{i}", cv_min_viz_i, global_step)
+
+                        self.logger.experiment.add_image(
+                                f"{prefix}_skymask_gt/{i}", skymask_gt_viz_i, global_step
+                        )
+                        self.logger.experiment.add_image(
+                            f"{prefix}_skymask_pred/{i}", skymask_pred_viz_i, global_step
+                        )
 
                     self.logger.experiment.flush()
 

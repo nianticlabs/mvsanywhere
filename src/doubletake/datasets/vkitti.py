@@ -334,6 +334,29 @@ class VirtualKITTIDataset(GenericMVSDataset):
         )
 
         return str(path)
+    
+    def get_full_res_classgt_filepath(self, scan_id, frame_id):
+        """returns the filepath for a frame's depth file at the native
+        resolution in the dataset.
+
+        Args:
+            scan_id: the scan this file belongs to.
+            frame_id: id for the frame.
+
+        Returns:
+            The full size depth frame from the dataset.
+
+        """
+        path = (
+            Path(self.dataset_path)
+            / scan_id
+            / "frames"
+            / "classSegmentation"
+            / "Camera_0"
+            / f"classgt_{int(frame_id):05d}.png"
+        )
+
+        return str(path)
 
     def load_intrinsics(self, scan_id, frame_id=None, flip=False):
         """Loads intrinsics, computes scaled intrinsics, and returns a dict
@@ -410,6 +433,11 @@ class VirtualKITTIDataset(GenericMVSDataset):
     def _load_depth(depth_path, is_float16=True):
         depth = cv2.imread(depth_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
         return depth
+    
+    @staticmethod
+    def _load_classgt(classgt_path, is_float16=True):
+        classgt = cv2.imread(classgt_path)
+        return classgt
 
     def load_target_size_depth_and_mask(self, scan_id, frame_id, crop=None):
         """Loads a depth map at the resolution the dataset is configured for.
@@ -431,19 +459,28 @@ class VirtualKITTIDataset(GenericMVSDataset):
             mask_b: like mask but boolean.
         """
         depth_filepath = self.get_full_res_depth_filepath(scan_id, frame_id)
+        classgt_filepath = self.get_full_res_classgt_filepath(scan_id, frame_id)
         
         depth = self._load_depth(depth_filepath)
+        classgt = self._load_classgt(classgt_filepath)
         if crop:
             depth = depth[
                 crop[1]:crop[3],
                 crop[0]:crop[2]
             ]
+            classgt = classgt[
+                crop[1]:crop[3],
+                crop[0]:crop[2]
+            ]
 
-
+        classgt = cv2.resize(
+            classgt, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
+        )
         depth = cv2.resize(
             depth, dsize=(self.depth_width, self.depth_height), interpolation=cv2.INTER_NEAREST
         )
 
+        skymask = torch.tensor(np.all(classgt == [255, 200, 90], axis=-1)).unsqueeze(0)
         mask_b = torch.tensor(depth < 65535).bool().unsqueeze(0)
         depth = torch.tensor(depth / 100).float().unsqueeze(0)
 
@@ -456,7 +493,7 @@ class VirtualKITTIDataset(GenericMVSDataset):
         # set invalids to nan
         depth[~mask_b] = torch.tensor(np.nan)
 
-        return depth, mask, mask_b
+        return depth, mask, mask_b, skymask
 
     def load_full_res_depth_and_mask(self, scan_id, frame_id):
         """Loads a depth map at the native resolution the dataset provides.
