@@ -610,6 +610,7 @@ class GenericMVSDataset(Dataset):
                 skymask = torch.full_like(mask, torch.nan)
             else:
                 depth, mask, mask_b, skymask = depth_outputs
+                skymask = skymask.float()
 
             if self.rotate_images:
                 depth = torch.rot90(depth, 3, [1, 2])

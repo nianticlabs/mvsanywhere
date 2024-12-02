@@ -524,7 +524,7 @@ class DepthModel(pl.LightningModule):
             if flip:
                 skymask = torch.flip(skymask, (-1,))
 
-            depth_outputs[k.replace("log_depth", "sky")] = skymask
+            depth_outputs[k] = skymask
 
         # include argmax likelihood depth estimates from cost volume and
         # overall source view mask.
@@ -627,12 +627,13 @@ class DepthModel(pl.LightningModule):
         normals_gt[~mask_b_dense.expand(-1, 3, -1, -1)] = torch.nan
         normals_loss = torch.nan_to_num(self.normals_loss(normals_gt, normals_pred))
 
-        loss = ms_loss + 1.0 * grad_loss + 1.0 * normals_loss
+        loss = ms_loss + sky_loss * 0.1 + 1.0 * grad_loss + 1.0 * normals_loss
 
         losses = {
             "loss": loss,
             "si_loss": si_loss,
             "grad_loss": grad_loss,
+            "sky_loss": sky_loss,
             "abs_loss": abs_loss,
             "normals_loss": normals_loss,
             "ms_loss": ms_loss,
