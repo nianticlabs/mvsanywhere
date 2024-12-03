@@ -1,0 +1,9 @@
+!!python/object:doubletake.options.DataOptions
+dataset_path: /mnt/nas3/shared/datasets/scannet
+tuple_info_file_location: data_splits/ScanNetv2/rmvd_split/
+dataset_scan_split_file: data_splits/ScanNetv2/rmvd_split/rmvd_test.txt
+dataset: scannet
+mv_tuple_file_suffix: _eight_view_rmvd_better_tuples.txt
+num_images_in_tuple: 8
+frame_tuple_type: dense_offline
+split: train

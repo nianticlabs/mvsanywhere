@@ -58,7 +58,7 @@ class ETH3DSample(Sample):
 class ETH3DTrainRobustMVD(Dataset):
 
     base_dataset = 'eth3d'
-    split = 'robustmvd'
+    split = 'robustmvd_undistorted'
     dataset_type = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):

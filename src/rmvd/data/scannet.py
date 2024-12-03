@@ -84,7 +84,7 @@ class ScanNetSample(Sample):
 class ScanNetRobustMVD(Dataset):
 
     base_dataset = 'scannet'
-    split = 'robustmvd'
+    split = 'robustmvd_better_tuples'
     dataset_type = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
