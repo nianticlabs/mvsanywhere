@@ -324,10 +324,10 @@ class DPTHead(nn.Module):
             "log_depth_pred_s1_b1hw": self.output_convs[1](path_2),
             "log_depth_pred_s2_b1hw": self.output_convs[2](path_3),
             "log_depth_pred_s3_b1hw": self.output_convs[3](path_4),
-            "sky_pred_s0_b1hw": self.output_convs[0](path_1),
-            "sky_pred_s1_b1hw": self.output_convs[1](path_2),
-            "sky_pred_s2_b1hw": self.output_convs[2](path_3),
-            "sky_pred_s3_b1hw": self.output_convs[3](path_4)
+            "sky_pred_s0_b1hw": self.sky_convs[0](path_1),
+            "sky_pred_s1_b1hw": self.sky_convs[1](path_2),
+            "sky_pred_s2_b1hw": self.sky_convs[2](path_3),
+            "sky_pred_s3_b1hw": self.sky_convs[3](path_4)
         }
   
         return depth_outputs
