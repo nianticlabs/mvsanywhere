@@ -1,3 +1,5 @@
+The `main` branch contains our HERO model, with high resolution, view count agnostic, normalized (except R) MLP.
+
 ## Create conda environment
 
 ```
@@ -8,21 +10,119 @@ mamba activate fmvs
 python -m pip install -e .
 ```
 
-## Branches
+## Models
 
-### main
-SimpleRecon branch with small changes that are common among other branches
- - Code to work with ray
- - Arbitrary matching scale and prediction scale as an option
+HERO 480x640 MLP (No R Norm):
+`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/ablation_mlp_allsynth_hr_no_rnorm/TorchTrainer_90e3d_00000_0_2024-11-16_01-38-42/checkpoint_000014/checkpoint.ckpt`
+HERO 480x640 w/o metadata:
+`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/hero_2_dot_allsynth_hr/TorchTrainer_67530_00000_0_2024-11-11_10-26-02/checkpoint_000014/checkpoint.ckpt`
+Other models (follow experiment name for clue on what they are, or check code inside the experiment):
+`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/*`
 
-### sr++ (and others sr++_double_img_encoder, sr++_fullvit)
-Only the architecture is changed to use ViT and Depth Anything volumes. Code ready to train, validate and evaluate on scannet
 
-### softmax_multids_double_img_encoder and regression_multids_double_img_encoder
-The double img encoder implementation ready to train on multiple datasets and to evaluate on scannet.
+## Train:
 
-### more_datasets
-Branch where I keep implementing dataloaders, tuple generators, .... for the different datasets
+To train a model:
+```
+python3 ./src/doubletake/train.py \
+  --log_dir logs \
+  --name HERO_MODEL \
+  --config_file configs/models/sr_double_vit.yaml \
+  --data_config configs/data/blendedmvg/blendedmvg_default_train.yaml:configs/data/vkitti/vkitti_default_train.yaml:configs/data/dynamic_replica/dynamic_replica_default_train.yaml:configs/data/matrix_city/matrix_city_default_train.yaml:configs/data/hypersim/hypersim_default_train.yaml:configs/data/tartanair/tartanair_default_train.yaml:configs/data/sailvos3d/sailvos3d_default_train.yaml:configs/data/mvssynth/mvssynth_default_train.yaml  \
+  --val_data_config configs/data/scannet/scannet_default_val.yaml \
+  --gpus 2 \
+  --batch_size 6 \
+  --val_batch_size 6 \
+  --num_workers 6 \
+  --da_weights_path /mnt/nas3/shared/projects/fmvs/fmvs/weights/depth_anything_v2_vitb.pth
+```
+
+More datasets can be added by appending more `:` concatenaded. To also use real datasets, append:
+```
+configs/data/waymo/waymo_default_train.yaml:configs/data/arkitscenes/arkitscenes_default_train_landscape.yaml
+```
+
+To start a training in ray:
+```
+python3 ./src/doubletake/ray/train.py \
+  --name HERO_MODEL \
+  --config_file configs/models/sr_double_vit.yaml \
+  --data_config configs/data/blendedmvg/blendedmvg_default_train.yaml:configs/data/vkitti/vkitti_default_train.yaml:configs/data/dynamic_replica/dynamic_replica_default_train.yaml:configs/data/matrix_city/matrix_city_default_train.yaml:configs/data/hypersim/hypersim_default_train.yaml:configs/data/tartanair/tartanair_default_train.yaml:configs/data/sailvos3d/sailvos3d_default_train.yaml:configs/data/mvssynth/mvssynth_default_train.yaml  \
+  --val_data_config configs/data/scannet/scannet_default_val.yaml \
+  --gpus 2 \
+  --batch_size 6 \
+  --val_batch_size 6 \
+  --da_weights_path /mnt/nas3/shared/projects/fmvs/fmvs/weights/depth_anything_v2_vitb.pth
+```
+
+
+## Evaluation on the Robust Benchmark
+
+To evaluate a model on all 5 datasets of the robust benchmark:
+
+```
+python ./eval.py \
+  --model fmvs_wrapped \
+  --eval_type robustmvd \
+  --inputs poses intrinsics \
+  --weights /path/to/code:/path/to/weights \
+  --output path/to/results \
+  --kitti_size 480 1280 \ 
+  --dtu_size 480 640 \
+  --eth3d_size 480 640 \
+  --scannet_size 480 640 \
+  --tanks_and_temples_size 480 640 \
+  --max_source_views 7 \
+  --use_refinement
+```
+
+For example to evaluate on our hero model, use:
+```
+--weights /mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/ablation_mlp_allsynth_hr_no_rnorm/code/_ray_pkg_aeeedeac580c8789/:/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/ablation_mlp_allsynth_hr_no_rnorm/TorchTrainer_90e3d_00000_0_2024-11-16_01-38-42/checkpoint_000014/checkpoint.ckpt
+```
+
+
+## Improved Benchmark
+
+Version of the Robust Benchmark with our improvements:
+- Scannet with better tuples, using the selection from DMVS
+- ETH3D on undistorted images.
+
+It lies on `sergioizquierdo/improved_benchmark`
+
+To run a model in these two improved datasets:
+```
+git switch sergioizquierdo/improved_benchmark
+python ./eval.py \
+  --model fmvs_wrapped \
+  --eval_type robustmvd \
+  --inputs poses intrinsics \
+  --weights /path/to/code:/path/to/weights \
+  --output path/to/results \
+  --eth3d_size 480 640 \
+  --scannet_size 480 640 \
+  --max_source_views 7 \
+  --use_refinement
+```
+
+To generate again the improved datasets pickel files:
+
+```
+git switch sergioizquierdo/improved_benchmark
+
+# Scannet
+# Compute the scannet tuples for the rmvd reference frames using DMVS selection
+python3 scripts/data_scripts/robustmvd_scripts/generate_rmvd_scannet_better_tuples.py \
+  --data_config configs/data/scannet/scannet_rmvd_better_tuples_test.yaml \
+  --num_workers 8 \
+  --num_images_in_tuple 8 \
+# Create the pickle file
+python3 scripts/data_scripts/robustmvd_scripts/create_scannet_better_tuples.py
+
+# ETH3D
+# Undistort the images and save them to disk. At the same time create the corresponding pickle file
+python3 scripts/data_scripts/robustmvd_scripts/create_undistorted_eth3d.py
+```
 
 
 ### Waymo preprocessing
@@ -48,31 +148,6 @@ python -m scripts.data_scripts.generate_train_tuples_geometry \
     --num_images_in_tuple 8
 ```
 
-## Train:
-
-To train and validate on scannet (from main, or sr++) run:
-```
-# For the original SR arch
-python3 ./src/doubletake/train.py --name HERO_MODEL --log_dir logs --config_file configs/models/sr_model.yaml --data_config configs/data/scannet/scannet_default_train.yaml --gpus 1 --batch_size 16
-# For the double img encoder
-python3 ./src/doubletake/train.py --name double_img_encoder --log_dir logs --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/scannet/scannet_default_train.yaml --gpus 1 --batch_size 16
-```
-
-To train on multiple datasets:
-
-```
-python3 ./src/doubletake/train.py --name double_img_encoder --log_dir logs --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/dynamic_replica/dynamic_replica_default_train.yaml:configs/data/matrix_city/matrix_city_default_train.yaml:configs/data/hypersim/hypersim_default_train.yaml:configs/data/blendedmvg/blendedmvg_default_val.yaml:configs/data/tartanair/tartanair_default_train.yaml:configs/data/vkitti/vkitti_default_train.yaml --val_data_config configs/data/scannet/scannet_default_val.yaml --gpus 1 --batch_size 16
-```
-
-To start a training in ray:
-
-```
-python src/doubletake/ray/train.py --name regression_multids_double_img_encoder_poses_range --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/dynamic_replica/dynamic_replica_default_train.yaml:configs/data/matrix_city/matrix_city_default_train.yaml:configs/data/hypersim/hypersim_default_train.yaml:configs/data/blendedmvg/blendedmvg_default_val.yaml:configs/data/tartanair/tartanair_default_train.yaml:configs/data/vkitti/vkitti_default_train.yaml --val_data_config configs/data/scannet/scannet_default_val.yaml --batch_size 8 --val_batch_size 8
-```
-
-To test on scannet:
-python3 ./src/doubletake/test.py --name my_model_name --config_file configs/models/sr_double_img_encoder.yaml --data_config configs/data/scannet/scannet_default_test.yaml --load_weights_from_checkpoint  /path/to/ckpt/ --fast_cost_volume --gpus 1 --num_workers 8 --batch_size 4
-
 ### Sections of the code that are relevant?
 
 To choose the input depth range of the network `src/doubletake/datasets/generic_mvs_dataset.py`, lines 630
@@ -95,6 +170,23 @@ Training logs
 /mnt/nas3/shared/projects/fmvs/fmvs/logs/ray
 ```
 
+## Branches
+
+### main
+Our hero branch, with all the datasets, MLP implemented.
+
+Best configuration: `sr_double_vit.yaml`
+
+### sergioizquierdo/improved_benchmark
+Code to create the improved datasates and to evaluate a model on them
+
+### sergioizquierdo/create_sequential_video
+Two small python scripts to create T&T and KITTI sequential datasets for the robust benchmark, and a script to create a video out of the results.
+Only the architecture is changed to use ViT and Depth Anything volumes. Code ready to train, validate and evaluate on scannet
+
+### sergioizquierdo/contribution_depth_range_estimator
+
+Branch with code to predict the depth range directly from the patchified cost volume. It doesn't work very well, but may be worth trying again.
 
 ## Evaluation on the robust benchmark
 
