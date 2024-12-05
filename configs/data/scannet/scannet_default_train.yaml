@@ -1,4 +1,4 @@
-!!python/object:doubletake.options.Options
+!!python/object:doubletake.options.DataOptions
 dataset_path: /mnt/nas3/shared/datasets/scannet
 tuple_info_file_location: data_splits/ScanNetv2/standard_split/
 dataset_scan_split_file: data_splits/ScanNetv2/standard_split/scannetv2_train.txt

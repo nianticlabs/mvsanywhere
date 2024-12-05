@@ -1,66 +1,66 @@
-""" 
-    Predicts depth maps using a DepthModel model. Uses an MVS dataset from 
+"""
+    Predicts depth maps using a DepthModel model. Uses an MVS dataset from
     datasets.
-    
+
     All results will be stored at a base results folder (results_path) at:
         opts.output_base_path/opts.name/opts.dataset/opts.frame_tuple_type/
 
-    frame_tuple_type is the type of image tuple used for MVS. A selection should 
-    be provided in the data_config file you used. 
+    frame_tuple_type is the type of image tuple used for MVS. A selection should
+    be provided in the data_config file you used.
 
-    By default will compute depth scores for each frame and provide both frame 
-    averaged and scene averaged metrics. The script will save these scores (per 
+    By default will compute depth scores for each frame and provide both frame
+    averaged and scene averaged metrics. The script will save these scores (per
     scene and totals) under:
         results_path/scores
 
-    We've done our best to ensure that a torch batching bug through the matching 
-    encoder is fixed for (<10^-4) accurate testing by disabling image batching 
-    through that encoder. Run `--batch_size 4` at most if in doubt, and if 
-    you're looking to get as stable as possible numbers and avoid PyTorch 
+    We've done our best to ensure that a torch batching bug through the matching
+    encoder is fixed for (<10^-4) accurate testing by disabling image batching
+    through that encoder. Run `--batch_size 4` at most if in doubt, and if
+    you're looking to get as stable as possible numbers and avoid PyTorch
     gremlins, use `--batch_size 1`  for comparison evaluation.
 
 
     If you want to use this for speed, set --fast_cost_volume to True. This will
-    enable batching through the matching encoder and will enable an einops 
+    enable batching through the matching encoder and will enable an einops
     optimized feature volume.
 
-    This script can also be used to perform a few different auxiliary tasks, 
+    This script can also be used to perform a few different auxiliary tasks,
     including:
 
     ### TSDF Fusion
-    To run TSDF fusion provide the --run_fusion flag. You have two choices for 
+    To run TSDF fusion provide the --run_fusion flag. You have two choices for
     fusers
-    1) '--depth_fuser ours' (default) will use our fuser, whose meshes are used 
-        in most visualizations and for scores. This fuser does not support 
-        color. You must use the provided version of skimage for our custom 
-        measure.marching_cubes implementation that allows exporting a single 
+    1) '--depth_fuser ours' (default) will use our fuser, whose meshes are used
+        in most visualizations and for scores. This fuser does not support
+        color. You must use the provided version of skimage for our custom
+        measure.marching_cubes implementation that allows exporting a single
         walled mesh.
-    2) '--depth_fuser open3d' will use the open3d depth fuser. This fuser 
-        supports color and you can enable this by using the '--fuse_color' flag. 
-    
-    By default, depth maps will be clipped to 3m for fusion and a tsdf 
-    resolution of 0.04m3 will be used, but you can change that by changing both 
+    2) '--depth_fuser open3d' will use the open3d depth fuser. This fuser
+        supports color and you can enable this by using the '--fuse_color' flag.
+
+    By default, depth maps will be clipped to 3m for fusion and a tsdf
+    resolution of 0.04m3 will be used, but you can change that by changing both
     '--max_fusion_depth' and '--fusion_resolution'
 
-    You can optionnally ask for predicted depths used for fusion to be masked 
-    when no vaiid MVS information exists using '--mask_pred_depths'. This is not 
+    You can optionnally ask for predicted depths used for fusion to be masked
+    when no vaiid MVS information exists using '--mask_pred_depths'. This is not
     enabled by default.
 
-    You can also fuse the best guess depths from the cost volume before the 
-    U-Net that fuses the strong image prior. You can do this by using 
+    You can also fuse the best guess depths from the cost volume before the
+    U-Net that fuses the strong image prior. You can do this by using
     --fusion_use_raw_lowest_cost.
 
     Meshes will be stored under results_path/meshes/mesh_options/
 
     ### Cache depths
-    You can optionally store depths by providing the '--cache_depths' flag. 
+    You can optionally store depths by providing the '--cache_depths' flag.
     They will be stored at
         results_path/depths
 
     ### Quick viz
-    There are other scripts for deeper visualizations of output depths and 
-    fusion, but for quick export of depth map visualization you can use 
-    '--dump_depth_visualization'. Visualizations will be stored at 
+    There are other scripts for deeper visualizations of output depths and
+    fusion, but for quick export of depth map visualization you can use
+    '--dump_depth_visualization'. Visualizations will be stored at
         results_path/viz/quick_viz/
 
 
@@ -128,13 +128,15 @@ from doubletake.utils.visualization_utils import quick_viz_export
 
 def main(opts):
     # get dataset
+    assert len(opts.datasets) == 1, f"Expected only one dataset but got {len(opts.datasets)}"
+    dataset_opts = opts.datasets[0]
     dataset_class, scans = get_dataset(
-        opts.dataset, opts.dataset_scan_split_file, opts.single_debug_scan_id
+        dataset_opts.dataset, dataset_opts.dataset_scan_split_file, opts.single_debug_scan_id
     )
 
     # path where results for this model, dataset, and tuple type are.
     results_path = os.path.join(
-        opts.output_base_path, opts.name, opts.dataset, opts.frame_tuple_type
+        opts.output_base_path, opts.name, dataset_opts.dataset, dataset_opts.frame_tuple_type
     )
 
     # set up directories for fusion
@@ -219,12 +221,12 @@ def main(opts):
 
             # set up dataset with current scan
             dataset = dataset_class(
-                opts.dataset_path,
-                split=opts.split,
-                mv_tuple_file_suffix=opts.mv_tuple_file_suffix,
+                dataset_opts.dataset_path,
+                split=dataset_opts.split,
+                mv_tuple_file_suffix=dataset_opts.mv_tuple_file_suffix,
                 limit_to_scan_id=scan,
                 include_full_res_depth=True,
-                tuple_info_file_location=opts.tuple_info_file_location,
+                tuple_info_file_location=dataset_opts.tuple_info_file_location,
                 num_images_in_tuple=None,
                 shuffle_tuple=opts.shuffle_tuple,
                 include_high_res_color=(
@@ -264,6 +266,23 @@ def main(opts):
 
                 depth_gt = cur_data["full_res_depth_b1hw"]
 
+                # If sift didn't work, use simple heuristic
+                # get all tensors from the batch dictioanries.
+                cur_image = cur_data["image_b3hw"]
+                src_K = src_data[f"K_matching_b44"]
+                src_cam_T_world = src_data["cam_T_world_b44"]
+                cur_world_T_cam = cur_data["world_T_cam_b44"]
+                
+                cam_dists = (src_cam_T_world @ cur_world_T_cam.unsqueeze(1))[:, :, :3, 3].norm(dim=-1)
+
+                baseline_min_depth = (torch.amin(cam_dists, 1) * src_K[:, 0, 0, 0]) * 4 / (1.0 * cur_image.shape[-1])
+                baseline_max_depth = (torch.amax(cam_dists, 1) * src_K[:, 0, 0, 0] * 4 ) / (0.01 * cur_image.shape[-1])
+                
+                min_depth = baseline_min_depth
+                max_depth = baseline_max_depth
+                cur_data["min_depth"] = baseline_min_depth
+                cur_data["max_depth"] = baseline_max_depth
+
                 # run to get output, also measure time
                 start_time.record()
                 # use unbatched (looping) matching encoder image forward passes
@@ -276,6 +295,44 @@ def main(opts):
                     unbatched_matching_encoder_forward=(not opts.fast_cost_volume),
                     return_mask=True,
                 )
+
+                pred_depth = outputs["depth_pred_s0_b1hw"]
+
+                num_near_max = (pred_depth > max_depth[:, None, None, None] * 0.95).flatten(1).sum(dim=1)
+                num_near_min = (pred_depth < min_depth[:, None, None, None] * 1.05).flatten(1).sum(dim=1)
+                fraction_near_max = num_near_max / (cur_image.shape[-2] * cur_image.shape[-1])
+                fraction_near_min = num_near_min / (cur_image.shape[-2] * cur_image.shape[-1])
+                refine_max = fraction_near_max > 0.05
+                refine_min = fraction_near_min > 0.05
+
+                # refinement
+                for _ in range(1):
+                    pred_depth = pred_depth.flatten(1)
+                    pred_min = torch.quantile(pred_depth, 0.05, dim=1) * 0.75
+                    pred_max = torch.quantile(pred_depth, 0.95, dim=1) * 1.25
+
+                    new_min = pred_min
+                    new_max = pred_max
+
+                    if refine_max.any().item():
+                        new_max[refine_max] = max_depth[refine_max] * 2.0
+                    if refine_min.any().item():
+                        new_min[refine_min] = min_depth[refine_min] * 0.5
+
+                    cur_data["min_depth"] = new_min
+                    cur_data["max_depth"] = new_max
+                    outputs = model(
+                        phase="test",
+                        cur_data=cur_data,
+                        src_data=src_data,
+                        unbatched_matching_encoder_forward=True,
+                        return_mask=True,
+                    )
+
+                    pred_depth = outputs["depth_pred_s0_b1hw"]
+                    min_depth = new_min
+                    max_depth = new_max
+
                 end_time.record()
                 torch.cuda.synchronize()
 
@@ -440,7 +497,7 @@ def main(opts):
             print_running_metrics=False,
         )
         all_scene_metrics.output_json(
-            os.path.join(scores_output_dir, f"all_scene_avg_metrics_{opts.split}.json")
+            os.path.join(scores_output_dir, f"all_scene_avg_metrics_{dataset_opts.split}.json")
         )
 
         print("")
@@ -450,7 +507,7 @@ def main(opts):
             include_metrics_names=True, print_running_metrics=False
         )
         all_frame_metrics.output_json(
-            os.path.join(scores_output_dir, f"all_frame_avg_metrics_{opts.split}.json")
+            os.path.join(scores_output_dir, f"all_frame_avg_metrics_{dataset_opts.split}.json")
         )
 
 

@@ -1,4 +1,4 @@
-!!python/object:doubletake.options.Options
+!!python/object:doubletake.options.DataOptions
 dataset_path: /mnt/nas3/shared/projects/fmvs/dtu/
 tuple_info_file_location: data_splits/DTU/
 dataset_scan_split_file: data_splits/DTU/dtu_test.txt
