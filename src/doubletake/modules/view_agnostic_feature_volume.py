@@ -194,12 +194,6 @@ class ViewAgnosticFeatureVolumeManager(CostVolumeManager):
         max_bkhw[zero_check_b] = 1.0
         t_measure_bkhw = t_measure_bkhw / max_bkhw
         
-        zero_check_b = torch.all((r_measure_bkhw[:,:,0,0] == 0), 1)
-        max_bkhw = r_measure_bkhw.max(dim=1, keepdim=True)[0]
-        max_bkhw[zero_check_b] = 1.0
-        r_measure_bkhw = r_measure_bkhw / max_bkhw
-        
-
         # init an overall mask if need be
         overall_mask_bhw = None
         if return_mask:
