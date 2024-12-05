@@ -146,7 +146,7 @@ class DepthModel(pl.LightningModule):
                 'dinov2_vitb14': [0, 2, 4, 5, 8, 11], 
                 'dinov2_vitl14': [4, 11, 17, 23], 
                 'dinov2_vitg14': [9, 19, 29, 39]
-            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            }[self.run_opts.image_encoder_name]
             self.encoder = DINOv2(
                 self.run_opts.image_encoder_name,
                 num_intermediate_layers=intermediate_layers_idx
@@ -174,7 +174,7 @@ class DepthModel(pl.LightningModule):
                 'dinov2_vitb14': [2, 5, 8, 11], 
                 'dinov2_vitl14': [4, 11, 17, 23], 
                 'dinov2_vitg14': [9, 19, 29, 39]
-            }[self.run_opts.depth_decoder_name.split(".")[1]]
+            }[self.run_opts.image_encoder_name]
             self.cost_volume_net = ViTCVEncoder(
                 model_name=self.run_opts.image_encoder_name,
                 num_ch_cv=self.run_opts.matching_num_depth_bins,
@@ -189,7 +189,7 @@ class DepthModel(pl.LightningModule):
             self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
-        elif self.run_opts.depth_decoder_name == "dpt" or "dpt" in self.run_opts.depth_decoder_name :
+        elif self.run_opts.depth_decoder_name == "dpt":
             self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)

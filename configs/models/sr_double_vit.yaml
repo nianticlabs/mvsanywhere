@@ -25,5 +25,5 @@ image_height: 480
 val_image_width: 640
 val_image_height: 480
 matching_scale: 0.25
-prediction_scale: 0.875
+prediction_scale: 1.0
 model_type: depth_model

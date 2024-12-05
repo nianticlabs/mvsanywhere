@@ -221,11 +221,6 @@ class DPTHead(nn.Module):
                 stride=2,
                 padding=1)
         ])
-
-        # self.cv_feat_fusers = nn.ModuleList([
-        #     double_basic_block(out_channels[i] + cv_encoder_feat_channels[i], out_channels[i])
-        #     for i in range(len(out_channels))
-        # ])
         
         if self.use_clstoken:
             self.readout_projects = nn.ModuleList()
@@ -256,7 +251,7 @@ class DPTHead(nn.Module):
             [
                 nn.Sequential(
                     nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                    nn.Upsample(scale_factor=(14 / 2 ** i) / 8, mode='bilinear', align_corners=True),
+                    nn.Upsample(scale_factor=(16 / 2 ** i) / 8, mode='bilinear', align_corners=True),
                     nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
                     nn.ReLU(True),
                     nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),

@@ -32,7 +32,7 @@ dependencies:
     - trimesh # mesh loading/storage, and mesh generation
     - transforms3d # for NeuralRecon's arkit
     - einops # batching one liners
-    - moviepy # storing videos
+    - moviepy==1.0.3 # storing videos
     - pyrender # rendering meshes
     - open3d==0.14.1 # mesh fusion
     - scipy # transformations and a few others
