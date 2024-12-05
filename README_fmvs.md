@@ -13,11 +13,18 @@ python -m pip install -e .
 ## Models
 
 HERO 480x640 MLP (No R Norm):
-`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/ablation_mlp_allsynth_hr_no_rnorm/TorchTrainer_90e3d_00000_0_2024-11-16_01-38-42/checkpoint_000014/checkpoint.ckpt`
+```
+/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/ablation_mlp_allsynth_hr_no_rnorm/TorchTrainer_90e3d_00000_0_2024-11-16_01-38-42/checkpoint_000014/checkpoint.ckpt
+```
+
 HERO 480x640 w/o metadata:
-`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/hero_2_dot_allsynth_hr/TorchTrainer_67530_00000_0_2024-11-11_10-26-02/checkpoint_000014/checkpoint.ckpt`
+```
+/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/hero_2_dot_allsynth_hr/TorchTrainer_67530_00000_0_2024-11-11_10-26-02/checkpoint_000014/checkpoint.ckpt
+```
 Other models (follow experiment name for clue on what they are, or check code inside the experiment):
-`/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/*`
+```
+/mnt/nas3/shared/projects/fmvs/fmvs/logs/ray/*
+```
 
 
 ## Train:

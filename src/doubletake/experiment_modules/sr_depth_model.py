@@ -189,8 +189,8 @@ class DepthModel(pl.LightningModule):
             self.depth_decoder = DepthDecoderPP(dec_num_input_ch, num_output_channels=self.run_opts.matching_num_depth_bins)
         elif self.run_opts.depth_decoder_name == "skip":
             self.depth_decoder = SkipDecoderRegression(dec_num_input_ch)
-        elif self.run_opts.depth_decoder_name == "dpt":
-            self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name)
+        elif self.run_opts.depth_decoder_name == "dpt" or "dpt" in self.run_opts.depth_decoder_name:
+            self.depth_decoder = DPTHead(model_name=self.run_opts.image_encoder_name, prediction_scale=self.run_opts.prediction_scale)
             if self.run_opts.da_weights_path is not None:
                 self.depth_decoder.load_da_weights(self.run_opts.da_weights_path)
         else:

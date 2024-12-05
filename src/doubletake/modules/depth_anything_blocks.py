@@ -177,6 +177,7 @@ class DPTHead(nn.Module):
     def __init__(
             self,
             model_name='dinov2_vits14',
+            prediction_scale=1.0,
             nclass=1,
             use_clstoken=False,
             use_bn=False
@@ -251,7 +252,7 @@ class DPTHead(nn.Module):
             [
                 nn.Sequential(
                     nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1),
-                    nn.Upsample(scale_factor=(16 / 2 ** i) / 8, mode='bilinear', align_corners=True),
+                    nn.Upsample(scale_factor=(16 * prediction_scale / 2 ** i) / 8, mode='bilinear', align_corners=True),
                     nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
                     nn.ReLU(True),
                     nn.Conv2d(head_features_2, nclass, kernel_size=1, stride=1, padding=0),
