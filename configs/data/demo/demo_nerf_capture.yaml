@@ -1,0 +1,9 @@
+!!python/object:mvsanywhere.options.DataOptions
+dataset_path: /path/to/nerf_capture/data/
+tuple_info_file_location: /path/to/nerf_capture/data/
+dataset_scan_split_file: /path/to/nerf_capture/data/scans.txt
+dataset: nerf
+mv_tuple_file_suffix: _eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: test

@@ -1,0 +1,5 @@
+!!python/object:mvsanywhere.options.DataOptions
+dataset: nerfstudio
+num_images_in_tuple: 8
+frame_tuple_type: dense_offline
+split: test

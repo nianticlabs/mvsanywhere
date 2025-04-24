@@ -1,0 +1,43 @@
+name: mvsanywhere
+channels:
+  - default
+  - pytorch
+  - nvidia/label/cuda-11.8.0
+  - conda-forge
+  - pytorch3d
+dependencies:
+  - cmake==3.22.3
+  - gxx==11.4
+  - python==3.10.14
+  - pytorch==2.1.2
+  - eigen==3.4.0
+  - numpy==1.26
+  - setuptools==69.5.1
+  - protobuf==3.20.3
+  - pytorch-cuda==11.8
+  - torchvision==0.16.2
+  - cuda-toolkit==11.8.0
+  - cuda-runtime=11.8.0
+  - lightning=2.2
+  - pytorch3d==0.7.8
+  - colmap==3.8=gpu*
+  - pip
+  - pip:
+    - kornia==0.6.7
+    - open3d==0.16.0
+    - gsplat==1.0.0
+    - nerfstudio==1.1.2
+    - antialiased-cnns # anti aliased resnet
+    - efficientnet_pytorch
+    - timm # efficent
+    - trimesh # mesh loading/storage, and mesh generation
+    - transforms3d # for NeuralRecon's arkit
+    - einops # batching one liners
+    - moviepy==1.0.3 # storing videos
+    - loguru==0.7.2
+    - opencv-python-headless==4.9.0.80
+    - ninja==1.11.1.1
+    - pandas
+    # For RMVD
+    - pytoml
+    - easydict

@@ -1,0 +1,30 @@
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "kornia.*",
+    "torchvision.transforms.*",
+    "torchvision.*",
+    "lightning.*",
+    "mediapipe.*",
+    "cv2.*",
+    "PIL.*",
+    "tqdm.*",
+    "matplotlib.*",
+    "absl.*",
+    "ray.*",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]

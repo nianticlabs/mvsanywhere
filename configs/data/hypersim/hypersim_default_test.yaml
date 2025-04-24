@@ -1,0 +1,10 @@
+!!python/object:mvsanywhere.options.DataOptions
+dataset_path: /mnt/nas3/shared/datasets/hypersim/raw/
+tuple_info_file_location: data_splits/hypersim/standard_split/
+dataset_scan_split_file: data_splits/hypersim/standard_split/test_files_all.json
+dataset: hypersim
+mv_tuple_file_suffix: _eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: test
+use_min_max_depth: True

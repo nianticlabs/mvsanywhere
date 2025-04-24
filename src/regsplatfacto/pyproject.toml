@@ -1,0 +1,19 @@
+[project]
+name = "regsplatfacto"
+version = "0.0.1"
+
+[tool.setuptools.packages.find]
+include = ["regsplatfacto*"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[project.entry-points.'nerfstudio.method_configs']
+regsplatfacto = 'regsplatfacto.regsplatfacto_config:regsplatfacto_method'
+
+[project.scripts]
+ns-render-for-meshing = "regsplatfacto.render_for_meshing:entrypoint"
+ns-meshing = "regsplatfacto.meshing:entrypoint"

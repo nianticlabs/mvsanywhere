@@ -1,0 +1,9 @@
+!!python/object:mvsanywhere.options.DataOptions
+dataset_path: /path/to/colmap_reconstructions/
+tuple_info_file_location: /path/to/colmap_reconstructions/
+dataset_scan_split_file: /path/to/colmap_reconstructions/scans.txt
+dataset: colmap
+mv_tuple_file_suffix: _eight_view_deepvmvs.txt
+num_images_in_tuple: 8
+frame_tuple_type: default
+split: test
