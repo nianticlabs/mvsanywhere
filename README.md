@@ -50,6 +50,11 @@ In the code directory, install the repo as a pip package:
 ```shell
 pip install -e .
 ```
+To use our Gaussian splatting regularization also install that module:
+
+```shell
+pip install -e src/regsplatfacto/
+```
 
 ## 📦 Pretrained Models
 
