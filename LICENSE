@@ -1,4 +1,4 @@
-Copyright © Niantic, Inc. 2024. Patent Pending.
+Copyright © Niantic, Inc. 2025. Patent Pending.
 
 All rights reserved.
 
@@ -8,7 +8,7 @@ All rights reserved.
 
 
 
-This Software is licensed under the terms of the following DoubleTake license
+This Software is licensed under the terms of the following MVSAnywhere license
 which allows for non-commercial use only. For any other use of the software not
 covered by the terms of this license, please contact partnerships@nianticlabs.com
 
@@ -30,16 +30,16 @@ defined and identified below.
     In this Agreement (“the Agreement”) the following words shall have the
 following meanings:
 
-    "Authors" shall mean M. Sayed, F. Aleotti, J. Watson, Z. Qureshi,
-G. Garcia-Hernando, G. Brostow, S. Vicente, M. Firman.
+    "Authors" shall mean S. Izquierdo, M. Sayed, M. Firman, G. Garcia-Hernando,
+D. Turmukhambetov, J. Civera, O. Mac Aodha, G. Brostow, and J. Watson
     "Licensee" Shall mean the person or organization agreeing to use the
 Software in accordance with these terms and conditions.
     "Licensor" shall mean Niantic Inc., a company organized and existing under
 the laws of Delaware, whose principal place of business is at 1 Ferry Building,
 Suite 200, San Francisco, 94111.
-    "Software" shall mean the DoubleTake Software uploaded by Licensor to the
-GitHub repository at https://github.com/nianticlabs/doubletake
-on September 1st 2022 in source code or object code form and any
+    "Software" shall mean the MVSAnywhere Software uploaded by Licensor to the
+GitHub repository at https://github.com/nianticlabs/mvsanywhere
+on April 25th 2025 in source code or object code form and any
 accompanying documentation as well as any modifications or additions uploaded
 to the same GitHub repository by Licensor.
 
@@ -169,9 +169,10 @@ commercialization payable to the Licensee, as the case may be).
     The Licensee shall acknowledge the Authors and use of the Software in the
 publication of any work that uses, or results that are achieved through, the
 use of the Software. The following citation shall be included in the
-acknowledgement: “DoubleTake: Geometry Guided Depth Estimation",
-by M. Sayed, F. Aleotti, J. Watson, Z. Qureshi, G. Garcia-Hernando, G. Brostow, S. Vicente, M. Firman,
-Proceedings of the European Conference on Computer Vision (ECCV), 2024”.
+acknowledgement: “MVSAnywhere: Zero Shot Multi-View Stereo",
+by S. Izquierdo, M. Sayed, M. Firman, G. Garcia-Hernando,
+D. Turmukhambetov, J. Civera, O. Mac Aodha, G. Brostow, and J. Watson
+Proceedings of the Computer Vision and Pattern Recognition (CVPR), 2025”.
 
 
 10. Governing Law.
