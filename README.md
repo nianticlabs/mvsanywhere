@@ -42,7 +42,7 @@ make install-mamba
 
 ```shell
 make create-mamba-env
-mamba activate mvsa
+mamba activate mvsanywhere
 ```
 
 In the code directory, install the repo as a pip package:
