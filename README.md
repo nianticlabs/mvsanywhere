@@ -7,6 +7,8 @@ A multi-view stereo depth estimation model which works anywhere, in any scene, w
 > [Sergio Izquierdo](https://serizba.github.io/), [Mohamed Sayed](https://masayed.com), [Michael Firman](http://www.michaelfirman.co.uk), [Guillermo Garcia-Hernando](https://guiggh.github.io/), [Daniyar Turmukhambetov](https://dantkz.github.io/about/), [Javier Civera](http://webdiis.unizar.es/~jcivera/), [Oisin Mac Aodha](https://homepages.inf.ed.ac.uk/omacaod/), [Gabriel Brostow](http://www0.cs.ucl.ac.uk/staff/g.brostow/) and [Jamie Watson](https://www.linkedin.com/in/jamie-watson-544825127/).
 > [Paper, CVPR 2025 (arXiv pdf)](https://arxiv.org/abs/2503.22430), [Project Page](https://nianticlabs.github.io/mvsanywhere/)
 
+https://github.com/user-attachments/assets/d35b93f7-5f0e-4fbd-b991-bc4e7a45f2b6
+
 This code is for non-commercial use; please see the [license file](LICENSE) for terms. If you do find any part of this codebase helpful, please cite our paper using the BibTex below and link this repo. Thanks!
 
 ## Table of Contents
@@ -190,30 +192,46 @@ python src/mvsanywhere/run_demo.py \
 
 ## Running Gaussian splatting with MVSAnywhere regularisation!
 
+https://github.com/user-attachments/assets/12a6bb3f-fe9c-48ed-8982-e55c59dfd14d
+
 We release code `regsplatfacto` to run splatting using MVSAnywhere depths as regularisation. This is heavily inspired by techniques such as [DN-Splatter](https://maturk.github.io/dn-splatter/) and [VCR-Gauss](https://hlinchen.github.io/projects/VCR-GauS/).
 
 You can use any data in the nerfstudio format - e.g. existing nerfstudio data, or data from the 3 sources listed above.
 
-If you are using data which has camera distortion, you will need to run our script `scripts/data_scripts/undistort_nerfstudio_data.py`. 
+If you are using data which has camera distortion, you will need to run our script `scripts/data_scripts/undistort_nerfstudio_data.py`:
+```shell
+python3 scripts/data_scripts/undistort_nerfstudio_data.py \
+    --data-dir /path/to/input/scene \
+    --output-dir /path/to/output/scene
+```
 
 Additionally, the [NeRF Capture](https://github.com/jc211/NeRFCapture) app saves frame metadata without file extension. To run splatting you will need to run our script `scripts/data_scripts/fix_nerfcapture_filenames.py`.
 
 To train a splat, you can use 
 ```shell
-ns-train regsplatfacto --data path/to/data  --experiment-name fmvs-splatting --pipeline.datamanager.load_weights_from_checkpoint path/to/model --pipeline.model.use-skybox False
+ns-train regsplatfacto \
+    --data path/to/data \
+    --experiment-name mvsanywhere-splatting \
+    --pipeline.datamanager.load_weights_from_checkpoint path/to/model \
+    --pipeline.model.use-skybox False
 ```
-This will first run mvsanywhere inference and save outputs to disk, before training your splat. 
+This will first run mvsanywhere inference and save outputs to disk, and then start training your splat. 
 
-If your data was captured with a phone in portrait mode, you can append the flag `--pipeline.datamanager.rotate_images True`.
-
-If your data contains a lot of sky, you can try adding a background skybox using `--pipeline.model.use-skybox True`.
+> Tips:
+> * If your data was captured with a phone in portrait mode, you can append the flag `--pipeline.datamanager.rotate_images True`.
+> * If your data contains a lot of sky, you can try adding a background skybox using `--pipeline.model.use-skybox True`.
 
 Once you have a splat, you can extract a mesh using TSDF fusion, using
 ```shell
-ns-render-for-meshing --load-config /path/to/splat/config --rescale_to_world True --output_path /path/to/render/outputs
-```
-```shell
-ns-meshing --renders-path /path/to/render/outputs  --max_depth 20.0  --save-name mvsanywhere_mesh  --voxel_size 0.04
+ns-render-for-meshing \
+    --load-config /path/to/splat/config \
+    --rescale_to_world True \
+    --output_path /path/to/render/outputs
+ns-meshing \
+    --renders-path /path/to/render/outputs \
+    --max_depth 20.0  \
+    --save-name mvsanywhere_mesh  \
+    --voxel_size 0.04
 ```
 If you are running on a scene reconstructed without metric scale (e.g. COLMAP), then you will need to adjust the `max_depth` and `voxel_size` to be something sensible for your scale.
 
