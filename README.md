@@ -5,6 +5,7 @@ A multi-view stereo depth estimation model which works anywhere, in any scene, w
 > **MVSAnywhere: Zero Shot Multi-View Stereo**
 >
 > [Sergio Izquierdo](https://serizba.github.io/), [Mohamed Sayed](https://masayed.com), [Michael Firman](http://www.michaelfirman.co.uk), [Guillermo Garcia-Hernando](https://guiggh.github.io/), [Daniyar Turmukhambetov](https://dantkz.github.io/about/), [Javier Civera](http://webdiis.unizar.es/~jcivera/), [Oisin Mac Aodha](https://homepages.inf.ed.ac.uk/omacaod/), [Gabriel Brostow](http://www0.cs.ucl.ac.uk/staff/g.brostow/) and [Jamie Watson](https://www.linkedin.com/in/jamie-watson-544825127/).
+> 
 > [Paper, CVPR 2025 (arXiv pdf)](https://arxiv.org/abs/2503.22430), [Project Page](https://nianticlabs.github.io/mvsanywhere/)
 
 https://github.com/user-attachments/assets/d35b93f7-5f0e-4fbd-b991-bc4e7a45f2b6
