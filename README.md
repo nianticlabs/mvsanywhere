@@ -93,7 +93,7 @@ CUDA_VISIBLE_DEVICES=0 python src/mvsanywhere/run_demo.py \
 
 This will output meshes, quick depth viz, and socres when benchmarked against LiDAR depth under `OUTPUT_PATH`. 
 
-If you run out of GPU memory, you can try removing the `--fast_cost_colume` flag.
+If you run out of GPU memory, you can try removing the `--fast_cost_volume` flag.
 
 ## Running on recordings from your own device!
 
